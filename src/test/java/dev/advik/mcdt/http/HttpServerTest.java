@@ -139,12 +139,18 @@ class HttpServerTest {
 				HttpResponse.BodyHandlers.ofString()
 		);
 
-		// Client tick drains the queue
-		Thread.sleep(50); // let request reach the queue
-		int drained = queue.drain(TimeUnit.MILLISECONDS.toNanos(100));
+		// Client tick drains the queue until the dispatched request is processed
+		int drained = 0;
+		long deadline = System.currentTimeMillis() + 5000;
+		while (drained == 0 && System.currentTimeMillis() < deadline) {
+			drained += queue.drain(TimeUnit.MILLISECONDS.toNanos(100));
+			if (drained == 0) {
+				Thread.sleep(10);
+			}
+		}
 		assertEquals(1, drained);
 
-		HttpResponse<String> res = asyncRes.get(2, TimeUnit.SECONDS);
+		HttpResponse<String> res = asyncRes.get(5, TimeUnit.SECONDS);
 		assertEquals(200, res.statusCode());
 		assertEquals("1", res.headers().firstValue("X-MCDT-Tick").orElse(null));
 
