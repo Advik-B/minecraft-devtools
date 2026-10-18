@@ -1,34 +1,26 @@
 {
 	"schemaVersion": 1,
-	"id": "minecraft-devtools",
+	"id": "mcdt",
 	"version": "${version}",
 	"name": "Minecraft DevTools",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "Local REST and WebSocket API for the live Minecraft 1.21.4 client.",
 	"authors": [
-		"Me!"
+		"Advik"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"sources": "https://github.com/Advik/minecraft-devtools"
 	},
 	"license": "CC0-1.0",
-	"icon": "assets/minecraft-devtools/icon.png",
-	"environment": "*",
+	"icon": "assets/mcdt/icon.png",
+	"environment": "client",
 	"entrypoints": {
-		"main": [
-			"dev.advik.mcdt.MinecraftDevTools"
-		],
 		"client": [
 			"dev.advik.mcdt.client.MinecraftDevToolsClient"
 		]
 	},
-	"mixins": [
-		"minecraft-devtools.mixins.json",
-		{
-			"config": "minecraft-devtools.client.mixins.json",
-			"environment": "client"
-		}
-	],
+	"suggests": {
+		"baritone": "1.13.1"
+	},
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~1.21.4",

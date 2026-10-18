@@ -46,7 +46,7 @@ MCDT picks libraries for developer experience and capability, not jar size: Fabr
 | Game version | 1.21.4 | Current target; port forward later |
 | Java | 21 | Required by 1.21.x |
 | Mappings | Mojang official + Parchment layer | Names match the game and wider ecosystem; Parchment adds parameter names and Javadoc |
-| HTTP and WebSocket | Javalin 6 on Jetty 12 | Mature routing, WebSocket, server-sent events, validation, and access logs out of the box |
+| HTTP and WebSocket | Javalin 7 on Jetty 12 | Mature routing, WebSocket, server-sent events, validation, and access logs out of the box |
 | JSON | Jackson | Annotations, polymorphic types, streaming writes for large responses |
 | API spec and docs | OpenAPI 3.1 generated from annotations (javalin-openapi), Scalar (bundled, version-pinned) at `/` | Spec never drifts from code; interactive docs in the browser |
 | High-level control | Baritone 1.13.1 (`baritone-api-fabric`) | Optional: features turn on when the user installs Baritone |
@@ -427,11 +427,13 @@ The hard target is that MCDT idle costs nothing measurable and MCDT under load c
 
 ## Implementation roadmap
 
-Build in seven milestones, read-only first and reflection writes late, so every release is useful and the risky parts land behind a security review.
-
-&#91;embedded content: MCDT roadmap · 6 milestones, each with a gate\]
-
-M1 alone is a usable 0.1 release. The reflection layer waits until M3 because it depends on the task queue, serializer, and permission model being proven first. M6, the MCP server, starts only after the REST API is frozen as v1. Dates are left open; set them once M0 shows how fast the scaffold comes together.
+- **M0 – Scaffold (Completed):** Build setup (Loom, Parchment mappings, Javalin 7 on Jetty 12, Jackson, jar-in-jar packaging), config store, token generation, owner-only discovery files, loopback HTTP server with Host/Origin/Bearer/RateLimit/Size filters, bounded TaskQueue drained on client tick under time budget, problem-JSON RFC 9457 error handling, `GET /v1/health`, offline Scalar docs at `/`, ReDoc at `/redoc`, and `/openapi.json`.
+- **M1 – Read-Only Client & World:** Curated read endpoints (`/v1/client`, `/v1/player`, `/v1/player/inventory`, `/v1/world`, `/v1/world/blocks`, `/v1/world/entities`, `/v1/screen`, `/v1/registries`, `/v1/options`), raycasting, and screenshot capture.
+- **M2 – Actions & Real Input:** Synthetic keyboard and mouse input injection, chat/commands, player look/move, screen slot actions, two-step confirmation flows.
+- **M3 – Reflection Layer (Read-Only):** Walk object graph from named roots, NameService (Mojang mappings download), HandleTable, path traversal.
+- **M4 – Event Streaming (WebSocket):** `/v1/events` WebSocket endpoint with ring buffer fan-out, clientbound packet stream.
+- **M5 – High-Level Control & Writes:** Reflection writes (`setField`, `invoke`), raw packet send, Baritone integration (goals, pathing, mining, following).
+- **M6 – Model Context Protocol (MCP):** Streamable HTTP MCP server at `/mcp` and stdio shim for LLM agents.
 
 ## MCP server (after v1)
 

@@ -1,0 +1,65 @@
+package dev.advik.mcdt.config;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * User settings, stored as {@code config/mcdt/config.json}. Missing fields keep their defaults, so older files
+ * upgrade in place.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class McdtConfig {
+	public static final int DEFAULT_PORT = 25580;
+
+	/** Start the HTTP server at all. */
+	public boolean enabled = true;
+	/** Preferred port; a random free port is used if it is taken. {@code MCDT_PORT} overrides it. */
+	public int preferredPort = DEFAULT_PORT;
+	/** Address to bind. Anything other than loopback exposes the API to the network. */
+	public String bindAddress = "127.0.0.1";
+	/** How long a request waits for the client thread before {@code 504}. */
+	public long requestTimeoutMs = 5_000;
+	/** Time the client thread may spend on queued tasks per tick. */
+	public long tickBudgetMicros = 2_000;
+	/** Maximum queued tasks before {@code 503}. */
+	public int queueCapacity = 256;
+	/** Highest permission level granted to API clients. */
+	public Permission permission = Permission.READ;
+	/** Extra browser origins allowed to call the API, e.g. {@code http://localhost:5173}. */
+	public List<String> originAllowlist = new ArrayList<>();
+	/** Whether the two-step quit endpoints may shut the game down. */
+	public boolean allowQuit = true;
+	/** Requests per second per token. */
+	public int rateLimitPerSecond = 200;
+	/** Largest accepted request body. */
+	public long maxRequestBytes = 1_048_576;
+
+	/** Clamps out-of-range values to safe ones. Returns {@code this}. */
+	public McdtConfig normalize() {
+		if (preferredPort < 0 || preferredPort > 65_535) {
+			preferredPort = DEFAULT_PORT;
+		}
+		if (bindAddress == null || bindAddress.isBlank()) {
+			bindAddress = "127.0.0.1";
+		}
+		requestTimeoutMs = clamp(requestTimeoutMs, 100, 120_000);
+		tickBudgetMicros = clamp(tickBudgetMicros, 100, 20_000);
+		queueCapacity = (int) clamp(queueCapacity, 1, 65_536);
+		rateLimitPerSecond = (int) clamp(rateLimitPerSecond, 1, 100_000);
+		maxRequestBytes = clamp(maxRequestBytes, 1_024, 64L * 1_048_576);
+		if (permission == null) {
+			permission = Permission.READ;
+		}
+		if (originAllowlist == null) {
+			originAllowlist = new ArrayList<>();
+		}
+		originAllowlist.removeIf(origin -> origin == null || origin.isBlank());
+		return this;
+	}
+
+	private static long clamp(long value, long min, long max) {
+		return Math.max(min, Math.min(max, value));
+	}
+}
