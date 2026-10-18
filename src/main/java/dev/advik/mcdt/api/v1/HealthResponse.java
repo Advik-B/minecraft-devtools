@@ -10,7 +10,8 @@ public record HealthResponse(
 		long tick,
 		QueueStats queue,
 		String baritone,
-		String permission
+		String permission,
+		long droppedEvents
 ) {
 	public record QueueStats(
 			int depth,

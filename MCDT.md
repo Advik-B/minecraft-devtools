@@ -431,7 +431,7 @@ The hard target is that MCDT idle costs nothing measurable and MCDT under load c
 - **M1 – Read-Only Client & World:** Curated read endpoints (`/v1/client`, `/v1/player`, `/v1/player/inventory`, `/v1/world`, `/v1/world/blocks`, `/v1/world/entities`, `/v1/screen`, `/v1/registries`, `/v1/options`), raycasting, and screenshot capture.
 - **M2 – Actions & Real Input:** Synthetic keyboard and mouse input injection, chat/commands, player look/move, screen slot actions, two-step confirmation flows.
 - **M3 – Reflection Layer (Read-Only):** Walk object graph from named roots, NameService (Mojang mappings download), HandleTable, path traversal.
-- **M4 – Event Streaming (WebSocket):** `/v1/events` WebSocket endpoint with ring buffer fan-out, clientbound packet stream.
+- **M4 – Event Streaming & Realtime Input (WebSocket) (Completed):** `/v1/events` WebSocket endpoint with lock-free ring buffer fan-out, clientbound packet stream, realtime input channels (`/v1/input/keys`, `/v1/input/mouse`), inventory stream (`/v1/player/inventory`), player status stream (`/v1/player/status`), and binary 3D viewer world stream (`/v1/world/stream`).
 - **M5 – High-Level Control & Writes:** Reflection writes (`setField`, `invoke`), raw packet send, Baritone integration (goals, pathing, mining, following).
 - **M6 – Model Context Protocol (MCP):** Streamable HTTP MCP server at `/mcp` and stdio shim for LLM agents.
 

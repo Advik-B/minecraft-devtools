@@ -83,7 +83,8 @@ public final class HealthHandler implements Handler {
 					queue.clock().current(),
 					queueStats,
 					env.baritone(),
-					config.permission.id()
+					config.permission.id(),
+					dev.advik.mcdt.events.EventHub.getInstance().totalDroppedEvents()
 			);
 
 			return Json.MAPPER.valueToTree(response);

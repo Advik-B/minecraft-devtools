@@ -33,7 +33,7 @@ public final class ConfigStore {
 		McdtConfig config = new McdtConfig();
 		if (Files.isRegularFile(file)) {
 			try {
-				config = Json.MAPPER.readValue(file.toFile(), McdtConfig.class);
+				config = Json.MAPPER.readValue(Files.readString(file), McdtConfig.class);
 			} catch (IOException e) {
 				Path backup = file.resolveSibling(file.getFileName() + ".bak");
 				Mcdt.LOGGER.warn("MCDT config {} is malformed ({}); moved it to {} and using defaults",

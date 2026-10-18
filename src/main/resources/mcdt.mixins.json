@@ -7,7 +7,11 @@
     "ChatComponentAccessor",
     "KeyboardHandlerAccessor",
     "MinecraftAccessor",
-    "MouseHandlerAccessor"
+    "MouseHandlerAccessor",
+    "MinecraftMixin",
+    "ClientLevelMixin",
+    "ConnectionMixin",
+    "LocalPlayerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

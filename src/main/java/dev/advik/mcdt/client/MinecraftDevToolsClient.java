@@ -27,8 +27,50 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 		ClientLifecycleEvents.CLIENT_STARTED.register(this::onClientStarted);
 		ClientTickEvents.END_CLIENT_TICK.register(this::onEndClientTick);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(this::onClientStopping);
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+			String dimension = client.level != null ? client.level.dimension().location().toString() : "unknown";
+			boolean isSingleplayer = client.isSingleplayer();
+			dev.advik.mcdt.events.EventHub.getInstance().publish("world.join", java.util.Map.of(
+					"dimension", dimension,
+					"singleplayer", isSingleplayer
+			));
+		});
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 			dev.advik.mcdt.reflection.HandleTable.getInstance().clear();
+			dev.advik.mcdt.events.EventHub.getInstance().publish("world.leave", java.util.Map.of(
+					"reason", "disconnect"
+			));
+		});
+		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> {
+			dev.advik.mcdt.events.EventHub.getInstance().publish("chat", java.util.Map.of(
+					"text", message.getString(),
+					"type", "chat"
+			));
+		});
+		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
+			dev.advik.mcdt.events.EventHub.getInstance().publish("chat", java.util.Map.of(
+					"text", message.getString(),
+					"overlay", overlay,
+					"type", "game"
+			));
+		});
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> {
+			String type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
+			dev.advik.mcdt.events.EventHub.getInstance().publish("entity.spawn", java.util.Map.of(
+					"id", entity.getId(),
+					"uuid", entity.getUUID().toString(),
+					"type", type,
+					"x", entity.getX(),
+					"y", entity.getY(),
+					"z", entity.getZ()
+			));
+		});
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> {
+			dev.advik.mcdt.events.EventHub.getInstance().publish("entity.remove", java.util.Map.of(
+					"id", entity.getId(),
+					"uuid", entity.getUUID().toString(),
+					"reason", entity.getRemovalReason() != null ? entity.getRemovalReason().name() : "DISCARDED"
+			));
 		});
 	}
 
@@ -81,6 +123,8 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 		McdtCore instance = core;
 		if (instance != null) {
 			instance.queue().clock().advance();
+			long currentTick = instance.queue().clock().current();
+			dev.advik.mcdt.events.EventHub.getInstance().publish("tick", currentTick, java.util.Map.of("tick", currentTick));
 			long budgetNanos = TimeUnit.MICROSECONDS.toNanos(instance.config().tickBudgetMicros);
 			instance.queue().drain(budgetNanos);
 		}

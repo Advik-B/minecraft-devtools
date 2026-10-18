@@ -35,6 +35,10 @@ public final class McdtConfig {
 	public int rateLimitPerSecond = 200;
 	/** Largest accepted request body. */
 	public long maxRequestBytes = 1_048_576;
+	/** Capacity of the lock-free event ring buffer. */
+	public int eventRingBufferSize = 4_096;
+	/** Capacity of each WebSocket subscriber's outgoing event queue. */
+	public int eventSubscriberQueueCapacity = 256;
 
 	/** Clamps out-of-range values to safe ones. Returns {@code this}. */
 	public McdtConfig normalize() {
@@ -49,6 +53,8 @@ public final class McdtConfig {
 		queueCapacity = (int) clamp(queueCapacity, 1, 65_536);
 		rateLimitPerSecond = (int) clamp(rateLimitPerSecond, 1, 100_000);
 		maxRequestBytes = clamp(maxRequestBytes, 1_024, 64L * 1_048_576);
+		eventRingBufferSize = (int) clamp(eventRingBufferSize, 64, 65_536);
+		eventSubscriberQueueCapacity = (int) clamp(eventSubscriberQueueCapacity, 16, 4_096);
 		if (permission == null) {
 			permission = Permission.READ;
 		}

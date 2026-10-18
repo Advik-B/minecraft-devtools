@@ -141,7 +141,10 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.post("/v1/screen/slots", new ScreenSlotsHandler(config, queue, gameClient), McdtRole.ACT);
 
 			cfg.routes.post("/v1/session/quit", new QuitHandler(config, confirmManager), McdtRole.ACT);
-			cfg.routes.post("/v1/session/quit/confirm", new QuitConfirmHandler(config, confirmManager, gameClient, () -> onQuitCallback.run()), McdtRole.ACT);
+			cfg.routes.post("/v1/session/quit/confirm", new QuitConfirmHandler(config, confirmManager, gameClient, () -> {
+				dev.advik.mcdt.events.EventHub.getInstance().closeAll(1001, "Server shutting down (quit)");
+				onQuitCallback.run();
+			}), McdtRole.ACT);
 
 			// --- Milestone M3 Reflection Routes ---
 			HandleTable handleTable = HandleTable.getInstance();
@@ -156,6 +159,15 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/objects/{handle}/fields/{name}", new ObjectFieldHandler(config, queue, gameClient, handleTable, reflectionCache, reflectionSerializer), McdtRole.READ);
 			cfg.routes.get("/v1/classes/{name}", new ClassInspectHandler(config, queue, nameService, reflectionSerializer), McdtRole.READ);
 			cfg.routes.delete("/v1/objects/{handle}", new ObjectDeleteHandler(handleTable), McdtRole.READ);
+
+			// --- Milestone M4 WebSocket Routes ---
+			dev.advik.mcdt.events.EventHub eventHub = dev.advik.mcdt.events.EventHub.getInstance();
+			cfg.routes.ws("/v1/events", new EventsWsHandler(config, token, boundPort::get, eventHub));
+			cfg.routes.ws("/v1/input/keys", new InputKeysWsHandler(config, token, boundPort::get, queue, gameClient));
+			cfg.routes.ws("/v1/input/mouse", new InputMouseWsHandler(config, token, boundPort::get, queue, gameClient));
+			cfg.routes.ws("/v1/player/inventory", new InventoryWsHandler(config, token, boundPort::get, queue, gameClient));
+			cfg.routes.ws("/v1/player/status", new PlayerStatusWsHandler(config, token, boundPort::get, queue, gameClient));
+			cfg.routes.ws("/v1/world/stream", new WorldStreamWsHandler(config, token, boundPort::get, queue, gameClient));
 
 			// Exception handling -> RFC 9457 Problem JSON
 			cfg.routes.exception(ProblemException.class, (e, ctx) -> {
@@ -275,6 +287,7 @@ public final class HttpServer implements AutoCloseable {
 	@Override
 	public void close() {
 		try {
+			dev.advik.mcdt.events.EventHub.getInstance().closeAll(1000, "Server stopping");
 			app.stop();
 		} catch (Exception e) {
 			Mcdt.LOGGER.warn("Error stopping Javalin server: {}", e.getMessage());

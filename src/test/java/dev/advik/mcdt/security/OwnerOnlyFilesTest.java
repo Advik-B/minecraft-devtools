@@ -26,5 +26,8 @@ class OwnerOnlyFilesTest {
 		OwnerOnlyFiles.write(target, newContent);
 
 		assertArrayEquals(newContent, Files.readAllBytes(target));
+
+		Files.deleteIfExists(target);
+		Files.deleteIfExists(target.getParent());
 	}
 }
