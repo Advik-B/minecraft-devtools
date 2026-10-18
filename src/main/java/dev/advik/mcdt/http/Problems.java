@@ -17,6 +17,13 @@ public final class Problems {
 	public static final String METHOD_NOT_ALLOWED = "method-not-allowed";
 	public static final String SHUTTING_DOWN = "shutting-down";
 	public static final String INTERNAL = "internal";
+	public static final String NO_PLAYER = "no-player";
+	public static final String NO_WORLD = "no-world";
+	public static final String BLOCKS_LIMIT_EXCEEDED = "blocks-limit-exceeded";
+	public static final String INVALID_COORDINATES = "invalid-coordinates";
+	public static final String REGISTRY_NOT_FOUND = "registry-not-found";
+	public static final String INVALID_PARAMETER = "invalid-parameter";
+	public static final String SCREENSHOT_FAILED = "screenshot-failed";
 
 	private Problems() {
 	}
@@ -61,6 +68,35 @@ public final class Problems {
 
 	public static ProblemException internal(String detail) {
 		return of(500, INTERNAL, "Internal error", detail);
+	}
+
+	public static ProblemException noPlayer() {
+		return of(409, NO_PLAYER, "No player loaded", "The client is not currently connected to a world with a player.");
+	}
+
+	public static ProblemException noWorld() {
+		return of(409, NO_WORLD, "No world loaded", "The client is not currently connected to a world or server.");
+	}
+
+	public static ProblemException blocksLimitExceeded(long count, int limit) {
+		return of(400, BLOCKS_LIMIT_EXCEEDED, "Blocks limit exceeded",
+				"Requested " + count + " blocks, which exceeds the limit of " + limit + " blocks.");
+	}
+
+	public static ProblemException invalidCoordinates(String detail) {
+		return of(400, INVALID_COORDINATES, "Invalid coordinates", detail);
+	}
+
+	public static ProblemException registryNotFound(String registry) {
+		return of(404, REGISTRY_NOT_FOUND, "Registry not found", "Registry '" + registry + "' does not exist.");
+	}
+
+	public static ProblemException invalidParameter(String name, String detail) {
+		return of(400, INVALID_PARAMETER, "Invalid parameter: " + name, detail);
+	}
+
+	public static ProblemException screenshotFailed(String detail) {
+		return of(500, SCREENSHOT_FAILED, "Screenshot failed", detail);
 	}
 
 	public static ProblemException of(int status, String type, String title, String detail) {

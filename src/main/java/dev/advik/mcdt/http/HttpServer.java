@@ -2,7 +2,9 @@ package dev.advik.mcdt.http;
 
 import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.McdtEnvironment;
-import dev.advik.mcdt.api.v1.HealthHandler;
+import dev.advik.mcdt.api.v1.*;
+import dev.advik.mcdt.game.GameClient;
+import dev.advik.mcdt.game.MinecraftGameClient;
 import dev.advik.mcdt.config.ConfigStore;
 import dev.advik.mcdt.config.McdtConfig;
 import dev.advik.mcdt.docs.DocsRoutes;
@@ -32,6 +34,7 @@ public final class HttpServer implements AutoCloseable {
 	private final BearerToken token;
 	private final TaskQueue queue;
 	private final RequestLogWriter logWriter;
+	private final GameClient gameClient;
 	private final Javalin app;
 	private final AtomicInteger boundPort = new AtomicInteger();
 
@@ -43,11 +46,24 @@ public final class HttpServer implements AutoCloseable {
 			RequestLogWriter logWriter,
 			Map<String, String> envOverrides
 	) {
+		this(env, config, token, queue, logWriter, envOverrides, MinecraftGameClient.getInstance());
+	}
+
+	public HttpServer(
+			McdtEnvironment env,
+			McdtConfig config,
+			BearerToken token,
+			TaskQueue queue,
+			RequestLogWriter logWriter,
+			Map<String, String> envOverrides,
+			GameClient gameClient
+	) {
 		this.env = env;
 		this.config = config;
 		this.token = token;
 		this.queue = queue;
 		this.logWriter = logWriter;
+		this.gameClient = gameClient;
 
 		int targetPort = ConfigStore.effectivePort(config, envOverrides);
 		RateLimiter rateLimiter = new RateLimiter(config.rateLimitPerSecond);
@@ -87,6 +103,19 @@ public final class HttpServer implements AutoCloseable {
 
 			HealthHandler healthHandler = new HealthHandler(env, config, queue);
 			cfg.routes.get("/v1/health", healthHandler, McdtRole.READ);
+
+			cfg.routes.get("/v1/client", new ClientHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/player", new PlayerHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/player/inventory", new InventoryHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/world", new WorldHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/world/blocks", new BlocksHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/world/entities", new EntitiesHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/world/raycast", new RaycastHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/screen", new ScreenHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/registries", new RegistriesHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/registries/{registry}", new RegistryEntriesHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/options", new OptionsHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/screenshot", new ScreenshotHandler(config, queue, gameClient), McdtRole.READ);
 
 			// Exception handling -> RFC 9457 Problem JSON
 			cfg.routes.exception(ProblemException.class, (e, ctx) -> {

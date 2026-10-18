@@ -16,12 +16,9 @@ repositories {
 }
 
 loom {
-	splitEnvironmentSourceSets()
-
 	mods {
 		register("mcdt") {
 			sourceSet(sourceSets.main.get())
-			sourceSet(sourceSets.getByName("client"))
 		}
 	}
 }
