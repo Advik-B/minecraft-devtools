@@ -5,6 +5,7 @@ import java.security.MessageDigest
 plugins {
 	id("net.fabricmc.fabric-loom-remap")
 	`maven-publish`
+	jacoco
 }
 
 repositories {
@@ -131,6 +132,15 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.test {
 	useJUnitPlatform()
 	systemProperty("jdk.httpclient.allowRestrictedHeaders", "host,origin")
+	finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+	dependsOn(tasks.test)
+	reports {
+		xml.required.set(true)
+		html.required.set(true)
+	}
 }
 
 java {

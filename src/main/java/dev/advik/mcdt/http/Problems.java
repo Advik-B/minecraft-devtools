@@ -31,6 +31,12 @@ public final class Problems {
 	public static final String SLOT_OUT_OF_BOUNDS = "slot-out-of-bounds";
 	public static final String WIDGET_NOT_FOUND = "widget-not-found";
 	public static final String INVALID_ACTION = "invalid-action";
+	public static final String HANDLE_NOT_FOUND = "handle-not-found";
+	public static final String HANDLE_GONE = "handle-gone";
+	public static final String REFLECTION_DENIED = "reflection-denied";
+	public static final String CLASS_NOT_FOUND = "class-not-found";
+	public static final String FIELD_NOT_FOUND = "field-not-found";
+	public static final String PATH_EVALUATION_FAILED = "path-evaluation-failed";
 
 	private Problems() {
 	}
@@ -136,6 +142,43 @@ public final class Problems {
 
 	public static ProblemException invalidAction(String action, String detail) {
 		return of(400, INVALID_ACTION, "Invalid action: " + action, detail);
+	}
+
+	public static ProblemException handleNotFound(String handle) {
+		return of(404, HANDLE_NOT_FOUND, "Handle not found",
+				"Handle '" + handle + "' does not exist or has expired.");
+	}
+
+	public static ProblemException handleGone(String handle) {
+		return of(410, HANDLE_GONE, "Object collected",
+				"The object referenced by handle '" + handle + "' has been garbage collected.");
+	}
+
+	public static ProblemException reflectionDenied(String detail) {
+		return of(403, REFLECTION_DENIED, "Reflection denied", detail);
+	}
+
+	public static ProblemException classNotFound(String className) {
+		return of(404, CLASS_NOT_FOUND, "Class not found",
+				"Class '" + className + "' could not be loaded.");
+	}
+
+	public static ProblemException fieldNotFound(String fieldName, String className) {
+		return of(404, FIELD_NOT_FOUND, "Field not found",
+				"Field '" + fieldName + "' was not found on class '" + className + "'.");
+	}
+
+	public static ProblemException pathEvaluationFailed(String path, String detail) {
+		return of(400, PATH_EVALUATION_FAILED, "Path evaluation failed",
+				"Failed evaluating path '" + path + "': " + detail);
+	}
+
+	public static ProblemException badRequest(String detail) {
+		return of(400, BAD_REQUEST, "Bad request", detail);
+	}
+
+	public static ProblemException notFound(String detail) {
+		return of(404, NOT_FOUND, "Not found", detail);
 	}
 
 	public static ProblemException of(int status, String type, String title, String detail) {

@@ -1,0 +1,38 @@
+### MCDT World, Player & Screen Inspection
+@baseUrl = http://127.0.0.1:25580
+@token = test-token
+
+### 1. Player kinematics, health & stats (409 Conflict if in menu)
+GET {{baseUrl}}/v1/player
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 2. Player inventory (409 Conflict if in menu)
+GET {{baseUrl}}/v1/player/inventory
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 3. World environment & dimension info (409 Conflict if in menu)
+GET {{baseUrl}}/v1/world
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 4. Query block states in bounding box (409 Conflict if in menu)
+GET {{baseUrl}}/v1/world/blocks?from=0,60,0&to=5,65,5
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 5. Spatial entity lookup (409 Conflict if in menu)
+GET {{baseUrl}}/v1/world/entities?radius=32.0&limit=20
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 6. Raycast query (crosshair or arbitrary ray)
+GET {{baseUrl}}/v1/world/raycast?maxDistance=20.0
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 7. Active GUI screen & widget tree
+GET {{baseUrl}}/v1/screen
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580

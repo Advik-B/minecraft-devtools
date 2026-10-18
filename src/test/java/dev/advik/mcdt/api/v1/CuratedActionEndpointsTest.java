@@ -298,4 +298,27 @@ class CuratedActionEndpointsTest {
 		assertEquals(403, confirmRes.statusCode());
 		assertTrue(confirmRes.body().contains("quit-disabled"));
 	}
+
+	@Test
+	void testInvalidInputActionsReturnBadRequest() throws Exception {
+		// Invalid JSON payload
+		HttpResponse<String> keyRes = post("/v1/input/keys", "invalid-json-body");
+		assertEquals(400, keyRes.statusCode());
+
+		// Invalid mouse payload
+		HttpResponse<String> mouseRes = post("/v1/input/mouse", "invalid-json-body");
+		assertEquals(400, mouseRes.statusCode());
+
+		// Invalid chat payload (missing both message and command)
+		HttpResponse<String> chatRes = post("/v1/chat", "{}");
+		assertEquals(400, chatRes.statusCode());
+
+		// Invalid player action
+		HttpResponse<String> actRes = post("/v1/player/actions", "{\"action\":\"dance\"}");
+		assertEquals(400, actRes.statusCode());
+
+		// Hotbar slot out of bounds (< 0 or > 8)
+		HttpResponse<String> hotbarRes = post("/v1/player/actions", "{\"action\":\"select_hotbar\",\"slot\":15}");
+		assertEquals(400, hotbarRes.statusCode());
+	}
 }

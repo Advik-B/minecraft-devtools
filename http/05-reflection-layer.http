@@ -1,0 +1,63 @@
+### MCDT Milestone M3 Reflection Layer Endpoints
+@baseUrl = http://127.0.0.1:25580
+@token = test-token
+
+### 1. Named root handles (minecraft, player, level, screen, options, gameRenderer)
+GET {{baseUrl}}/v1/objects/roots
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 2. Inspect root 'minecraft' instance
+GET {{baseUrl}}/v1/objects/minecraft
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 3. Inspect root 'options' instance
+GET {{baseUrl}}/v1/objects/options
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 4. Inspect root 'gameRenderer' instance
+GET {{baseUrl}}/v1/objects/gameRenderer
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 5. Inspect root 'screen' instance (live TitleScreen when in menu)
+GET {{baseUrl}}/v1/objects/screen
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 6. Path traversal: query renderDistance on options from minecraft root
+GET {{baseUrl}}/v1/objects/minecraft?path=options.renderDistance().get()
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 7. Path traversal: query live client FPS
+GET {{baseUrl}}/v1/objects/minecraft?path=fps
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 8. Expand specific field 'options' on minecraft root
+GET {{baseUrl}}/v1/objects/minecraft/fields/options?depth=1
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 9. Static class inspection: net.minecraft.client.Minecraft
+GET {{baseUrl}}/v1/classes/net.minecraft.client.Minecraft
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 10. Static class inspection: java.lang.String
+GET {{baseUrl}}/v1/classes/java.lang.String
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 11. Security denylist verification: java.lang.Runtime (expected 403 Forbidden)
+GET {{baseUrl}}/v1/classes/java.lang.Runtime
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 12. Release handle (replace {{handle}} with an allocated h_... handle)
+DELETE {{baseUrl}}/v1/objects/h_12345678
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580

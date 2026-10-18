@@ -347,7 +347,14 @@ public class MockGameClient implements GameClient {
 			throw Problems.noPlayer();
 		}
 		this.lastPlayerAction = request;
-		String action = request.action() != null ? request.action() : "swing";
+		String action = request.action() != null ? request.action().toLowerCase() : "";
+		if ("select_hotbar".equals(action)) {
+			if (request.slot() == null || request.slot() < 0 || request.slot() > 8) {
+				throw Problems.invalidParameter("slot", "Hotbar slot index must be 0-8");
+			}
+		} else if (!java.util.Set.of("attack", "use", "stop_using", "swing", "pick_block", "swap_hands", "drop", "respawn", "interact_block", "interact_entity").contains(action)) {
+			throw Problems.invalidAction(action, "Unknown player action: " + action);
+		}
 		return new PlayerActionDto.Response(action, true, "Mock action " + action + " executed", 100L);
 	}
 
@@ -404,5 +411,74 @@ public class MockGameClient implements GameClient {
 	@Override
 	public void quitGame() {
 		this.quitCalled = true;
+	}
+
+	// --- Milestone M3 Reflection Roots ---
+
+	public static class MockInventory {
+		public final List<String> items = new ArrayList<>(List.of("minecraft:diamond_sword", "minecraft:shield"));
+		public List<String> getItems() { return items; }
+	}
+
+	public static class MockPlayer {
+		public final String name = "TestPlayer";
+		public final MockInventory inventory = new MockInventory();
+		public MockInventory getInventory() { return inventory; }
+	}
+
+	public static class MockMinecraft {
+		public int fps = 144;
+		public MockPlayer player = new MockPlayer();
+		public MockPlayer getPlayer() { return player; }
+	}
+
+	public static class MockLevel {
+		public final String dimension = "minecraft:overworld";
+	}
+
+	public static class MockScreen {
+		public final String title = "Inventory";
+	}
+
+	public static class MockOptions {
+		public int fov = 70;
+		public int renderDistance = 12;
+	}
+
+	public static class MockGameRenderer {
+		public boolean fovModified = false;
+	}
+
+	public final MockMinecraft mockMinecraft = new MockMinecraft();
+	public final MockPlayer mockPlayer = mockMinecraft.player;
+	public final MockLevel mockLevel = new MockLevel();
+	public final MockScreen mockScreen = new MockScreen();
+	public final MockOptions mockOptions = new MockOptions();
+	public final MockGameRenderer mockGameRenderer = new MockGameRenderer();
+
+	@Override
+	public Object getRootObject(String name) {
+		if (name == null) return null;
+		return switch (name) {
+			case "minecraft" -> mockMinecraft;
+			case "player" -> hasPlayer ? mockPlayer : null;
+			case "level" -> hasWorld ? mockLevel : null;
+			case "screen" -> isScreenOpen ? mockScreen : null;
+			case "options" -> mockOptions;
+			case "gameRenderer" -> mockGameRenderer;
+			default -> null;
+		};
+	}
+
+	@Override
+	public Map<String, Object> getRootObjects() {
+		Map<String, Object> roots = new java.util.LinkedHashMap<>();
+		roots.put("minecraft", mockMinecraft);
+		roots.put("player", hasPlayer ? mockPlayer : null);
+		roots.put("level", hasWorld ? mockLevel : null);
+		roots.put("screen", isScreenOpen ? mockScreen : null);
+		roots.put("options", mockOptions);
+		roots.put("gameRenderer", mockGameRenderer);
+		return roots;
 	}
 }

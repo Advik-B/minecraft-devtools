@@ -1,0 +1,44 @@
+### MCDT Client, Diagnostics, Options & Registries
+@baseUrl = http://127.0.0.1:25580
+@token = test-token
+
+### 1. Client engine & window diagnostics
+GET {{baseUrl}}/v1/client
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 2. Live game options
+GET {{baseUrl}}/v1/options
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 3. Patch options (e.g. FOV and render distance)
+PATCH {{baseUrl}}/v1/options
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "fov": 85,
+  "renderDistance": 12
+}
+
+### 4. Framebuffer screenshot capture (scale 0.5)
+GET {{baseUrl}}/v1/screenshot?scale=0.5
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 5. Enumerate built-in registries
+GET {{baseUrl}}/v1/registries
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 6. Query entries in minecraft:item registry
+GET {{baseUrl}}/v1/registries/minecraft:item?limit=10&query=diamond
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 7. Query entries in minecraft:block registry
+GET {{baseUrl}}/v1/registries/minecraft:block?limit=10
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580

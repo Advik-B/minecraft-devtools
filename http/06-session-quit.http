@@ -1,0 +1,18 @@
+### MCDT Two-Step Confirmation Safe Client Shutdown
+@baseUrl = http://127.0.0.1:25580
+@token = test-token
+
+### 1. Step 1: Request client shutdown (returns single-use confirmToken)
+POST {{baseUrl}}/v1/session/quit
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 2. Step 2: Confirm shutdown (pass the confirmToken from Step 1)
+POST {{baseUrl}}/v1/session/quit/confirm
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "confirmToken": "PASTE_CONFIRM_TOKEN_HERE"
+}

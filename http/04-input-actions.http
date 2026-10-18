@@ -1,0 +1,75 @@
+### MCDT Input Injection & Actions
+@baseUrl = http://127.0.0.1:25580
+@token = test-token
+
+### 1. Synthetic keyboard key tap (e.g. Escape key)
+POST {{baseUrl}}/v1/input/keys
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "key": "escape",
+  "action": "tap"
+}
+
+### 2. Synthetic keyboard text typing
+POST {{baseUrl}}/v1/input/keys
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "text": "Hello Minecraft"
+}
+
+### 3. Synthetic mouse move
+POST {{baseUrl}}/v1/input/mouse
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "action": "move",
+  "x": 400.0,
+  "y": 300.0
+}
+
+### 4. Synthetic mouse scroll wheel
+POST {{baseUrl}}/v1/input/mouse
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "action": "scroll",
+  "scrollDeltaY": 1.0
+}
+
+### 5. Chat history retrieval
+GET {{baseUrl}}/v1/chat?limit=20
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 6. Player orientation / look (requires player loaded)
+POST {{baseUrl}}/v1/player/look
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "yaw": 90.0,
+  "pitch": 0.0
+}
+
+### 7. Player movement input (requires player loaded)
+POST {{baseUrl}}/v1/player/move
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "forward": true,
+  "jump": false,
+  "ticks": 10
+}

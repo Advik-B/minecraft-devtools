@@ -27,6 +27,9 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 		ClientLifecycleEvents.CLIENT_STARTED.register(this::onClientStarted);
 		ClientTickEvents.END_CLIENT_TICK.register(this::onEndClientTick);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(this::onClientStopping);
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			dev.advik.mcdt.reflection.HandleTable.getInstance().clear();
+		});
 	}
 
 	private void onClientStarted(Minecraft client) {

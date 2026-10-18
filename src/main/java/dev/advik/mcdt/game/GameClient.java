@@ -50,4 +50,10 @@ public interface GameClient {
 	OptionsDto patchOptions(OptionsPatchDto request);
 
 	void quitGame();
+
+	// --- Milestone M3 Reflection Roots ---
+
+	Object getRootObject(String name);
+
+	java.util.Map<String, Object> getRootObjects();
 }

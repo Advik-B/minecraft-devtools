@@ -19,16 +19,20 @@ public final class TextSerializer {
 		if (component == null) {
 			return null;
 		}
-		Minecraft client = Minecraft.getInstance();
-		HolderLookup.Provider provider = null;
-		if (client != null) {
-			if (client.level != null) {
-				provider = client.level.registryAccess();
-			} else if (client.getConnection() != null) {
-				provider = client.getConnection().registryAccess();
+		try {
+			Minecraft client = Minecraft.getInstance();
+			HolderLookup.Provider provider = null;
+			if (client != null) {
+				if (client.level != null) {
+					provider = client.level.registryAccess();
+				} else if (client.getConnection() != null) {
+					provider = client.getConnection().registryAccess();
+				}
 			}
+			return toJson(component, provider);
+		} catch (Throwable t) {
+			return "{\"text\":\"" + component.getString().replace("\"", "\\\"") + "\"}";
 		}
-		return toJson(component, provider);
 	}
 
 	public static String toJson(Component component, HolderLookup.Provider provider) {

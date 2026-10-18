@@ -354,4 +354,37 @@ class CuratedReadEndpointsTest {
 			assertTrue(body.contains(route), "OpenAPI schema must contain route: " + route);
 		}
 	}
+
+	@Test
+	void getBlocksFailsOnMissingParams() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/world/blocks");
+		assertEquals(400, res.statusCode());
+	}
+
+	@Test
+	void getScreenshotFailsOnInvalidScale() throws Exception {
+		clock.advance();
+		HttpResponse<String> res1 = get("/v1/screenshot?scale=0.01");
+		assertEquals(400, res1.statusCode());
+		assertTrue(res1.body().contains("invalid-parameter"));
+
+		HttpResponse<String> res2 = get("/v1/screenshot?scale=not-a-number");
+		assertEquals(400, res2.statusCode());
+		assertTrue(res2.body().contains("invalid-parameter"));
+	}
+
+	@Test
+	void getEntitiesAndRaycastFailWhenNoWorld() throws Exception {
+		mockGameClient.hasWorld = false;
+		clock.advance();
+
+		HttpResponse<String> entRes = get("/v1/world/entities");
+		assertEquals(409, entRes.statusCode());
+		assertTrue(entRes.body().contains("no-world"));
+
+		HttpResponse<String> rayRes = get("/v1/world/raycast");
+		assertEquals(409, rayRes.statusCode());
+		assertTrue(rayRes.body().contains("no-world"));
+	}
 }

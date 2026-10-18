@@ -4,6 +4,16 @@ Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a 
 
 ## Features
 
+### Reflection Layer & Object Graph Inspection (Milestone M3)
+- **Named Root Inspection:** `GET /v1/objects/roots` exposing canonical root handles (`minecraft`, `player`, `level`, `screen`, `options`, `gameRenderer`).
+- **Object Graph Traversal:** `GET /v1/objects/{handle}` inspecting live object instances with depth-limited field evaluation, methods, and cycle detection.
+- **Path Traversal Queries:** `GET /v1/objects/{handle}?path=...` supporting dot-separated fields, zero-argument method calls (getters), and list/array/map indexing (e.g. `minecraft?path=player.getInventory().items[0]`).
+- **Targeted Field Expansion:** `GET /v1/objects/{handle}/fields/{name}` expanding individual object fields with configurable depth.
+- **Static Class Inspection:** `GET /v1/classes/{name}` inspecting static fields and methods of any non-denylisted class.
+- **Handle Lifecycle Management:** `DELETE /v1/objects/{handle}` releasing handles early; automatic 10-minute inactivity expiration, LRU eviction at 50,000 entries, and automatic flush on world disconnect.
+- **NameService Runtime Translation:** On-demand fetching and disk caching of official Mojang 1.21.4 client mappings, translating between runtime intermediary and Mojang names.
+- **Strict Security & Token Redaction:** Denylist blocking dangerous JVM reflection targets (`Runtime`, `ProcessBuilder`, `ClassLoader`, `java.lang.reflect.*`, `java.io.*`, `java.nio.file.*`, `java.net.*`, `Unsafe`), and automatic redaction of player session credentials (`accessToken`, `User` tokens).
+
 ### Actions & Real Input Injection (Milestone M2)
 - **Synthetic Keyboard Injection:** `POST /v1/input/keys` simulating GLFW key presses, releases, taps, and text typing sequences with keymapping and scancode resolution.
 - **Synthetic Mouse Injection:** `POST /v1/input/mouse` driving cursor movement, clicks (left/right/middle), presses, releases, and scroll wheel events.

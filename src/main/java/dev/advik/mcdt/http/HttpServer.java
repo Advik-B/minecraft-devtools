@@ -3,6 +3,7 @@ package dev.advik.mcdt.http;
 import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.McdtEnvironment;
 import dev.advik.mcdt.api.v1.*;
+import dev.advik.mcdt.reflection.*;
 import dev.advik.mcdt.game.GameClient;
 import dev.advik.mcdt.game.MinecraftGameClient;
 import dev.advik.mcdt.config.ConfigStore;
@@ -100,6 +101,7 @@ public final class HttpServer implements AutoCloseable {
 
 			// Register docs routes
 			cfg.routes.get("/", DocsRoutes.scalarHtml());
+			cfg.routes.get("/docs", DocsRoutes.scalarHtml());
 			cfg.routes.get("/docs/scalar/standalone.js", DocsRoutes.scalarJs());
 			cfg.routes.get("/assets/mcdt/icon.png", DocsRoutes.icon());
 
@@ -140,6 +142,20 @@ public final class HttpServer implements AutoCloseable {
 
 			cfg.routes.post("/v1/session/quit", new QuitHandler(config, confirmManager), McdtRole.ACT);
 			cfg.routes.post("/v1/session/quit/confirm", new QuitConfirmHandler(config, confirmManager, gameClient, () -> onQuitCallback.run()), McdtRole.ACT);
+
+			// --- Milestone M3 Reflection Routes ---
+			HandleTable handleTable = HandleTable.getInstance();
+			NameService nameService = new NameService();
+			nameService.initialize(env.configDir(), env.gameVersion());
+			ReflectionCache reflectionCache = new ReflectionCache(nameService);
+			PathEvaluator pathEvaluator = new PathEvaluator(reflectionCache);
+			ReflectionSerializer reflectionSerializer = new ReflectionSerializer(handleTable, nameService, reflectionCache);
+
+			cfg.routes.get("/v1/objects/roots", new ObjectsRootsHandler(config, queue, gameClient, nameService), McdtRole.READ);
+			cfg.routes.get("/v1/objects/{handle}", new ObjectInspectHandler(config, queue, gameClient, handleTable, pathEvaluator, reflectionSerializer), McdtRole.READ);
+			cfg.routes.get("/v1/objects/{handle}/fields/{name}", new ObjectFieldHandler(config, queue, gameClient, handleTable, reflectionCache, reflectionSerializer), McdtRole.READ);
+			cfg.routes.get("/v1/classes/{name}", new ClassInspectHandler(config, queue, nameService, reflectionSerializer), McdtRole.READ);
+			cfg.routes.delete("/v1/objects/{handle}", new ObjectDeleteHandler(handleTable), McdtRole.READ);
 
 			// Exception handling -> RFC 9457 Problem JSON
 			cfg.routes.exception(ProblemException.class, (e, ctx) -> {

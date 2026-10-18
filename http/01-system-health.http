@@ -1,0 +1,24 @@
+### MCDT System & Health Endpoints
+@baseUrl = http://127.0.0.1:25580
+@token = test-token
+
+### 1. Health check with Bearer authentication
+GET {{baseUrl}}/v1/health
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 2. Health check unauthorized (expected 401)
+GET {{baseUrl}}/v1/health
+Host: 127.0.0.1:25580
+
+### 3. OpenAPI 3.1 specification (public, no auth needed)
+GET {{baseUrl}}/openapi.json
+Host: 127.0.0.1:25580
+
+### 4. Interactive Scalar API documentation (public)
+GET {{baseUrl}}/
+Host: 127.0.0.1:25580
+
+### 5. ReDoc API documentation (public)
+GET {{baseUrl}}/redoc
+Host: 127.0.0.1:25580

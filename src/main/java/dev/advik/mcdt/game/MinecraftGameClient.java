@@ -1050,4 +1050,34 @@ public final class MinecraftGameClient implements GameClient {
 		}
 		return InteractionHand.MAIN_HAND;
 	}
+
+	@Override
+	public Object getRootObject(String name) {
+		if (name == null) {
+			return null;
+		}
+		Minecraft client = Minecraft.getInstance();
+		return switch (name) {
+			case "minecraft" -> client;
+			case "player" -> client.player;
+			case "level" -> client.level;
+			case "screen" -> client.screen;
+			case "options" -> client.options;
+			case "gameRenderer" -> client.gameRenderer;
+			default -> null;
+		};
+	}
+
+	@Override
+	public Map<String, Object> getRootObjects() {
+		Minecraft client = Minecraft.getInstance();
+		Map<String, Object> roots = new LinkedHashMap<>();
+		roots.put("minecraft", client);
+		roots.put("player", client.player);
+		roots.put("level", client.level);
+		roots.put("screen", client.screen);
+		roots.put("options", client.options);
+		roots.put("gameRenderer", client.gameRenderer);
+		return roots;
+	}
 }
