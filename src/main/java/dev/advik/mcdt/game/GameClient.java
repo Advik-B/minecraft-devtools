@@ -26,4 +26,28 @@ public interface GameClient {
 	OptionsDto getOptions();
 
 	byte[] captureScreenshot(float scale);
+
+	// --- Milestone M2 Actions ---
+
+	InputKeyDto.Response pressKey(InputKeyDto.Request request);
+
+	InputMouseDto.Response mouseInput(InputMouseDto.Request request);
+
+	ChatDto.SendResponse sendChat(ChatDto.SendRequest request);
+
+	ChatDto.HistoryResponse getChatHistory(int offset, int limit);
+
+	PlayerLookDto.Response setPlayerLook(PlayerLookDto.Request request);
+
+	PlayerMoveDto.Response setPlayerMove(PlayerMoveDto.Request request);
+
+	PlayerActionDto.Response performPlayerAction(PlayerActionDto.Request request);
+
+	ScreenActionDto.Response performScreenAction(ScreenActionDto.Request request);
+
+	ScreenSlotDto.Response clickScreenSlot(ScreenSlotDto.Request request);
+
+	OptionsDto patchOptions(OptionsPatchDto request);
+
+	void quitGame();
 }

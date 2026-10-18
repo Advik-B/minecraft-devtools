@@ -14,6 +14,7 @@ import dev.advik.mcdt.security.AccessFilter;
 import dev.advik.mcdt.security.BearerToken;
 import dev.advik.mcdt.security.McdtRole;
 import dev.advik.mcdt.security.RateLimiter;
+import dev.advik.mcdt.security.ConfirmManager;
 import io.javalin.Javalin;
 import io.javalin.http.HttpResponseException;
 import io.javalin.openapi.plugin.OpenApiPlugin;
@@ -37,6 +38,7 @@ public final class HttpServer implements AutoCloseable {
 	private final GameClient gameClient;
 	private final Javalin app;
 	private final AtomicInteger boundPort = new AtomicInteger();
+	private volatile Runnable onQuitCallback = () -> {};
 
 	public HttpServer(
 			McdtEnvironment env,
@@ -114,8 +116,30 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/screen", new ScreenHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/registries", new RegistriesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/registries/{registry}", new RegistryEntriesHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.get("/v1/options", new OptionsHandler(config, queue, gameClient), McdtRole.READ);
+
+			OptionsHandler optionsHandler = new OptionsHandler(config, queue, gameClient);
+			cfg.routes.get("/v1/options", optionsHandler, McdtRole.READ);
+			cfg.routes.patch("/v1/options", optionsHandler, McdtRole.ACT);
+
 			cfg.routes.get("/v1/screenshot", new ScreenshotHandler(config, queue, gameClient), McdtRole.READ);
+
+			ConfirmManager confirmManager = new ConfirmManager();
+			cfg.routes.post("/v1/input/keys", new InputKeysHandler(config, queue, gameClient), McdtRole.ACT);
+			cfg.routes.post("/v1/input/mouse", new InputMouseHandler(config, queue, gameClient), McdtRole.ACT);
+
+			ChatHandler chatHandler = new ChatHandler(config, queue, gameClient);
+			cfg.routes.post("/v1/chat", chatHandler, McdtRole.ACT);
+			cfg.routes.get("/v1/chat", chatHandler, McdtRole.READ);
+
+			cfg.routes.post("/v1/player/look", new PlayerLookHandler(config, queue, gameClient), McdtRole.ACT);
+			cfg.routes.post("/v1/player/move", new PlayerMoveHandler(config, queue, gameClient), McdtRole.ACT);
+			cfg.routes.post("/v1/player/actions", new PlayerActionsHandler(config, queue, gameClient), McdtRole.ACT);
+
+			cfg.routes.post("/v1/screen/actions", new ScreenActionsHandler(config, queue, gameClient), McdtRole.ACT);
+			cfg.routes.post("/v1/screen/slots", new ScreenSlotsHandler(config, queue, gameClient), McdtRole.ACT);
+
+			cfg.routes.post("/v1/session/quit", new QuitHandler(config, confirmManager), McdtRole.ACT);
+			cfg.routes.post("/v1/session/quit/confirm", new QuitConfirmHandler(config, confirmManager, gameClient, () -> onQuitCallback.run()), McdtRole.ACT);
 
 			// Exception handling -> RFC 9457 Problem JSON
 			cfg.routes.exception(ProblemException.class, (e, ctx) -> {
@@ -191,7 +215,7 @@ public final class HttpServer implements AutoCloseable {
 			boundPort.set(app.port());
 			Mcdt.LOGGER.info("MCDT HTTP server started at http://{}:{}/", host, app.port());
 		} catch (Exception e) {
-			if (targetPort != 0 && (e.getCause() instanceof BindException || e instanceof BindException)) {
+			if (targetPort != 0 && isBindException(e)) {
 				Mcdt.LOGGER.warn("Port {} is in use; trying a random free port...", targetPort);
 				app.start(host, 0);
 				boundPort.set(app.port());
@@ -200,6 +224,16 @@ public final class HttpServer implements AutoCloseable {
 				throw new IllegalStateException("Failed to start MCDT HTTP server on " + host + ":" + targetPort, e);
 			}
 		}
+	}
+
+	private static boolean isBindException(Throwable t) {
+		while (t != null) {
+			if (t instanceof BindException || (t.getMessage() != null && t.getMessage().toLowerCase().contains("failed to bind"))) {
+				return true;
+			}
+			t = t.getCause();
+		}
+		return false;
 	}
 
 	private static String serializeProblem(Problem problem) {
@@ -216,6 +250,10 @@ public final class HttpServer implements AutoCloseable {
 
 	public String baseUrl() {
 		return "http://" + config.bindAddress + ":" + port();
+	}
+
+	public void setOnQuitCallback(Runnable callback) {
+		this.onQuitCallback = callback != null ? callback : () -> {};
 	}
 
 	@Override

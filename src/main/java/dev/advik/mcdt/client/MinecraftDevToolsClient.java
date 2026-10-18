@@ -74,6 +74,7 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 	}
 
 	private void onEndClientTick(Minecraft client) {
+		dev.advik.mcdt.game.input.MovementTracker.getInstance().tick();
 		McdtCore instance = core;
 		if (instance != null) {
 			instance.queue().clock().advance();

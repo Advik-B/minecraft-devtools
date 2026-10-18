@@ -24,6 +24,13 @@ public final class Problems {
 	public static final String REGISTRY_NOT_FOUND = "registry-not-found";
 	public static final String INVALID_PARAMETER = "invalid-parameter";
 	public static final String SCREENSHOT_FAILED = "screenshot-failed";
+	public static final String QUIT_TOKEN_INVALID = "quit-token-invalid";
+	public static final String QUIT_DISABLED = "quit-disabled";
+	public static final String NO_SCREEN = "no-screen";
+	public static final String NO_CONTAINER = "no-container";
+	public static final String SLOT_OUT_OF_BOUNDS = "slot-out-of-bounds";
+	public static final String WIDGET_NOT_FOUND = "widget-not-found";
+	public static final String INVALID_ACTION = "invalid-action";
 
 	private Problems() {
 	}
@@ -97,6 +104,38 @@ public final class Problems {
 
 	public static ProblemException screenshotFailed(String detail) {
 		return of(500, SCREENSHOT_FAILED, "Screenshot failed", detail);
+	}
+
+	public static ProblemException quitTokenInvalid() {
+		return of(409, QUIT_TOKEN_INVALID, "Invalid confirmation token",
+				"The confirmation token is invalid, expired, or was already used. Request a new token from step 1.");
+	}
+
+	public static ProblemException quitDisabled() {
+		return of(403, QUIT_DISABLED, "Quit disabled",
+				"Quitting the game via MCDT is disabled in the server configuration (allowQuit is false).");
+	}
+
+	public static ProblemException noScreen() {
+		return of(409, NO_SCREEN, "No screen open", "The client does not currently have any GUI screen open.");
+	}
+
+	public static ProblemException noContainer() {
+		return of(409, NO_CONTAINER, "No container open", "The current screen is not a container screen with interactive slots.");
+	}
+
+	public static ProblemException slotOutOfBounds(int slot, int totalSlots) {
+		return of(400, SLOT_OUT_OF_BOUNDS, "Slot out of bounds",
+				"Slot index " + slot + " is out of bounds for the current container (size: " + totalSlots + ").");
+	}
+
+	public static ProblemException widgetNotFound(int index) {
+		return of(404, WIDGET_NOT_FOUND, "Widget not found",
+				"No widget found at index " + index + " in the current screen.");
+	}
+
+	public static ProblemException invalidAction(String action, String detail) {
+		return of(400, INVALID_ACTION, "Invalid action: " + action, detail);
 	}
 
 	public static ProblemException of(int status, String type, String title, String detail) {

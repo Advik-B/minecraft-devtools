@@ -53,6 +53,7 @@ public final class McdtCore implements AutoCloseable {
 
 		long pid = ProcessHandle.current().pid();
 		DiscoveryFile discovery = new DiscoveryFile(env.instancesDir(), env.configDir(), pid);
+		server.setOnQuitCallback(discovery::delete);
 		discovery.write(new DiscoveryFile.Info(
 				server.baseUrl(),
 				server.port(),

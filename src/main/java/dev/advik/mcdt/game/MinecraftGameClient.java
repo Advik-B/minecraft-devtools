@@ -1,14 +1,18 @@
 package dev.advik.mcdt.game;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.platform.Window;
 import dev.advik.mcdt.api.v1.dto.*;
+import dev.advik.mcdt.game.input.MovementTracker;
 import dev.advik.mcdt.game.raycast.RaycastUtil;
 import dev.advik.mcdt.game.serializers.BlockStateSerializer;
 import dev.advik.mcdt.game.serializers.EntitySerializer;
 import dev.advik.mcdt.game.serializers.ItemSerializer;
 import dev.advik.mcdt.game.serializers.TextSerializer;
 import dev.advik.mcdt.http.Problems;
+import dev.advik.mcdt.mixin.*;
+import net.minecraft.client.GuiMessage;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -23,17 +27,22 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 import javax.imageio.ImageIO;
@@ -516,5 +525,529 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		return baos.toByteArray();
+	}
+
+	// --- Milestone M2 Actions ---
+
+	@Override
+	public InputKeyDto.Response pressKey(InputKeyDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		long window = client.getWindow().getWindow();
+		String action = request.action() != null ? request.action().toLowerCase(Locale.ROOT) : "tap";
+
+		KeyMapping keyMapping = null;
+		if (request.key() != null) {
+			for (KeyMapping km : client.options.keyMappings) {
+				if (km.getName().equalsIgnoreCase(request.key()) || km.saveString().equalsIgnoreCase(request.key())) {
+					keyMapping = km;
+					break;
+				}
+			}
+		}
+
+		int keyCode = request.keyCode() != null ? request.keyCode() : 0;
+		int scanCode = request.scanCode() != null ? request.scanCode() : 0;
+
+		if (keyMapping != null) {
+			keyCode = keyMapping.getDefaultKey().getValue();
+		} else if (keyCode == 0 && request.key() != null) {
+			try {
+				String keyName = request.key().startsWith("key.") ? request.key() : "key.keyboard." + request.key().toLowerCase(Locale.ROOT);
+				InputConstants.Key k = InputConstants.getKey(keyName);
+				keyCode = k.getValue();
+			} catch (Exception ignored) {
+			}
+		}
+
+		int glfwAction = switch (action) {
+			case "press" -> 1;
+			case "release" -> 0;
+			case "repeat" -> 2;
+			default -> 1;
+		};
+
+		if (keyMapping != null) {
+			if ("press".equals(action)) {
+				keyMapping.setDown(true);
+			} else if ("release".equals(action)) {
+				keyMapping.setDown(false);
+			} else {
+				keyMapping.setDown(true);
+				KeyMapping.click(keyMapping.getDefaultKey());
+			}
+		}
+
+		if (window != 0 && keyCode != 0) {
+			client.keyboardHandler.keyPress(window, keyCode, scanCode, glfwAction, 0);
+			if ("tap".equals(action)) {
+				client.keyboardHandler.keyPress(window, keyCode, scanCode, 0, 0);
+			}
+		}
+
+		if (request.text() != null && !request.text().isEmpty()) {
+			var kbAccessor = (KeyboardHandlerAccessor) client.keyboardHandler;
+			for (char ch : request.text().toCharArray()) {
+				kbAccessor.invokeCharTyped(window, ch, 0);
+			}
+		}
+
+		return new InputKeyDto.Response(true, action, request.key() != null ? request.key() : String.valueOf(keyCode), keyCode, -1);
+	}
+
+	@Override
+	public InputMouseDto.Response mouseInput(InputMouseDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		long window = client.getWindow().getWindow();
+		MouseHandlerAccessor accessor = (MouseHandlerAccessor) client.mouseHandler;
+		String action = request.action() != null ? request.action().toLowerCase(Locale.ROOT) : "click";
+
+		int buttonCode = 0;
+		if (request.buttonCode() != null) {
+			buttonCode = request.buttonCode();
+		} else if (request.button() != null) {
+			buttonCode = switch (request.button().toLowerCase(Locale.ROOT)) {
+				case "right" -> 1;
+				case "middle" -> 2;
+				default -> 0;
+			};
+		}
+
+		double curX = client.mouseHandler.xpos();
+		double curY = client.mouseHandler.ypos();
+
+		switch (action) {
+			case "move" -> {
+				double targetX = request.dx() != null ? curX + request.dx() : (request.x() != null ? request.x() : curX);
+				double targetY = request.dy() != null ? curY + request.dy() : (request.y() != null ? request.y() : curY);
+				accessor.invokeOnMove(window, targetX, targetY);
+			}
+			case "click" -> {
+				if (request.x() != null && request.y() != null) {
+					accessor.invokeOnMove(window, request.x(), request.y());
+				}
+				accessor.invokeOnPress(window, buttonCode, 1, 0);
+				accessor.invokeOnPress(window, buttonCode, 0, 0);
+			}
+			case "press" -> {
+				if (request.x() != null && request.y() != null) {
+					accessor.invokeOnMove(window, request.x(), request.y());
+				}
+				accessor.invokeOnPress(window, buttonCode, 1, 0);
+			}
+			case "release" -> {
+				if (request.x() != null && request.y() != null) {
+					accessor.invokeOnMove(window, request.x(), request.y());
+				}
+				accessor.invokeOnPress(window, buttonCode, 0, 0);
+			}
+			case "scroll" -> {
+				double sx = request.scrollX() != null ? request.scrollX() : 0.0;
+				double sy = request.scrollY() != null ? request.scrollY() : 0.0;
+				accessor.invokeOnScroll(window, sx, sy);
+			}
+			default -> throw Problems.invalidAction(action, "Unknown mouse action: " + action);
+		}
+
+		return new InputMouseDto.Response(true, action, client.mouseHandler.xpos(), client.mouseHandler.ypos(), -1);
+	}
+
+	@Override
+	public ChatDto.SendResponse sendChat(ChatDto.SendRequest request) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+
+		String text = request.message();
+		boolean isCommand = false;
+		if (request.command() != null && !request.command().isBlank()) {
+			text = request.command();
+			isCommand = true;
+		}
+
+		if (text == null || text.isBlank()) {
+			throw Problems.invalidParameter("message", "Message or command text cannot be empty");
+		}
+
+		if (text.startsWith("/")) {
+			isCommand = true;
+			text = text.substring(1);
+		}
+
+		if (isCommand) {
+			client.player.connection.sendCommand(text);
+			return new ChatDto.SendResponse(true, "command", "/" + text, -1);
+		} else {
+			client.player.connection.sendChat(text);
+			return new ChatDto.SendResponse(true, "chat", text, -1);
+		}
+	}
+
+	@Override
+	public ChatDto.HistoryResponse getChatHistory(int offset, int limit) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.gui == null || client.gui.getChat() == null) {
+			return new ChatDto.HistoryResponse(0, offset, limit, List.of());
+		}
+
+		ChatComponentAccessor chatAccessor = (ChatComponentAccessor) client.gui.getChat();
+		List<GuiMessage> allMessages = chatAccessor.getAllMessages();
+		if (allMessages == null || allMessages.isEmpty()) {
+			return new ChatDto.HistoryResponse(0, offset, limit, List.of());
+		}
+
+		List<ChatDto.MessageEntry> entries = new ArrayList<>(allMessages.size());
+		for (GuiMessage msg : allMessages) {
+			entries.add(new ChatDto.MessageEntry(
+					TextSerializer.toPlainText(msg.content()),
+					TextSerializer.toJson(msg.content()),
+					msg.addedTime()
+			));
+		}
+
+		int total = entries.size();
+		int start = Math.max(0, Math.min(offset, total));
+		int end = Math.min(start + Math.max(1, limit), total);
+		List<ChatDto.MessageEntry> page = entries.subList(start, end);
+
+		return new ChatDto.HistoryResponse(total, offset, page.size(), page);
+	}
+
+	@Override
+	public PlayerLookDto.Response setPlayerLook(PlayerLookDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+		LocalPlayer player = client.player;
+		float yaw = player.getYRot();
+		float pitch = player.getXRot();
+
+		if (request.target() != null && request.target().length >= 3) {
+			double dx = request.target()[0] - player.getX();
+			double dy = request.target()[1] - player.getEyeY();
+			double dz = request.target()[2] - player.getZ();
+			double dXZ = Math.sqrt(dx * dx + dz * dz);
+			yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+			pitch = (float) Math.toDegrees(-Math.atan2(dy, dXZ));
+		} else {
+			if (request.yaw() != null) {
+				yaw = request.yaw();
+			} else if (request.deltaYaw() != null) {
+				yaw += request.deltaYaw();
+			}
+
+			if (request.pitch() != null) {
+				pitch = request.pitch();
+			} else if (request.deltaPitch() != null) {
+				pitch += request.deltaPitch();
+			}
+		}
+
+		pitch = Math.max(-90.0f, Math.min(90.0f, pitch));
+		player.setYRot(yaw);
+		player.setXRot(pitch);
+		player.setYHeadRot(yaw);
+		player.yRotO = yaw;
+		player.xRotO = pitch;
+
+		return new PlayerLookDto.Response(yaw, pitch, -1);
+	}
+
+	@Override
+	public PlayerMoveDto.Response setPlayerMove(PlayerMoveDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+		LocalPlayer player = client.player;
+		if (Boolean.TRUE.equals(request.stop())) {
+			MovementTracker.getInstance().stop();
+			return new PlayerMoveDto.Response(false, false, false, false, false, false, false,
+					player.getAbilities().flying, 0, -1);
+		}
+
+		if (request.fly() != null) {
+			player.getAbilities().flying = request.fly();
+			player.onUpdateAbilities();
+		}
+		if (Boolean.TRUE.equals(request.dismount())) {
+			player.stopRiding();
+		}
+
+		boolean forward = Boolean.TRUE.equals(request.forward());
+		boolean backward = Boolean.TRUE.equals(request.backward());
+		boolean left = Boolean.TRUE.equals(request.left());
+		boolean right = Boolean.TRUE.equals(request.right());
+		boolean jump = Boolean.TRUE.equals(request.jump());
+		boolean sneak = Boolean.TRUE.equals(request.sneak());
+		boolean sprint = Boolean.TRUE.equals(request.sprint());
+		int ticks = request.ticks() != null ? request.ticks() : 1;
+
+		MovementTracker.getInstance().start(forward, backward, left, right, jump, sneak, sprint, ticks);
+
+		return new PlayerMoveDto.Response(forward, backward, left, right, jump, sneak, sprint,
+				player.getAbilities().flying, MovementTracker.getInstance().getRemainingTicks(), -1);
+	}
+
+	@Override
+	public PlayerActionDto.Response performPlayerAction(PlayerActionDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+		LocalPlayer player = client.player;
+		String action = request.action() != null ? request.action().toLowerCase(Locale.ROOT) : "";
+		MinecraftAccessor mcAccessor = (MinecraftAccessor) client;
+
+		switch (action) {
+			case "attack" -> {
+				if (request.entityId() != null && client.level != null) {
+					Entity target = client.level.getEntity(request.entityId());
+					if (target != null && client.gameMode != null) {
+						client.gameMode.attack(player, target);
+						player.swing(InteractionHand.MAIN_HAND);
+					} else {
+						mcAccessor.invokeStartAttack();
+					}
+				} else {
+					mcAccessor.invokeStartAttack();
+				}
+			}
+			case "use" -> {
+				if (request.pos() != null && request.pos().length >= 3 && client.gameMode != null) {
+					BlockPos pos = new BlockPos(request.pos()[0], request.pos()[1], request.pos()[2]);
+					Direction dir = parseDirection(request.face());
+					BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), dir, pos, false);
+					client.gameMode.useItemOn(player, parseHand(request.hand()), hit);
+				} else {
+					mcAccessor.invokeStartUseItem();
+				}
+			}
+			case "stop_using" -> {
+				if (client.gameMode != null) {
+					client.gameMode.releaseUsingItem(player);
+				}
+			}
+			case "swing" -> player.swing(parseHand(request.hand()));
+			case "pick_block" -> mcAccessor.invokePickBlock();
+			case "swap_hands" -> player.connection.send(new ServerboundPlayerActionPacket(
+					ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN));
+			case "select_hotbar" -> {
+				if (request.slot() != null && request.slot() >= 0 && request.slot() <= 8) {
+					player.getInventory().selected = request.slot();
+				} else {
+					throw Problems.invalidParameter("slot", "Hotbar slot index must be 0-8");
+				}
+			}
+			case "drop" -> player.drop(Boolean.TRUE.equals(request.all()));
+			case "respawn" -> player.respawn();
+			case "interact_block" -> {
+				if (request.pos() == null || request.pos().length < 3) {
+					throw Problems.invalidParameter("pos", "Target block coordinates [x, y, z] required");
+				}
+				if (client.gameMode == null) {
+					throw Problems.noWorld();
+				}
+				BlockPos pos = new BlockPos(request.pos()[0], request.pos()[1], request.pos()[2]);
+				Direction dir = parseDirection(request.face());
+				BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), dir, pos, false);
+				client.gameMode.useItemOn(player, parseHand(request.hand()), hit);
+			}
+			case "interact_entity" -> {
+				if (request.entityId() == null) {
+					throw Problems.invalidParameter("entityId", "Target entity ID required");
+				}
+				if (client.level == null || client.gameMode == null) {
+					throw Problems.noWorld();
+				}
+				Entity target = client.level.getEntity(request.entityId());
+				if (target == null) {
+					throw Problems.of(404, "entity-not-found", "Entity not found", "Entity with id " + request.entityId() + " not found");
+				}
+				InteractionHand hand = parseHand(request.hand());
+				if ("attack".equalsIgnoreCase(request.interactionType())) {
+					client.gameMode.attack(player, target);
+				} else {
+					client.gameMode.interact(player, target, hand);
+				}
+			}
+			default -> throw Problems.invalidAction(action, "Unknown player action: " + action);
+		}
+
+		return new PlayerActionDto.Response(action, true, "Player action " + action + " executed", -1);
+	}
+
+	@Override
+	public ScreenActionDto.Response performScreenAction(ScreenActionDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		Screen screen = client.screen;
+		if (screen == null) {
+			throw Problems.noScreen();
+		}
+		String action = request.action() != null ? request.action().toLowerCase(Locale.ROOT) : "click";
+		if ("close".equals(action)) {
+			screen.onClose();
+			return new ScreenActionDto.Response(true, action, client.screen != null,
+					client.screen != null ? client.screen.getClass().getName() : null,
+					client.screen != null ? TextSerializer.toPlainText(client.screen.getTitle()) : null, -1);
+		}
+
+		if ("click".equals(action)) {
+			if (request.widgetIndex() != null) {
+				int idx = 0;
+				AbstractWidget targetWidget = null;
+				for (GuiEventListener listener : screen.children()) {
+					if (listener instanceof AbstractWidget widget) {
+						if (idx == request.widgetIndex()) {
+							targetWidget = widget;
+							break;
+						}
+						idx++;
+					}
+				}
+				if (targetWidget == null) {
+					throw Problems.widgetNotFound(request.widgetIndex());
+				}
+				int btn = request.button() != null ? request.button() : 0;
+				if (targetWidget instanceof Button b) {
+					b.onPress();
+				} else {
+					targetWidget.mouseClicked(targetWidget.getX() + targetWidget.getWidth() / 2.0,
+							targetWidget.getY() + targetWidget.getHeight() / 2.0, btn);
+				}
+			} else if (request.x() != null && request.y() != null) {
+				int btn = request.button() != null ? request.button() : 0;
+				screen.mouseClicked(request.x(), request.y(), btn);
+			} else {
+				throw Problems.invalidParameter("widgetIndex/x,y", "Either widgetIndex or (x, y) coordinates must be provided");
+			}
+		} else if ("type".equals(action)) {
+			if (request.text() == null) {
+				throw Problems.invalidParameter("text", "Text to type must be provided");
+			}
+			if (request.widgetIndex() != null) {
+				int idx = 0;
+				AbstractWidget targetWidget = null;
+				for (GuiEventListener listener : screen.children()) {
+					if (listener instanceof AbstractWidget widget) {
+						if (idx == request.widgetIndex()) {
+							targetWidget = widget;
+							break;
+						}
+						idx++;
+					}
+				}
+				if (targetWidget instanceof EditBox editBox) {
+					editBox.setValue(request.text());
+				} else {
+					for (char ch : request.text().toCharArray()) {
+						screen.charTyped(ch, 0);
+					}
+				}
+			} else {
+				for (char ch : request.text().toCharArray()) {
+					screen.charTyped(ch, 0);
+				}
+			}
+		} else {
+			throw Problems.invalidAction(action, "Unknown screen action: " + action);
+		}
+
+		return new ScreenActionDto.Response(true, action, client.screen != null,
+				client.screen != null ? client.screen.getClass().getName() : null,
+				client.screen != null ? TextSerializer.toPlainText(client.screen.getTitle()) : null, -1);
+	}
+
+	@Override
+	public ScreenSlotDto.Response clickScreenSlot(ScreenSlotDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		Screen screen = client.screen;
+		if (screen == null) {
+			throw Problems.noScreen();
+		}
+		if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) {
+			throw Problems.noContainer();
+		}
+		var menu = containerScreen.getMenu();
+		int slot = request.slot();
+		if (slot < 0 || slot >= menu.slots.size()) {
+			throw Problems.slotOutOfBounds(slot, menu.slots.size());
+		}
+
+		String modeStr = request.mode() != null ? request.mode().toUpperCase(Locale.ROOT) : "PICKUP";
+		ClickType clickType;
+		try {
+			clickType = ClickType.valueOf(modeStr);
+		} catch (IllegalArgumentException e) {
+			throw Problems.invalidParameter("mode", "Unknown click type mode: " + request.mode());
+		}
+
+		int button = request.button() != null ? request.button() : 0;
+		if (client.gameMode != null && client.player != null) {
+			client.gameMode.handleInventoryMouseClick(menu.containerId, slot, button, clickType, client.player);
+		}
+
+		ItemStack carried = menu.getCarried();
+		ItemStack clicked = menu.getSlot(slot).getItem();
+
+		return new ScreenSlotDto.Response(slot, modeStr.toLowerCase(Locale.ROOT),
+				ItemSerializer.toSlotInfo(-1, carried),
+				ItemSerializer.toSlotInfo(slot, clicked), -1);
+	}
+
+	@Override
+	public OptionsDto patchOptions(OptionsPatchDto request) {
+		Minecraft client = Minecraft.getInstance();
+		var opt = client.options;
+
+		if (request.fov() != null) opt.fov().set(request.fov());
+		if (request.renderDistance() != null) opt.renderDistance().set(request.renderDistance());
+		if (request.simulationDistance() != null) opt.simulationDistance().set(request.simulationDistance());
+		if (request.guiScale() != null) opt.guiScale().set(request.guiScale());
+		if (request.gamma() != null) opt.gamma().set(request.gamma());
+		if (request.maxFps() != null) opt.framerateLimit().set(request.maxFps());
+		if (request.fullscreen() != null) opt.fullscreen().set(request.fullscreen());
+		if (request.vsync() != null) opt.enableVsync().set(request.vsync());
+		if (request.bobView() != null) opt.bobView().set(request.bobView());
+		if (request.mouseSensitivity() != null) opt.sensitivity().set(request.mouseSensitivity());
+		if (request.invertYMouse() != null) opt.invertYMouse().set(request.invertYMouse());
+		if (request.pauseOnLostFocus() != null) opt.pauseOnLostFocus = request.pauseOnLostFocus();
+		if (request.language() != null && !request.language().isBlank()) opt.languageCode = request.language();
+
+		if (request.soundVolumes() != null) {
+			for (var entry : request.soundVolumes().entrySet()) {
+				for (SoundSource source : SoundSource.values()) {
+					if (source.getName().equalsIgnoreCase(entry.getKey())) {
+						opt.getSoundSourceOptionInstance(source).set(entry.getValue().doubleValue());
+						break;
+					}
+				}
+			}
+		}
+
+		opt.save();
+		return getOptions();
+	}
+
+	@Override
+	public void quitGame() {
+		Minecraft client = Minecraft.getInstance();
+		client.stop();
+	}
+
+	private static Direction parseDirection(String face) {
+		if (face == null || face.isBlank()) {
+			return Direction.UP;
+		}
+		Direction dir = Direction.byName(face.toLowerCase(Locale.ROOT));
+		return dir != null ? dir : Direction.UP;
+	}
+
+	private static InteractionHand parseHand(String hand) {
+		if (hand != null && ("off_hand".equalsIgnoreCase(hand) || "offhand".equalsIgnoreCase(hand))) {
+			return InteractionHand.OFF_HAND;
+		}
+		return InteractionHand.MAIN_HAND;
 	}
 }

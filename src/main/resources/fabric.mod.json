@@ -18,6 +18,9 @@
 			"dev.advik.mcdt.client.MinecraftDevToolsClient"
 		]
 	},
+	"mixins": [
+		"mcdt.mixins.json"
+	],
 	"suggests": {
 		"baritone": "1.13.1"
 	},

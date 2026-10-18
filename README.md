@@ -4,6 +4,18 @@ Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a 
 
 ## Features
 
+### Actions & Real Input Injection (Milestone M2)
+- **Synthetic Keyboard Injection:** `POST /v1/input/keys` simulating GLFW key presses, releases, taps, and text typing sequences with keymapping and scancode resolution.
+- **Synthetic Mouse Injection:** `POST /v1/input/mouse` driving cursor movement, clicks (left/right/middle), presses, releases, and scroll wheel events.
+- **Chat & Command Dispatch:** `POST /v1/chat` sending in-game chat messages or executing client commands, and `GET /v1/chat` retrieving paginated chat history.
+- **Player Kinematics & Orientation:** `POST /v1/player/look` setting absolute angles, relative angular deltas, or orienting the player towards 3D target coordinates.
+- **Timed Player Movement:** `POST /v1/player/move` driving forward, backward, strafe, jump, sneak, sprint, fly, and dismount inputs over N client ticks or continuously.
+- **Interactive Player Actions:** `POST /v1/player/actions` performing attacks, item usage, arm swinging, pick block, offhand hand swaps, hotbar slot selection (0-8), item dropping, and targeted block/entity interaction.
+- **GUI Screen & Widget Manipulation:** `POST /v1/screen/actions` clicking buttons, editing text fields (`EditBox`), and closing open screens.
+- **Container Slot Operations:** `POST /v1/screen/slots` handling all container click types (`PICKUP`, `QUICK_MOVE`, `SWAP`, `CLONE`, `THROW`, `QUICK_CRAFT`, `PICKUP_ALL`).
+- **Dynamic Options Modification:** `PATCH /v1/options` updating FOV, render distance, GUI scale, audio volumes, and saving changes persistently.
+- **Two-Step Confirmation Quitting:** `POST /v1/session/quit` & `POST /v1/session/quit/confirm` with single-use 30-second security tokens for safe client shutdown.
+
 ### Read-Only Client & World Inspection (Milestone M1)
 - **Engine & Session Diagnostics:** `GET /v1/client` reporting live FPS, window geometry, active screen name, and connection state (`menu`, `singleplayer`, `multiplayer`).
 - **Player State & Kinematics:** `GET /v1/player` returning position, rotation, velocity, health, food, XP, game mode, status flags, and active potion effects.

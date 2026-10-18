@@ -243,4 +243,166 @@ public class MockGameClient implements GameClient {
 		}
 		return baos.toByteArray();
 	}
+
+	// --- Milestone M2 Mock Implementation ---
+
+	public InputKeyDto.Request lastPressedKey;
+	public InputMouseDto.Request lastMouseInput;
+	public final List<String> sentMessages = new ArrayList<>();
+	public final List<ChatDto.MessageEntry> chatHistory = new ArrayList<>(List.of(
+			new ChatDto.MessageEntry("Welcome to Minecraft DevTools", "{\"text\":\"Welcome to Minecraft DevTools\"}", 100)
+	));
+	public float currentYaw = 90.0f;
+	public float currentPitch = 0.0f;
+	public PlayerMoveDto.Request lastMoveRequest;
+	public PlayerActionDto.Request lastPlayerAction;
+	public ScreenActionDto.Request lastScreenAction;
+	public ScreenSlotDto.Request lastSlotClick;
+	public boolean quitCalled = false;
+	public int currentFov = 70;
+	public int currentRenderDistance = 12;
+
+	@Override
+	public InputKeyDto.Response pressKey(InputKeyDto.Request request) {
+		this.lastPressedKey = request;
+		int keyCode = request.keyCode() != null ? request.keyCode() : 87;
+		return new InputKeyDto.Response(true, request.action() != null ? request.action() : "tap",
+				request.key() != null ? request.key() : "w", keyCode, 100L);
+	}
+
+	@Override
+	public InputMouseDto.Response mouseInput(InputMouseDto.Request request) {
+		this.lastMouseInput = request;
+		double x = request.x() != null ? request.x() : 100.0;
+		double y = request.y() != null ? request.y() : 100.0;
+		return new InputMouseDto.Response(true, request.action() != null ? request.action() : "click", x, y, 100L);
+	}
+
+	@Override
+	public ChatDto.SendResponse sendChat(ChatDto.SendRequest request) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		String text = request.message() != null ? request.message() : request.command();
+		if (text == null || text.isBlank()) {
+			throw Problems.invalidParameter("message", "Message or command cannot be empty");
+		}
+		sentMessages.add(text);
+		chatHistory.add(new ChatDto.MessageEntry(text, "{\"text\":\"" + text + "\"}", 101));
+		boolean isCommand = request.command() != null || text.startsWith("/");
+		return new ChatDto.SendResponse(true, isCommand ? "command" : "chat", text, 101L);
+	}
+
+	@Override
+	public ChatDto.HistoryResponse getChatHistory(int offset, int limit) {
+		int total = chatHistory.size();
+		int start = Math.max(0, Math.min(offset, total));
+		int end = Math.min(start + Math.max(1, limit), total);
+		List<ChatDto.MessageEntry> page = chatHistory.subList(start, end);
+		return new ChatDto.HistoryResponse(total, offset, page.size(), page);
+	}
+
+	@Override
+	public PlayerLookDto.Response setPlayerLook(PlayerLookDto.Request request) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		if (request.target() != null && request.target().length >= 3) {
+			currentYaw = 45.0f;
+			currentPitch = 10.0f;
+		} else {
+			if (request.yaw() != null) currentYaw = request.yaw();
+			else if (request.deltaYaw() != null) currentYaw += request.deltaYaw();
+
+			if (request.pitch() != null) currentPitch = request.pitch();
+			else if (request.deltaPitch() != null) currentPitch += request.deltaPitch();
+		}
+		currentPitch = Math.max(-90.0f, Math.min(90.0f, currentPitch));
+		return new PlayerLookDto.Response(currentYaw, currentPitch, 100L);
+	}
+
+	@Override
+	public PlayerMoveDto.Response setPlayerMove(PlayerMoveDto.Request request) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		this.lastMoveRequest = request;
+		if (Boolean.TRUE.equals(request.stop())) {
+			return new PlayerMoveDto.Response(false, false, false, false, false, false, false, false, 0, 100L);
+		}
+		boolean fwd = Boolean.TRUE.equals(request.forward());
+		boolean back = Boolean.TRUE.equals(request.backward());
+		boolean left = Boolean.TRUE.equals(request.left());
+		boolean right = Boolean.TRUE.equals(request.right());
+		boolean jump = Boolean.TRUE.equals(request.jump());
+		boolean sneak = Boolean.TRUE.equals(request.sneak());
+		boolean sprint = Boolean.TRUE.equals(request.sprint());
+		int ticks = request.ticks() != null ? request.ticks() : 1;
+		return new PlayerMoveDto.Response(fwd, back, left, right, jump, sneak, sprint, false, ticks, 100L);
+	}
+
+	@Override
+	public PlayerActionDto.Response performPlayerAction(PlayerActionDto.Request request) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		this.lastPlayerAction = request;
+		String action = request.action() != null ? request.action() : "swing";
+		return new PlayerActionDto.Response(action, true, "Mock action " + action + " executed", 100L);
+	}
+
+	@Override
+	public ScreenActionDto.Response performScreenAction(ScreenActionDto.Request request) {
+		if (!isScreenOpen) {
+			throw Problems.noScreen();
+		}
+		this.lastScreenAction = request;
+		if ("close".equals(request.action())) {
+			isScreenOpen = false;
+			return new ScreenActionDto.Response(true, "close", false, null, null, 100L);
+		}
+		return new ScreenActionDto.Response(true, request.action() != null ? request.action() : "click",
+				true, "net.minecraft.client.gui.screens.inventory.InventoryScreen", "Inventory", 100L);
+	}
+
+	@Override
+	public ScreenSlotDto.Response clickScreenSlot(ScreenSlotDto.Request request) {
+		if (!isScreenOpen) {
+			throw Problems.noScreen();
+		}
+		this.lastSlotClick = request;
+		if (request.slot() < 0 || request.slot() > 45) {
+			throw Problems.slotOutOfBounds(request.slot(), 46);
+		}
+		return new ScreenSlotDto.Response(request.slot(), request.mode() != null ? request.mode() : "pickup",
+				InventoryDto.SlotInfo.empty(-1), InventoryDto.SlotInfo.empty(request.slot()), 100L);
+	}
+
+	@Override
+	public OptionsDto patchOptions(OptionsPatchDto request) {
+		if (request.fov() != null) currentFov = request.fov();
+		if (request.renderDistance() != null) currentRenderDistance = request.renderDistance();
+		return new OptionsDto(
+				currentFov,
+				currentRenderDistance,
+				10,
+				2,
+				1.0,
+				120,
+				false,
+				true,
+				"fancy",
+				true,
+				1.0,
+				false,
+				Map.of("master", 1.0f, "music", 0.5f),
+				List.of(new OptionsDto.KeyMappingInfo("key.forward", "key.categories.movement", "W", "key.keyboard.w")),
+				"en_us"
+		);
+	}
+
+	@Override
+	public void quitGame() {
+		this.quitCalled = true;
+	}
 }
