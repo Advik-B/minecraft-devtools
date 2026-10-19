@@ -73,7 +73,10 @@ configurations.include {
 		artifacts.mapNotNull { artifact ->
 			val id = artifact.id.componentIdentifier as? ModuleComponentIdentifier ?: return@mapNotNull null
 			// Exclude libraries provided by Minecraft or compile-only annotations from jar-in-jar.
-			if (id.group == "org.slf4j" || (id.group == "org.jetbrains" && id.module == "annotations")) {
+			// ASM (pulled in by Jetty) is provided by Fabric Loader; bundling a second copy causes a
+			// LinkageError against Mixin's ASM classes and crashes the game at startup.
+			if (id.group == "org.slf4j" || id.group == "org.ow2.asm" ||
+				(id.group == "org.jetbrains" && id.module == "annotations")) {
 				return@mapNotNull null
 			}
 			project.dependencies.create("${id.group}:${id.module}:${id.version}")
