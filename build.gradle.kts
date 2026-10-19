@@ -13,6 +13,14 @@ repositories {
 		name = "ParchmentMC"
 		url = uri("https://maven.parchmentmc.org")
 	}
+	maven {
+		name = "Xander"
+		url = uri("https://maven.isxander.dev/releases")
+	}
+	maven {
+		name = "TerraformersMC"
+		url = uri("https://maven.terraformersmc.com/releases/")
+	}
 	mavenCentral()
 }
 
@@ -78,6 +86,12 @@ dependencies {
 	// Baritone API (optional, modCompileOnly)
 	modCompileOnly(files("libs/baritone-api-fabric-${prop("baritone_version")}.jar"))
 	testImplementation(files("libs/baritone-api-fabric-${prop("baritone_version")}.jar"))
+
+	// Optional config UI: compile against it, run it in dev, never ship or require it.
+	modCompileOnly("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
+	modCompileOnly("com.terraformersmc:modmenu:${prop("modmenu_version")}")
+	modLocalRuntime("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
+	modLocalRuntime("com.terraformersmc:modmenu:${prop("modmenu_version")}")
 }
 
 /** Downloads a file and fails the build unless it matches a pinned SHA-256. */

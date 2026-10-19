@@ -19,6 +19,7 @@ import java.util.Map;
  */
 public final class McdtCore implements AutoCloseable {
 	private final McdtEnvironment env;
+	private final ConfigStore configStore;
 	private final McdtConfig config;
 	private final BearerToken token;
 	private final TaskQueue queue;
@@ -75,13 +76,14 @@ public final class McdtCore implements AutoCloseable {
 				token.value()
 		));
 
-		McdtCore core = new McdtCore(env, config, token, queue, logWriter, server, discovery);
+		McdtCore core = new McdtCore(env, configStore, config, token, queue, logWriter, server, discovery);
 		Runtime.getRuntime().addShutdownHook(core.shutdownHook);
 		return core;
 	}
 
 	private McdtCore(
 			McdtEnvironment env,
+			ConfigStore configStore,
 			McdtConfig config,
 			BearerToken token,
 			TaskQueue queue,
@@ -90,6 +92,7 @@ public final class McdtCore implements AutoCloseable {
 			DiscoveryFile discovery
 	) {
 		this.env = env;
+		this.configStore = configStore;
 		this.config = config;
 		this.token = token;
 		this.queue = queue;
@@ -101,6 +104,10 @@ public final class McdtCore implements AutoCloseable {
 
 	public McdtEnvironment env() {
 		return env;
+	}
+
+	public ConfigStore configStore() {
+		return configStore;
 	}
 
 	public McdtConfig config() {

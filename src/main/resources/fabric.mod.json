@@ -16,13 +16,18 @@
 	"entrypoints": {
 		"client": [
 			"dev.advik.mcdt.client.MinecraftDevToolsClient"
+		],
+		"modmenu": [
+			"dev.advik.mcdt.client.config.McdtModMenuApi"
 		]
 	},
 	"mixins": [
 		"mcdt.mixins.json"
 	],
 	"suggests": {
-		"baritone": "1.13.1"
+		"baritone": "1.13.1",
+		"yet_another_config_lib_v3": "*",
+		"modmenu": "*"
 	},
 	"depends": {
 		"fabricloader": ">=0.19.5",

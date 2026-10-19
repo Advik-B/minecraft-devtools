@@ -4,6 +4,11 @@ Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a 
 
 ## Features
 
+### In-Game Configuration Screen
+- **Where:** install [Mod Menu](https://modrinth.com/mod/modmenu) and [YetAnotherConfigLib (YACL) 3.x](https://modrinth.com/mod/yacl), then open *Mods → Minecraft DevTools → Configure*. Both are optional; without them MCDT works as before and you edit `config/mcdt/config.json` by hand.
+- **Categories:** Server, Security, Performance, Integrations. Every setting in `config.json` is editable.
+- **Applying changes:** pressing *Save Changes* writes `config.json`. Settings read live (permission, quit endpoints, request timeout, tick budget, MCP and Baritone toggles, origin and multiplayer allowlists, subscriber queue size) apply immediately. Startup-only settings (enable server, port, bind address, rate limit, max request size, task queue capacity, event ring buffer size, MCP notification throttle) are marked *Requires a game restart* and show a restart prompt.
+
 ### Model Context Protocol (MCP) Server (Milestone M6)
 - **Native Dual HTTP & SSE MCP Server:** Standard JSON-RPC 2.0 interface hosted at `/mcp` on the same Javalin port.
   - `POST /mcp`: Receives JSON-RPC requests, returning synchronous responses in `application/json`.

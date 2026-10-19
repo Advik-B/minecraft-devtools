@@ -20,21 +20,21 @@ public final class McdtConfig {
 	/** Address to bind. Anything other than loopback exposes the API to the network. */
 	public String bindAddress = "127.0.0.1";
 	/** How long a request waits for the client thread before {@code 504}. */
-	public long requestTimeoutMs = 5_000;
+	public volatile long requestTimeoutMs = 5_000;
 	/** Time the client thread may spend on queued tasks per tick. */
-	public long tickBudgetMicros = 2_000;
+	public volatile long tickBudgetMicros = 2_000;
 	/** Maximum queued tasks before {@code 503}. */
 	public int queueCapacity = 256;
 	/** Highest permission level granted to API clients. */
-	public Permission permission = Permission.READ;
+	public volatile Permission permission = Permission.READ;
 	/** Extra browser origins allowed to call the API, e.g. {@code http://localhost:5173}. */
-	public List<String> originAllowlist = new ArrayList<>();
+	public volatile List<String> originAllowlist = new ArrayList<>();
 	/** Allowed multiplayer server addresses for act and reflect-write actions. */
-	public List<String> allowedMultiplayerServers = new ArrayList<>();
+	public volatile List<String> allowedMultiplayerServers = new ArrayList<>();
 	/** Enable or disable Baritone endpoints. */
-	public boolean enableBaritone = true;
+	public volatile boolean enableBaritone = true;
 	/** Whether the two-step quit endpoints may shut the game down. */
-	public boolean allowQuit = true;
+	public volatile boolean allowQuit = true;
 	/** Requests per second per token. */
 	public int rateLimitPerSecond = 200;
 	/** Largest accepted request body. */
@@ -42,11 +42,11 @@ public final class McdtConfig {
 	/** Capacity of the lock-free event ring buffer. */
 	public int eventRingBufferSize = 4_096;
 	/** Capacity of each WebSocket subscriber's outgoing event queue. */
-	public int eventSubscriberQueueCapacity = 256;
+	public volatile int eventSubscriberQueueCapacity = 256;
 	/** Enable or disable the Model Context Protocol (MCP) server. */
-	public boolean enableMcp = true;
+	public volatile boolean enableMcp = true;
 	/** Whether to log recent MCP tool calls in an in-memory ring buffer. */
-	public boolean mcpLogCalls = true;
+	public volatile boolean mcpLogCalls = true;
 	/** Minimum milliseconds between resource update notifications per URI per session. */
 	public long mcpNotificationThrottleMs = 250;
 
