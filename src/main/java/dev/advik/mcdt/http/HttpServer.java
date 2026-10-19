@@ -40,6 +40,7 @@ public final class HttpServer implements AutoCloseable {
 	private final RequestLogWriter logWriter;
 	private final GameClient gameClient;
 	private final BaritoneService baritoneService;
+	private final dev.advik.mcdt.mcp.McpSessionManager mcpSessionManager;
 	private final Javalin app;
 	private final AtomicInteger boundPort = new AtomicInteger();
 	private volatile Runnable onQuitCallback = () -> {};
@@ -84,6 +85,7 @@ public final class HttpServer implements AutoCloseable {
 		this.logWriter = logWriter;
 		this.gameClient = gameClient;
 		this.baritoneService = baritoneService != null ? baritoneService : new UnavailableBaritoneService();
+		this.mcpSessionManager = new dev.advik.mcdt.mcp.McpSessionManager(config.mcpNotificationThrottleMs);
 
 		int targetPort = ConfigStore.effectivePort(config, envOverrides);
 		RateLimiter rateLimiter = new RateLimiter(config.rateLimitPerSecond);
@@ -207,6 +209,36 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.ws("/v1/player/status", new PlayerStatusWsHandler(config, token, boundPort::get, queue, gameClient));
 			cfg.routes.ws("/v1/world/stream", new WorldStreamWsHandler(config, token, boundPort::get, queue, gameClient));
 
+			// --- Milestone M6 MCP Routes ---
+			dev.advik.mcdt.mcp.McpToolLog toolLog = new dev.advik.mcdt.mcp.McpToolLog(100);
+			dev.advik.mcdt.mcp.McpToolRegistry toolRegistry = new dev.advik.mcdt.mcp.McpToolRegistry(
+					config,
+					token,
+					boundPort::get,
+					queue,
+					gameClient,
+					baritoneService,
+					handleTable,
+					nameService,
+					pathEvaluator,
+					reflectionSerializer
+			);
+			dev.advik.mcdt.mcp.McpResourceRegistry resourceRegistry = new dev.advik.mcdt.mcp.McpResourceRegistry(gameClient);
+			dev.advik.mcdt.mcp.McpHandler mcpHandler = new dev.advik.mcdt.mcp.McpHandler(
+					env,
+					config,
+					queue,
+					mcpSessionManager,
+					toolRegistry,
+					resourceRegistry,
+					toolLog
+			);
+
+			cfg.routes.post("/mcp", mcpHandler::handlePost, McdtRole.READ);
+			cfg.routes.sse("/mcp", mcpHandler::handleSse, McdtRole.READ);
+			cfg.routes.get("/v1/mcp/status", mcpHandler::handleStatus, McdtRole.READ);
+			cfg.routes.get("/v1/mcp/log", mcpHandler::handleLog, McdtRole.READ);
+
 			// Exception handling -> RFC 9457 Problem JSON
 			cfg.routes.exception(ProblemException.class, (e, ctx) -> {
 				e.headers().forEach(ctx::header);
@@ -325,6 +357,9 @@ public final class HttpServer implements AutoCloseable {
 	@Override
 	public void close() {
 		try {
+			if (mcpSessionManager != null) {
+				mcpSessionManager.close();
+			}
 			dev.advik.mcdt.events.EventHub.getInstance().closeAll(1000, "Server stopping");
 			app.stop();
 		} catch (Exception e) {

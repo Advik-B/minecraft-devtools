@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class EventDispatcher implements AutoCloseable {
 	private final EventRingBuffer ringBuffer;
 	private final List<EventSubscriber> subscribers = new CopyOnWriteArrayList<>();
+	private final List<java.util.function.Consumer<EventRecord>> listeners = new CopyOnWriteArrayList<>();
 	private final AtomicLong totalDroppedEvents = new AtomicLong(0);
 	private final AtomicBoolean running = new AtomicBoolean(true);
 	private final Thread dispatcherThread;
@@ -35,6 +36,14 @@ public final class EventDispatcher implements AutoCloseable {
 		subscriber.close();
 	}
 
+	public void addListener(java.util.function.Consumer<EventRecord> listener) {
+		listeners.add(listener);
+	}
+
+	public void removeListener(java.util.function.Consumer<EventRecord> listener) {
+		listeners.remove(listener);
+	}
+
 	public List<EventSubscriber> subscribers() {
 		return subscribers;
 	}
@@ -52,6 +61,14 @@ public final class EventDispatcher implements AutoCloseable {
 			while (ringBuffer.isPublished(nextSequence)) {
 				processedAny = true;
 				EventRecord record = ringBuffer.get(nextSequence);
+
+				for (java.util.function.Consumer<EventRecord> listener : listeners) {
+					try {
+						listener.accept(record);
+					} catch (Throwable t) {
+						Mcdt.LOGGER.warn("Error in event listener: {}", t.getMessage());
+					}
+				}
 
 				if (!subscribers.isEmpty()) {
 					dispatchRecord(record);

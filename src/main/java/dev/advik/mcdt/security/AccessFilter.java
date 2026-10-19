@@ -41,7 +41,7 @@ public final class AccessFilter implements Handler {
 		String path = ctx.path();
 
 		// Docs, OpenAPI spec, and root endpoints are public and do not require authentication or rate limits.
-		if (!path.startsWith("/v1")) {
+		if (!path.startsWith("/v1") && !path.startsWith("/mcp")) {
 			return;
 		}
 

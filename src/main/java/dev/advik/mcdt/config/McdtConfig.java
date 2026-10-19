@@ -43,6 +43,12 @@ public final class McdtConfig {
 	public int eventRingBufferSize = 4_096;
 	/** Capacity of each WebSocket subscriber's outgoing event queue. */
 	public int eventSubscriberQueueCapacity = 256;
+	/** Enable or disable the Model Context Protocol (MCP) server. */
+	public boolean enableMcp = true;
+	/** Whether to log recent MCP tool calls in an in-memory ring buffer. */
+	public boolean mcpLogCalls = true;
+	/** Minimum milliseconds between resource update notifications per URI per session. */
+	public long mcpNotificationThrottleMs = 250;
 
 	/** Clamps out-of-range values to safe ones. Returns {@code this}. */
 	public McdtConfig normalize() {
@@ -59,6 +65,7 @@ public final class McdtConfig {
 		maxRequestBytes = clamp(maxRequestBytes, 1_024, 64L * 1_048_576);
 		eventRingBufferSize = (int) clamp(eventRingBufferSize, 64, 65_536);
 		eventSubscriberQueueCapacity = (int) clamp(eventSubscriberQueueCapacity, 16, 4_096);
+		mcpNotificationThrottleMs = clamp(mcpNotificationThrottleMs, 50, 10_000);
 		if (permission == null) {
 			permission = Permission.READ;
 		}

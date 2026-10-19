@@ -4,6 +4,35 @@ Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a 
 
 ## Features
 
+### Model Context Protocol (MCP) Server (Milestone M6)
+- **Native Dual HTTP & SSE MCP Server:** Standard JSON-RPC 2.0 interface hosted at `/mcp` on the same Javalin port.
+  - `POST /mcp`: Receives JSON-RPC requests, returning synchronous responses in `application/json`.
+  - `GET /mcp`: Server-Sent Events (SSE) stream (`text/event-stream`) advertising endpoint URL (`event: endpoint\ndata: /mcp?sessionId=...`) and streaming real-time notifications.
+- **Curated Agent Tools:**
+  - `get_state`: Consolidated overview of client, player, world, inventory, and Baritone status in a single call.
+  - `look`: Orient yaw and pitch or face target coordinates.
+  - `move`: Timed or continuous movement inputs (forward, back, strafe, jump, sneak, sprint).
+  - `interact`: World and item interactions (attack, use, swing, pick block, drop, swap hands).
+  - `inventory_click`: Slot manipulation in player inventory and open container screens.
+  - `screen_action`: Click widgets, type text into inputs, or close open GUI screens.
+  - `chat`: Send in-game chat messages/commands, or read chat history.
+  - `screenshot`: Vision-enabled viewport capture returning standard MCP image content (`type: image`, `mimeType: image/png`, Base64 data).
+  - `raycast`: Line-of-sight targeting raycasts.
+  - `baritone_goto`, `baritone_mine`, `baritone_follow`, `baritone_cancel`: Autonomous pathing and actions returning job IDs immediately.
+  - `job_status`: Poll status of background Baritone or movement jobs.
+- **Escape Hatches for Full Reach:**
+  - `rest_call`: Directly execute any `/v1/*` REST endpoint from the agent.
+  - `inspect`: Access live JVM reflection object graph with path traversal.
+- **MCP Resources & Streaming Subscriptions:**
+  - Standard resource endpoints: `mcdt://player`, `mcdt://inventory`, `mcdt://screen`, `mcdt://world`, `mcdt://hud`.
+  - Real-time `notifications/resources/updated` pushed over SSE when world, player, or screen changes occur, throttled per session.
+- **Cross-Platform Stdio Shim Launcher:**
+  - Standalone launchers (`scripts/mcdt-mcp.py` and `scripts/mcdt-mcp.ps1`) for local desktop MCP clients (Claude Desktop, Cursor, Zed).
+  - Auto-discovers running instances, performs health checks, and relays standard I/O JSON-RPC to `/mcp`.
+- **Diagnostics & Logging:**
+  - `GET /v1/mcp/status`: Active session count, tool registry status, and configuration.
+  - `GET /v1/mcp/log`: In-memory ring buffer logging recent tool calls, durations, and outcomes.
+
 ### High-Level Control & Writes (Milestone M5)
 - **Reflection Field Writes:** `PUT /v1/objects/{handle}/fields/{name}` allowing dynamic mutation of instance or static fields on loaded objects, with rich type coercion for primitives, strings, enums, handles, `BlockPos`, `Vec3`, and `ResourceLocation`. Guarded by `reflect-write` permission.
 - **Dynamic Method Invocation:** `POST /v1/objects/{handle}/invoke` executing arbitrary instance or static methods with typed arguments, returning converted values or handles to return objects.

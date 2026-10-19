@@ -102,6 +102,14 @@ public final class EventHub implements AutoCloseable {
 		return subscribersBySession.size();
 	}
 
+	public void addListener(java.util.function.Consumer<EventRecord> listener) {
+		dispatcher.addListener(listener);
+	}
+
+	public void removeListener(java.util.function.Consumer<EventRecord> listener) {
+		dispatcher.removeListener(listener);
+	}
+
 	public long totalDroppedEvents() {
 		return dispatcher.totalDroppedEvents();
 	}

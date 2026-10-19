@@ -126,7 +126,7 @@ function Test-Endpoint {
 
     $isOk = ($status -eq $ExpectedStatus)
     $jsonObj = $null
-    if ($rawContent -and $rawContent.StartsWith("{")) {
+    if ($rawContent -and ($rawContent.StartsWith("{") -or $rawContent.StartsWith("["))) {
         try {
             $jsonObj = $rawContent | ConvertFrom-Json
         } catch {}
@@ -273,8 +273,62 @@ $null = Test-Endpoint -Name "World Entities Query in Menu (expected 409)" -Path 
 $null = Test-Endpoint -Name "World Raycast Query in Menu (expected 409)" -Path "/v1/world/raycast" -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-world" }
 $null = Test-Endpoint -Name "Chat Send in Menu (expected 409)" -Path "/v1/chat" -Method "POST" -Body @{ message = "hello" } -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-player" }
 
+Write-Host "`n=== 6. Model Context Protocol (MCP) Live Tests ===" -ForegroundColor White
+$null = Test-Endpoint -Name "MCP Initialize Handshake" -Path "/mcp" -Method "POST" -Body @{
+    jsonrpc = "2.0"; id = 1; method = "initialize"; params = @{ protocolVersion = "2024-11-05"; capabilities = @{}; clientInfo = @{ name = "LiveTestClient"; version = "1.0.0" } }
+} -Validator { param($j) $j.result.protocolVersion -eq "2024-11-05" -and $j.result.serverInfo.name -eq "mcdt" }
+
+$null = Test-Endpoint -Name "MCP Ping" -Path "/mcp" -Method "POST" -Body @{
+    jsonrpc = "2.0"; id = 2; method = "ping"
+} -Validator { param($j) $j.id -eq 2 -and $j.result -ne $null }
+
+$null = Test-Endpoint -Name "MCP Tools List" -Path "/mcp" -Method "POST" -Body @{
+    jsonrpc = "2.0"; id = 3; method = "tools/list"; params = @{}
+} -Validator { param($j) $j.result.tools.Count -ge 5 }
+
+$null = Test-Endpoint -Name "MCP Tool Call: get_state" -Path "/mcp" -Method "POST" -Body @{
+    jsonrpc = "2.0"; id = 4; method = "tools/call"; params = @{ name = "get_state"; arguments = @{} }
+} -Validator { param($j) $j.result.isError -eq $false -and $j.result.content[0].text.Contains("client") }
+
+$null = Test-Endpoint -Name "MCP Tool Call: screenshot" -Path "/mcp" -Method "POST" -Body @{
+    jsonrpc = "2.0"; id = 5; method = "tools/call"; params = @{ name = "screenshot"; arguments = @{ scale = 0.2 } }
+} -Validator { param($j) $j.result.isError -eq $false -and $j.result.content[0].type -eq "image" -and $j.result.content[0].data.Length -gt 100 }
+
+$null = Test-Endpoint -Name "MCP Resources List" -Path "/mcp" -Method "POST" -Body @{
+    jsonrpc = "2.0"; id = 6; method = "resources/list"; params = @{}
+} -Validator { param($j) $j.result.resources.Count -eq 5 }
+
+$null = Test-Endpoint -Name "MCP Resource Read: mcdt://screen" -Path "/mcp" -Method "POST" -Body @{
+    jsonrpc = "2.0"; id = 7; method = "resources/read"; params = @{ uri = "mcdt://screen" }
+} -Validator { param($j) $j.result.contents[0].uri -eq "mcdt://screen" }
+
+$null = Test-Endpoint -Name "MCP Server Status" -Path "/v1/mcp/status" -Validator { param($j)
+    $j.enabled -eq $true -and $j.protocolVersion -eq "2024-11-05" -and $j.registeredTools -ge 5
+}
+
+$null = Test-Endpoint -Name "MCP Tool Execution Log" -Path "/v1/mcp/log" -Validator { param($j)
+    $j.Count -ge 2
+}
+
+# Test Python MCP stdio shim against live instance
+Write-Host "  Testing Python stdio shim (scripts/mcdt-mcp.py)..." -ForegroundColor DarkGray
+try {
+    $shimInput = '{"jsonrpc":"2.0","id":99,"method":"ping"}'
+    $shimOutput = $shimInput | python (Join-Path $PSScriptRoot "mcdt-mcp.py") --url $BaseUrl --token $Token --no-sse
+    if ($shimOutput -and $shimOutput.Contains('"id":99')) {
+        $script:passed++
+        Write-Host "  [PASS] Stdio Shim Relay - scripts/mcdt-mcp.py" -ForegroundColor Green
+    } else {
+        $script:failed++
+        Write-Host "  [FAIL] Stdio Shim Relay: output did not contain id:99: $shimOutput" -ForegroundColor Red
+    }
+} catch {
+    $script:failed++
+    Write-Host "  [FAIL] Stdio Shim Relay exception: $($_.Exception.Message)" -ForegroundColor Red
+}
+
 if ($ShutdownClient) {
-    Write-Host "`n=== 6. Two-Step Safe Shutdown Flow ===" -ForegroundColor White
+    Write-Host "`n=== 7. Two-Step Safe Shutdown Flow ===" -ForegroundColor White
     $step1 = Test-Endpoint -Name "Quit Request (Step 1)" -Path "/v1/session/quit" -Method "POST" -ExpectedStatus 202 -Validator { param($j) $j.confirmToken -ne $null }
     if ($step1.Json -and $step1.Json.confirmToken) {
         $cToken = $step1.Json.confirmToken
