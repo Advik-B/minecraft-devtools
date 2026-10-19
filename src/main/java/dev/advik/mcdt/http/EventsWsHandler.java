@@ -152,13 +152,19 @@ public final class EventsWsHandler implements Consumer<WsConfig> {
 			}
 		}
 
+		String presented = null;
 		String auth = ctx.header("Authorization");
-		if (auth == null || !auth.startsWith("Bearer ")) {
+		if (auth != null && auth.startsWith("Bearer ")) {
+			presented = auth.substring("Bearer ".length()).trim();
+		} else if (ctx.queryParam("token") != null && !ctx.queryParam("token").isBlank()) {
+			presented = ctx.queryParam("token").trim();
+		}
+
+		if (presented == null) {
 			ctx.closeSession(1008, "Missing or invalid Bearer token");
 			return false;
 		}
 
-		String presented = auth.substring("Bearer ".length()).trim();
 		if (!token.matches(presented)) {
 			ctx.closeSession(1008, "Invalid Bearer token");
 			return false;

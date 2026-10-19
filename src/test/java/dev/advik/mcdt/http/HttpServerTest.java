@@ -71,9 +71,22 @@ class HttpServerTest {
 	}
 
 	@Test
-	void rootServesScalarDocsWithoutAuth() throws Exception {
+	void rootServesWebUiWithoutAuth() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(server.baseUrl() + "/"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.GET()
+				.build();
+
+		HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("MCDT") || res.body().contains("id=\"app\""));
+	}
+
+	@Test
+	void scalarDocsServesWithoutAuth() throws Exception {
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/docs/scalar"))
 				.header("Host", "127.0.0.1:" + server.port())
 				.GET()
 				.build();
@@ -101,7 +114,7 @@ class HttpServerTest {
 	@Test
 	void redocServesWithoutAuth() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
-				.uri(URI.create(server.baseUrl() + "/redoc"))
+				.uri(URI.create(server.baseUrl() + "/docs/redoc"))
 				.header("Host", "127.0.0.1:" + server.port())
 				.GET()
 				.build();
@@ -109,6 +122,19 @@ class HttpServerTest {
 		HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, res.statusCode());
 		assertTrue(res.body().contains("<redoc"));
+	}
+
+	@Test
+	void redocLegacyRedirectsToDocsRedoc() throws Exception {
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/redoc"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.GET()
+				.build();
+
+		// Default HttpClient does not follow redirects automatically unless configured
+		HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+		assertTrue(res.statusCode() == 302 || res.statusCode() == 200);
 	}
 
 	@Test

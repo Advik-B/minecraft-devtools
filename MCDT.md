@@ -427,7 +427,7 @@ The hard target is that MCDT idle costs nothing measurable and MCDT under load c
 
 ## Implementation roadmap
 
-- **M0 – Scaffold (Completed):** Build setup (Loom, Parchment mappings, Javalin 7 on Jetty 12, Jackson, jar-in-jar packaging), config store, token generation, owner-only discovery files, loopback HTTP server with Host/Origin/Bearer/RateLimit/Size filters, bounded TaskQueue drained on client tick under time budget, problem-JSON RFC 9457 error handling, `GET /v1/health`, offline Scalar docs at `/`, ReDoc at `/redoc`, and `/openapi.json`.
+- **M0 – Scaffold (Completed):** Build setup (Loom, Parchment mappings, Javalin 7 on Jetty 12, Jackson, jar-in-jar packaging), config store, token generation, owner-only discovery files, loopback HTTP server with Host/Origin/Bearer/RateLimit/Size filters, bounded TaskQueue drained on client tick under time budget, problem-JSON RFC 9457 error handling, `GET /v1/health`, Svelte 5 WebUI dashboard at `/`, offline Scalar docs at `/docs/scalar` (alias `/docs/scaler`), ReDoc at `/docs/redoc` (legacy `/redoc` redirect), and `/openapi.json`.
 - **M1 – Read-Only Client & World:** Curated read endpoints (`/v1/client`, `/v1/player`, `/v1/player/inventory`, `/v1/world`, `/v1/world/blocks`, `/v1/world/entities`, `/v1/screen`, `/v1/registries`, `/v1/options`), raycasting, and screenshot capture.
 - **M2 – Actions & Real Input:** Synthetic keyboard and mouse input injection, chat/commands, player look/move, screen slot actions, two-step confirmation flows.
 - **M3 – Reflection Layer (Read-Only):** Walk object graph from named roots, NameService (Mojang mappings download), HandleTable, path traversal.

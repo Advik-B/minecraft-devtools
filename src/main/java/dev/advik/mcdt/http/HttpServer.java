@@ -11,6 +11,7 @@ import dev.advik.mcdt.baritone.UnavailableBaritoneService;
 import dev.advik.mcdt.config.ConfigStore;
 import dev.advik.mcdt.config.McdtConfig;
 import dev.advik.mcdt.docs.DocsRoutes;
+import dev.advik.mcdt.docs.WebUiRoutes;
 import dev.advik.mcdt.exec.TaskQueue;
 import dev.advik.mcdt.json.Json;
 import dev.advik.mcdt.security.AccessFilter;
@@ -107,9 +108,9 @@ public final class HttpServer implements AutoCloseable {
 				});
 			}));
 
-			// Configure ReDoc UI
+			// Configure ReDoc UI at /docs/redoc
 			cfg.registerPlugin(new ReDocPlugin(reDoc -> {
-				reDoc.withUiPath("/redoc");
+				reDoc.withUiPath("/docs/redoc");
 				reDoc.withDocumentationPath("/openapi.json");
 				reDoc.withTitle("MCDT ReDoc");
 			}));
@@ -118,11 +119,17 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.before(accessFilter);
 			cfg.routes.beforeMatched(accessFilter::checkPermission);
 
-			// Register docs routes
-			cfg.routes.get("/", DocsRoutes.scalarHtml());
-			cfg.routes.get("/docs", DocsRoutes.scalarHtml());
+			// Register WebUI dashboard, docs routes, and static assets
+			cfg.routes.get("/", WebUiRoutes.serveApp());
+			cfg.routes.get("/docs", DocsRoutes.redirectTo("/docs/scalar"));
+			cfg.routes.get("/docs/scalar", DocsRoutes.scalarHtml());
+			cfg.routes.get("/docs/scaler", DocsRoutes.redirectTo("/docs/scalar"));
 			cfg.routes.get("/docs/scalar/standalone.js", DocsRoutes.scalarJs());
+			cfg.routes.get("/redoc", DocsRoutes.redirectTo("/docs/redoc"));
 			cfg.routes.get("/assets/mcdt/icon.png", DocsRoutes.icon());
+			cfg.routes.get("/assets/{file}", WebUiRoutes.serveAsset());
+			cfg.routes.get("/favicon.ico", WebUiRoutes.serveAsset());
+			cfg.routes.get("/favicon.svg", WebUiRoutes.serveAsset());
 
 			HealthHandler healthHandler = new HealthHandler(env, config, queue);
 			cfg.routes.get("/v1/health", healthHandler, McdtRole.READ);

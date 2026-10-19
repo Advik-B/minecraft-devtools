@@ -51,6 +51,10 @@ public final class DocsRoutes {
 		};
 	}
 
+	public static Handler redirectTo(String location) {
+		return ctx -> ctx.redirect(location);
+	}
+
 	public static Handler scalarJs() {
 		return ctx -> {
 			byte[] bytes = getScalarJsBytes();

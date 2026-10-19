@@ -77,8 +77,16 @@ public final class EventSubscriber {
 
 	public boolean matches(String topic, Object payload) {
 		if (closed.get()) return false;
-		if (!subscribedTopics.contains("*") && !subscribedTopics.contains(topic.toLowerCase())) {
-			return false;
+		String lowerTopic = topic.toLowerCase();
+		if ("tick".equals(lowerTopic)) {
+			// High-frequency tick events (20/s) only match if explicitly subscribed, never via wildcard "*"
+			if (!subscribedTopics.contains("tick")) {
+				return false;
+			}
+		} else {
+			if (!subscribedTopics.contains("*") && !subscribedTopics.contains(lowerTopic)) {
+				return false;
+			}
 		}
 
 		if ("packet.in".equalsIgnoreCase(topic) && payload instanceof String packetName) {

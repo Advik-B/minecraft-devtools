@@ -37,7 +37,7 @@ class EventDispatcherTest {
 					EventSubscriber sub = eventHub.registerSubscriber(ctx, 32);
 					SubscriptionRequest req = new SubscriptionRequest();
 					req.action = "subscribe";
-					req.topics = List.of("*");
+					req.topics = List.of("*", "tick");
 					sub.updateSubscription(req);
 				});
 				ws.onClose(ctx -> eventHub.removeSubscriber(ctx));
@@ -136,6 +136,49 @@ class EventDispatcherTest {
 		assertEquals(1, received.size());
 		assertTrue(received.get(0).contains("\"topic\":\"screen.open\""));
 		assertTrue(received.get(0).contains("InventoryScreen"));
+
+		ws.sendClose(WebSocket.NORMAL_CLOSURE, "done").get(5, TimeUnit.SECONDS);
+	}
+
+	@Test
+	void wildcardDoesNotReceiveTickUnlessExplicitlySubscribed() throws Exception {
+		List<String> received = new CopyOnWriteArrayList<>();
+		CountDownLatch latch = new CountDownLatch(1);
+
+		WebSocket ws = httpClient.newWebSocketBuilder()
+				.buildAsync(URI.create("ws://127.0.0.1:" + port + "/test/events"), new WebSocket.Listener() {
+					@Override
+					public void onOpen(WebSocket webSocket) {
+						webSocket.request(100);
+					}
+
+					@Override
+					public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+						received.add(data.toString());
+						latch.countDown();
+						webSocket.request(1);
+						return CompletableFuture.completedFuture(null);
+					}
+				})
+				.get(5, TimeUnit.SECONDS);
+
+		Thread.sleep(100);
+
+		// Ensure subscriber only has "*" (not explicit "tick")
+		EventSubscriber sub = eventHub.dispatcher().subscribers().get(0);
+		SubscriptionRequest unSubReq = new SubscriptionRequest();
+		unSubReq.action = "unsubscribe";
+		unSubReq.topics = List.of("tick");
+		sub.updateSubscription(unSubReq);
+
+		// Publish tick and chat
+		eventHub.publish("tick", 101, 101);
+		eventHub.publish("chat", 102, "hello wildcard");
+
+		assertTrue(latch.await(5, TimeUnit.SECONDS));
+		assertEquals(1, received.size());
+		assertTrue(received.get(0).contains("\"topic\":\"chat\""));
+		assertFalse(received.get(0).contains("\"topic\":\"tick\""));
 
 		ws.sendClose(WebSocket.NORMAL_CLOSURE, "done").get(5, TimeUnit.SECONDS);
 	}

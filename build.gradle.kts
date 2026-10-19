@@ -140,8 +140,34 @@ val downloadBaritoneApi = tasks.register<DownloadVerified>("downloadBaritoneApi"
 }
 
 
+val buildWeb = tasks.register<Exec>("buildWeb") {
+	group = "build setup"
+	description = "Builds the Svelte WebUI dashboard using Bun."
+
+	val webDir = layout.projectDirectory.dir("web")
+	val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+
+	workingDir = webDir.asFile
+	commandLine = if (isWindows) listOf("cmd", "/c", "bun run build") else listOf("bun", "run", "build")
+
+	inputs.dir(webDir.dir("src"))
+	inputs.file(webDir.file("index.html"))
+	inputs.file(webDir.file("package.json"))
+	inputs.file(webDir.file("vite.config.ts"))
+	outputs.dir(webDir.dir("dist"))
+}
+
+val syncWebAssets = tasks.register<Sync>("syncWebAssets") {
+	group = "build setup"
+	description = "Copies compiled WebUI assets into generated resources."
+	dependsOn(buildWeb)
+	from(layout.projectDirectory.dir("web/dist"))
+	into(layout.buildDirectory.dir("generated/web/mcdt-web/dist"))
+}
+
 sourceSets.main {
 	resources.srcDir(downloadScalar)
+	resources.srcDir(layout.buildDirectory.dir("generated/web"))
 }
 
 tasks.compileJava {
@@ -149,6 +175,7 @@ tasks.compileJava {
 }
 
 tasks.processResources {
+	dependsOn(syncWebAssets)
 	val version = version
 	inputs.property("version", version)
 

@@ -140,10 +140,10 @@ class EventsWsIntegrationTest {
 
 		assertTrue(welcomeLatch.await(5, TimeUnit.SECONDS));
 
-		// Subscribe to all topics
+		// Subscribe to all topics including explicit tick
 		SubscriptionRequest req = new SubscriptionRequest();
 		req.action = "subscribe";
-		req.topics = List.of("*");
+		req.topics = List.of("*", "tick");
 		ws.sendText(Json.MAPPER.writeValueAsString(req), true).get(5, TimeUnit.SECONDS);
 
 		Thread.sleep(100);
