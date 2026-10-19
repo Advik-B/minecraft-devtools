@@ -1,6 +1,6 @@
 <script lang="ts">
   import { appState } from '../stores.svelte'
-  import { Activity, Radio, Terminal, BookOpen, Key, Layers } from 'lucide-svelte'
+  import { Activity, Radio, Terminal, BookOpen, Key } from 'lucide-svelte'
 
   const tabs = [
     { id: 'telemetry', label: 'Telemetry', icon: Activity },
@@ -14,14 +14,13 @@
   <!-- Top Primary Navbar -->
   <div class="navbar bg-base-200 border-b border-base-300 px-4 sm:px-8 min-h-16">
     <div class="navbar-start flex items-center gap-3">
-      <div class="flex items-center gap-2">
-        <div class="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-          <Layers class="w-5 h-5" />
-        </div>
-        <div>
-          <span class="font-bold tracking-tight text-lg text-base-content">MCDT</span>
-          <span class="hidden sm:inline text-xs text-base-content/60 ml-1.5">DevTools</span>
-        </div>
+      <div class="flex items-center gap-2.5">
+        <img
+          src="/icon.svg"
+          alt="Minecraft DevTools"
+          class="w-9 h-9 rounded-lg shadow-xs [image-rendering:pixelated] border border-base-300 shrink-0"
+        />
+        <span class="font-bold tracking-tight text-lg text-base-content whitespace-nowrap">Minecraft DevTools</span>
       </div>
 
       {#if appState.mcdtVersion}

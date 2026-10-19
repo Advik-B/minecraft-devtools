@@ -75,10 +75,10 @@ public final class WebUiRoutes {
 			ctx.result("""
 					<!doctype html>
 					<html>
-					<head><title>MCDT - WebUI</title></head>
+					<head><title>Minecraft DevTools - WebUI</title><link rel="icon" type="image/svg+xml" href="/icon.svg" /></head>
 					<body style="font-family:sans-serif;background:#0b0f19;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
 					  <div style="text-align:center;">
-					    <h2>MCDT WebUI</h2>
+					    <h2>Minecraft DevTools WebUI</h2>
 					    <p>Web dashboard assets are building or not packaged. Access Scalar at <a style="color:#a78bfa;" href="/docs/scalar">/docs/scalar</a> or ReDoc at <a style="color:#38bdf8;" href="/docs/redoc">/docs/redoc</a>.</p>
 					  </div>
 					</body>

@@ -19,8 +19,9 @@ public final class DocsRoutes {
 			  <head>
 			    <meta charset="utf-8" />
 			    <meta name="viewport" content="width=device-width, initial-scale=1" />
-			    <title>MCDT - Minecraft DevTools</title>
-			    <link rel="icon" type="image/png" href="/assets/mcdt/icon.png" />
+			    <title>Minecraft DevTools</title>
+			    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+			    <link rel="alternate icon" type="image/png" href="/assets/mcdt/icon.png" />
 			    <style>
 			      body {
 			        margin: 0;
@@ -75,6 +76,20 @@ public final class DocsRoutes {
 					return;
 				}
 				ctx.contentType("image/png");
+				ctx.header("Cache-Control", "public, max-age=86400");
+				ctx.result(in.readAllBytes());
+			}
+		};
+	}
+
+	public static Handler iconSvg() {
+		return ctx -> {
+			try (InputStream in = DocsRoutes.class.getResourceAsStream("/assets/mcdt/icon.svg")) {
+				if (in == null) {
+					ctx.status(404);
+					return;
+				}
+				ctx.contentType("image/svg+xml");
 				ctx.header("Cache-Control", "public, max-age=86400");
 				ctx.result(in.readAllBytes());
 			}

@@ -138,6 +138,29 @@ class HttpServerTest {
 	}
 
 	@Test
+	void iconEndpointsServeWithoutAuth() throws Exception {
+		HttpRequest reqSvg = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/icon.svg"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.GET()
+				.build();
+		HttpResponse<byte[]> resSvg = httpClient.send(reqSvg, HttpResponse.BodyHandlers.ofByteArray());
+		assertEquals(200, resSvg.statusCode());
+		assertTrue(resSvg.headers().firstValue("Content-Type").orElse("").contains("image/svg+xml"));
+		assertTrue(resSvg.body().length > 50);
+
+		HttpRequest reqPng = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/icon.png"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.GET()
+				.build();
+		HttpResponse<byte[]> resPng = httpClient.send(reqPng, HttpResponse.BodyHandlers.ofByteArray());
+		assertEquals(200, resPng.statusCode());
+		assertTrue(resPng.headers().firstValue("Content-Type").orElse("").contains("image/png"));
+		assertTrue(resPng.body().length > 50);
+	}
+
+	@Test
 	void healthEndpointRequiresBearerToken() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(server.baseUrl() + "/v1/health"))

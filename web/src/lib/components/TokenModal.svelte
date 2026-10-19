@@ -71,7 +71,7 @@
         </div>
         <div>
           <h3 class="font-bold text-base text-base-content">API Bearer Authentication</h3>
-          <p class="text-xs text-base-content/60">MCDT generates a random 256-bit token on launch.</p>
+          <p class="text-xs text-base-content/60">Minecraft DevTools generates a random 256-bit token on launch.</p>
         </div>
       </div>
 
@@ -82,7 +82,7 @@
           <div class="font-semibold text-base-content">How to obtain your token:</div>
           <ol class="list-decimal list-inside space-y-0.5 text-base-content/80 text-[11px]">
             <li>Open <code class="font-mono bg-base-300 px-1 py-0.5 rounded">config/mcdt/token</code> in game folder</li>
-            <li>Or copy from in-game <strong>Mod Menu &gt; MCDT</strong> settings</li>
+            <li>Or copy from in-game <strong>Mod Menu &gt; Minecraft DevTools</strong> settings</li>
             <li>Or click the link printed in in-game chat</li>
           </ol>
         </div>

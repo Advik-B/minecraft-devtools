@@ -115,7 +115,7 @@
           <div>
             <h2 class="card-title text-base text-base-content">Minecraft Client Active: Main Menu</h2>
             <p class="text-sm text-base-content/70">
-              The MCDT HTTP server is active and responding. Player and world telemetry will automatically stream here once a singleplayer world or server is loaded.
+              The Minecraft DevTools HTTP server is active and responding. Player and world telemetry will automatically stream here once a singleplayer world or server is loaded.
             </p>
           </div>
         </div>
@@ -124,7 +124,7 @@
 
         <div class="flex flex-wrap gap-2 text-xs">
           <span class="badge badge-neutral gap-1.5">
-            MCDT: {healthData?.mcdtVersion || 'running'}
+            DevTools: {healthData?.mcdtVersion || 'running'}
           </span>
           <span class="badge badge-outline gap-1.5">
             Game: {healthData?.gameVersion || '1.21.4'}

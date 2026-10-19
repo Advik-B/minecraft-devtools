@@ -266,7 +266,7 @@
               <div class="flex items-center gap-2">
                 <a
                   href={screenshotUrl}
-                  download="mcdt-screenshot.png"
+                  download="minecraft-devtools-screenshot.png"
                   class="btn btn-xs btn-outline gap-1"
                 >
                   <Download class="w-3 h-3" />

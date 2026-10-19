@@ -112,7 +112,7 @@ public final class HttpServer implements AutoCloseable {
 			cfg.registerPlugin(new ReDocPlugin(reDoc -> {
 				reDoc.withUiPath("/docs/redoc");
 				reDoc.withDocumentationPath("/openapi.json");
-				reDoc.withTitle("MCDT ReDoc");
+				reDoc.withTitle("Minecraft DevTools ReDoc");
 			}));
 
 			// Global before filter for security and route role permission check
@@ -127,6 +127,9 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/docs/scalar/standalone.js", DocsRoutes.scalarJs());
 			cfg.routes.get("/redoc", DocsRoutes.redirectTo("/docs/redoc"));
 			cfg.routes.get("/assets/mcdt/icon.png", DocsRoutes.icon());
+			cfg.routes.get("/assets/mcdt/icon.svg", DocsRoutes.iconSvg());
+			cfg.routes.get("/icon.svg", DocsRoutes.iconSvg());
+			cfg.routes.get("/icon.png", DocsRoutes.icon());
 			cfg.routes.get("/assets/{file}", WebUiRoutes.serveAsset());
 			cfg.routes.get("/favicon.ico", WebUiRoutes.serveAsset());
 			cfg.routes.get("/favicon.svg", WebUiRoutes.serveAsset());

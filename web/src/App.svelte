@@ -40,7 +40,7 @@
 <footer class="bg-base-200 border-t border-base-300 py-4 px-4 sm:px-8 mt-auto">
   <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-base-content/60">
     <div class="flex items-center gap-2">
-      <span class="font-semibold text-base-content/80">Minecraft DevTools (MCDT)</span>
+      <span class="font-semibold text-base-content/80">Minecraft DevTools</span>
       <span>&bull;</span>
       <span>Fabric 1.21.4</span>
     </div>
