@@ -26,7 +26,7 @@
   } from 'lucide-svelte'
 
   let rootsData = $state<RootsResponse | null>(null)
-  let activeHandle = $state<string>('client')
+  let activeHandle = $state<string>('')
   let activeObject = $state<ObjectInspectResponse | null>(null)
   let breadcrumbs = $state<Array<{ handle: string; label: string }>>([])
 
@@ -53,8 +53,9 @@
       const roots = await getObjectRoots()
       if (roots) {
         rootsData = roots
-        if (!activeHandle && roots.roots['client']) {
-          selectRoot('client', roots.roots['client'].$handle)
+        if (!activeHandle) {
+          const [name, desc] = availableRoots.find(([n]) => n === 'minecraft') ?? availableRoots[0] ?? []
+          if (name && desc) selectRoot(name, desc.$handle)
         }
       }
     } catch {
@@ -97,8 +98,8 @@
     isEvaluating = true
     replResult = null
     try {
-      // Evaluate against client root
-      const clientHandle = rootsData?.roots?.['client']?.$handle || 'client'
+      // Evaluate against the Minecraft client root
+      const clientHandle = rootsData?.roots?.['minecraft']?.$handle || 'minecraft'
       const res = await inspectObject(clientHandle, replPath.trim())
       if (res) {
         replResult = JSON.stringify(res, null, 2)
@@ -135,12 +136,23 @@
     loadRoots()
   })
 
+  const availableRoots = $derived(
+    Object.entries(rootsData?.roots ?? {}).filter((e): e is [string, RootDescriptor] => e[1] !== null)
+  )
+
+  function formatValue(val: unknown): string {
+    if (val === null || val === undefined) return String(val)
+    if (typeof val !== 'object') return String(val)
+    const json = JSON.stringify(val)
+    return json.length > 120 ? json.slice(0, 117) + '...' : json
+  }
+
   const filteredFields = $derived.by(() => {
     if (!activeObject?.fields) return []
     const entries = Object.entries(activeObject.fields)
     if (!fieldSearch.trim()) return entries
     const q = fieldSearch.toLowerCase()
-    return entries.filter(([k, v]) => k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q))
+    return entries.filter(([k, v]) => k.toLowerCase().includes(q) || formatValue(v).toLowerCase().includes(q))
   })
 
   const filteredMethods = $derived.by(() => {
@@ -210,10 +222,10 @@
       <div class="space-y-4">
         <div class="flex items-center gap-2 overflow-x-auto pb-1">
           <span class="text-xs font-bold text-base-content/60 uppercase tracking-wider shrink-0 mr-2">Roots:</span>
-          {#if rootsData?.roots}
-            {#each Object.entries(rootsData.roots) as [name, desc]}
+          {#if availableRoots.length > 0}
+            {#each availableRoots as [name, desc]}
               <button
-                class="btn btn-xs {activeHandle === desc.$handle ? 'btn-primary' : 'btn-outline btn-neutral'} font-mono shrink-0"
+                class="btn btn-xs {activeHandle === desc.$handle ? 'btn-primary' : 'btn-outline'} font-mono shrink-0"
                 onclick={() => selectRoot(name, desc.$handle)}
               >
                 <span>{name}</span>
@@ -221,7 +233,7 @@
               </button>
             {/each}
           {:else}
-            <button class="btn btn-xs btn-primary font-mono" onclick={() => selectRoot('client', 'client')}>client</button>
+            <button class="btn btn-xs btn-primary font-mono" onclick={() => selectRoot('minecraft', 'minecraft')}>minecraft</button>
             <button class="btn btn-xs btn-outline font-mono" onclick={() => selectRoot('player', 'player')}>player</button>
             <button class="btn btn-xs btn-outline font-mono" onclick={() => selectRoot('level', 'level')}>level</button>
             <button class="btn btn-xs btn-outline font-mono" onclick={() => selectRoot('options', 'options')}>options</button>
@@ -303,7 +315,7 @@
                                 <ChevronRight class="w-3 h-3" />
                               </button>
                             {:else}
-                              <span class="text-base-content/80 truncate block max-w-xs">{String(val)}</span>
+                              <span class="text-base-content/80 truncate block max-w-xs" title={formatValue(val)}>{formatValue(val)}</span>
                             {/if}
                           </td>
                         </tr>
@@ -423,7 +435,7 @@
         <div class="flex items-center gap-2">
           <span class="text-xs text-base-content/60">Presets:</span>
           <button
-            class="btn btn-xs btn-outline btn-neutral font-mono"
+            class="btn btn-xs btn-outline font-mono"
             onclick={() => {
               packetPayload = JSON.stringify({
                 type: 'minecraft:chat',
@@ -435,7 +447,7 @@
             Chat Packet
           </button>
           <button
-            class="btn btn-xs btn-outline btn-neutral font-mono"
+            class="btn btn-xs btn-outline font-mono"
             onclick={() => {
               packetPayload = JSON.stringify({
                 type: 'minecraft:player_action',

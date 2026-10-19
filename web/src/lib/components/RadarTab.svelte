@@ -148,7 +148,7 @@
     ctx.stroke()
 
     // Player heading cone & pointer
-    const playerYaw = playerData?.position?.yaw || 0
+    const playerYaw = playerData?.rotation.yaw || 0
     // Minecraft yaw: 0 = South (+Z), 90 = West (-X), 180 = North (-Z), 270 = East (+X)
     // Canvas standard: angle = yaw * Math.PI / 180 + Math.PI / 2
     const rad = ((playerYaw + 90) * Math.PI) / 180
@@ -162,9 +162,9 @@
     ctx.fill()
 
     // Draw entities
-    if (entitiesData && playerData?.position) {
-      const px = playerData.position.x
-      const pz = playerData.position.z
+    if (entitiesData && playerData) {
+      const px = playerData.pos[0]
+      const pz = playerData.pos[2]
 
       entitiesData.entities.forEach((ent) => {
         const dx = ent.pos[0] - px
@@ -332,13 +332,13 @@
               <Crosshair class="w-4 h-4 text-secondary" />
               <span>Crosshair Raycast Target</span>
             </div>
-            <span class="badge {raycastData?.hitType === 'BLOCK' ? 'badge-primary' : raycastData?.hitType === 'ENTITY' ? 'badge-secondary' : 'badge-ghost'} badge-sm font-mono font-bold">
-              {raycastData?.hitType || 'AIR / MISS'}
+            <span class="badge {raycastData?.hitType === 'block' ? 'badge-primary' : raycastData?.hitType === 'entity' ? 'badge-secondary' : 'badge-ghost'} badge-sm font-mono font-bold uppercase">
+              {raycastData?.hitType || 'miss'}
             </span>
           </div>
 
           <div class="py-4 space-y-3">
-            {#if raycastData?.hitType === 'BLOCK' && raycastData.block}
+            {#if raycastData?.hitType === 'block' && raycastData.block}
               <div class="p-4 rounded-xl bg-base-100 border border-base-300 space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="font-bold text-sm text-base-content">{raycastData.block.state.split('[')[0]}</span>
@@ -354,7 +354,7 @@
                   </div>
                 {/if}
               </div>
-            {:else if raycastData?.hitType === 'ENTITY' && raycastData.entity}
+            {:else if raycastData?.hitType === 'entity' && raycastData.entity}
               <div class="p-4 rounded-xl bg-base-100 border border-secondary/40 space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="font-bold text-sm text-secondary">{raycastData.entity.name || raycastData.entity.type}</span>
@@ -372,23 +372,23 @@
             {/if}
 
             <!-- Player Position & Orientation Quick Summary -->
-            {#if playerData?.position}
+            {#if playerData}
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
                 <div class="p-2.5 rounded-lg bg-base-100 border border-base-300 text-center">
                   <span class="text-[10px] text-base-content/50 uppercase block font-semibold">X</span>
-                  <span class="font-mono font-bold text-xs">{playerData.position.x.toFixed(2)}</span>
+                  <span class="font-mono font-bold text-xs">{playerData.pos[0].toFixed(2)}</span>
                 </div>
                 <div class="p-2.5 rounded-lg bg-base-100 border border-base-300 text-center">
                   <span class="text-[10px] text-base-content/50 uppercase block font-semibold">Y</span>
-                  <span class="font-mono font-bold text-xs">{playerData.position.y.toFixed(2)}</span>
+                  <span class="font-mono font-bold text-xs">{playerData.pos[1].toFixed(2)}</span>
                 </div>
                 <div class="p-2.5 rounded-lg bg-base-100 border border-base-300 text-center">
                   <span class="text-[10px] text-base-content/50 uppercase block font-semibold">Z</span>
-                  <span class="font-mono font-bold text-xs">{playerData.position.z.toFixed(2)}</span>
+                  <span class="font-mono font-bold text-xs">{playerData.pos[2].toFixed(2)}</span>
                 </div>
                 <div class="p-2.5 rounded-lg bg-base-100 border border-base-300 text-center">
                   <span class="text-[10px] text-base-content/50 uppercase block font-semibold">Facing</span>
-                  <span class="font-mono font-bold text-xs">{playerData.position.yaw.toFixed(1)}°</span>
+                  <span class="font-mono font-bold text-xs">{playerData.rotation.yaw.toFixed(1)}°</span>
                 </div>
               </div>
             {/if}

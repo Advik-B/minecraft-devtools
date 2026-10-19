@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { appState } from '../stores.svelte'
-  import { getHealth, getClient, getPlayer, getWorld, getPlayerSkinInfo, getPlayerSkinImageUrl } from '../api'
+  import { getHealth, getClient, getPlayer, getWorld, getPlayerSkinInfo, loadPlayerSkinImage } from '../api'
   import { toastStore } from '../toast.svelte'
   import type { HealthResponse, ClientResponse, PlayerResponse, WorldResponse, PlayerSkinResponse } from '../types'
   import {
@@ -26,6 +26,8 @@
   let playerData = $state<PlayerResponse | null>(null)
   let worldData = $state<WorldResponse | null>(null)
   let skinData = $state<PlayerSkinResponse | null>(null)
+  let skinImageUrl = $state<string | null>(null)
+  let skinImageRequested = false
   let pollInterval: number | null = null
   let copiedPos = $state(false)
 
@@ -59,6 +61,12 @@
       playerData = p
       worldData = w
       skinData = s
+
+      // The skin rarely changes, so fetch the image once instead of on every poll
+      if (p && !skinImageRequested) {
+        skinImageRequested = true
+        skinImageUrl = await loadPlayerSkinImage().catch(() => null)
+      }
     } catch {
       // ignore
     }
@@ -74,11 +82,22 @@
       clearInterval(pollInterval)
       pollInterval = null
     }
+    if (skinImageUrl) URL.revokeObjectURL(skinImageUrl)
   })
 
+  const playerName = $derived(skinData?.playerName || appState.playerName || 'Player')
+
+  function formatUptime(ms: number): string {
+    const totalSeconds = Math.floor(ms / 1000)
+    const h = Math.floor(totalSeconds / 3600)
+    const m = Math.floor((totalSeconds % 3600) / 60)
+    const sec = totalSeconds % 60
+    return h > 0 ? `${h}h ${m}m` : `${m}m ${sec}s`
+  }
+
   function copyCoordinates() {
-    if (!playerData?.position) return
-    const { x, y, z } = playerData.position
+    if (!playerData?.pos) return
+    const [x, y, z] = playerData.pos
     const text = `/tp ${x.toFixed(2)} ${y.toFixed(2)} ${z.toFixed(2)}`
     try {
       navigator.clipboard?.writeText(text).catch(() => {})
@@ -154,7 +173,7 @@
               <div class="w-8 h-8 rounded-lg bg-error/10 text-error flex items-center justify-center">
                 <Heart class="w-4 h-4 fill-error/20" />
               </div>
-              <h2 class="card-title text-sm font-bold tracking-tight">Player: {playerData.name}</h2>
+              <h2 class="card-title text-sm font-bold tracking-tight">Player: {playerName}</h2>
             </div>
             <span class="badge badge-soft badge-success badge-sm font-medium">In World</span>
           </div>
@@ -180,22 +199,22 @@
               <span class="flex items-center gap-1.5 text-base-content/70">
                 <Apple class="w-3.5 h-3.5 text-warning" /> Hunger / Food
               </span>
-              <span class="font-mono">{playerData.foodLevel ?? 20} / 20</span>
+              <span class="font-mono">{playerData.food ?? 20} / 20</span>
             </div>
             <progress
               class="progress progress-warning w-full h-2.5"
-              value={playerData.foodLevel ?? 20}
+              value={playerData.food ?? 20}
               max="20"
             ></progress>
           </div>
 
           <!-- Coordinates Display -->
-          {#if playerData.position}
+          {#if playerData.pos}
             <div class="pt-2 border-t border-base-300 space-y-2">
               <div class="text-xs text-base-content/70 font-medium">World Coordinates</div>
               <div class="flex items-center justify-between gap-2 p-2 bg-base-300/60 rounded-lg">
                 <kbd class="kbd kbd-sm font-mono text-xs bg-base-100">
-                  X: {playerData.position.x.toFixed(1)} Y: {playerData.position.y.toFixed(1)} Z: {playerData.position.z.toFixed(1)}
+                  X: {playerData.pos[0].toFixed(1)} Y: {playerData.pos[1].toFixed(1)} Z: {playerData.pos[2].toFixed(1)}
                 </kbd>
                 <button
                   class="btn btn-xs {copiedPos ? 'btn-success' : 'btn-ghost'} gap-1"
@@ -240,35 +259,35 @@
             <div class="p-2.5 bg-base-300/40 rounded-lg space-y-1">
               <span class="text-base-content/60 block">Weather</span>
               <span class="font-semibold text-base-content">
-                {worldData?.isRaining ? (worldData?.isThundering ? 'Thunderstorm' : 'Rain') : 'Clear'}
+                {worldData?.weather?.raining ? (worldData.weather.thundering ? 'Thunderstorm' : 'Rain') : 'Clear'}
               </span>
             </div>
             <div class="p-2.5 bg-base-300/40 rounded-lg space-y-1">
               <span class="text-base-content/60 block flex items-center gap-1">
                 <Boxes class="w-3 h-3" /> Entities
               </span>
-              <span class="font-mono font-bold text-base-content">{worldData?.loadedEntitiesCount ?? 0}</span>
+              <span class="font-mono font-bold text-base-content">{worldData?.entityCount ?? 0}</span>
             </div>
             <div class="p-2.5 bg-base-300/40 rounded-lg space-y-1">
               <span class="text-base-content/60 block flex items-center gap-1">
                 <Layers class="w-3 h-3" /> Chunks
               </span>
-              <span class="font-mono font-bold text-base-content">{worldData?.loadedChunksCount ?? 0}</span>
+              <span class="font-mono font-bold text-base-content">{worldData?.loadedChunks ?? 0}</span>
             </div>
           </div>
 
           <!-- Day / Night Cycle -->
-          {#if worldData?.dayTime !== undefined}
+          {#if worldData?.time}
             <div class="pt-1 space-y-1.5">
               <div class="flex justify-between text-xs font-medium">
                 <span class="flex items-center gap-1 text-base-content/70">
                   <Clock class="w-3.5 h-3.5 text-info" /> Day / Night Cycle
                 </span>
-                <span class="font-mono">{worldData.dayTime % 24000} / 24000 ticks</span>
+                <span class="font-mono">{worldData.time.timeOfDay} / 24000 ticks</span>
               </div>
               <progress
                 class="progress progress-info w-full h-2"
-                value={worldData.dayTime % 24000}
+                value={worldData.time.timeOfDay}
                 max="24000"
               ></progress>
             </div>
@@ -291,13 +310,20 @@
 
           <div class="space-y-2.5 text-xs">
             <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
-              <span class="text-base-content/70">Engine Tick</span>
-              <span class="font-mono font-bold">{appState.tick || healthData?.eventRingBufferHead || 'Active'}</span>
+              <span class="text-base-content/70">Client Tick</span>
+              <span class="font-mono font-bold">{healthData?.tick ?? appState.tick}</span>
             </div>
 
             <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
-              <span class="text-base-content/70">Event Buffer Capacity</span>
-              <span class="font-mono font-semibold">{healthData?.eventRingBufferSize ?? 1024} events</span>
+              <span class="text-base-content/70">Uptime</span>
+              <span class="font-mono font-semibold">{healthData ? formatUptime(healthData.uptimeMs) : '-'}</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
+              <span class="text-base-content/70">Task Queue</span>
+              <span class="font-mono font-semibold">
+                {healthData ? `${healthData.queue.depth} / ${healthData.queue.capacity} · p99 ${healthData.queue.p99TaskMicros} µs` : '-'}
+              </span>
             </div>
 
             <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
@@ -308,8 +334,8 @@
             </div>
 
             <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
-              <span class="text-base-content/70">API Health Status</span>
-              <span class="badge badge-sm badge-success">OK / Ready</span>
+              <span class="text-base-content/70">API Permission</span>
+              <span class="badge badge-sm badge-success font-mono">{healthData?.permission ?? 'read'}</span>
             </div>
           </div>
         </div>
@@ -335,15 +361,18 @@
           <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             <div class="flex items-center gap-4">
               <div class="relative w-16 h-16 bg-base-300/80 rounded-xl overflow-hidden flex items-center justify-center border border-base-300 shrink-0 shadow-inner">
-                <img
-                  src={getPlayerSkinImageUrl()}
-                  alt="Player Skin Texture"
-                  class="w-full h-full object-contain [image-rendering:pixelated]"
-                  onerror={(e) => { (e.currentTarget as HTMLElement).style.display = 'none' }}
-                />
+                {#if skinImageUrl}
+                  <img
+                    src={skinImageUrl}
+                    alt="Player Skin Texture"
+                    class="w-full h-full object-contain [image-rendering:pixelated]"
+                  />
+                {:else}
+                  <User class="w-6 h-6 text-base-content/30" />
+                {/if}
               </div>
               <div class="space-y-1 text-xs">
-                <div class="font-semibold text-base-content text-sm">{playerData?.name}</div>
+                <div class="font-semibold text-base-content text-sm">{playerName}</div>
                 <div class="text-base-content/70">Model: <span class="badge badge-xs badge-neutral capitalize font-mono">{skinData?.model || 'wide'}</span></div>
                 <div class="text-base-content/70">Security: <span class="badge badge-xs {skinData?.secure ? 'badge-success' : 'badge-ghost'}">{skinData?.secure ? 'Official Mojang Profile' : 'Default / Custom'}</span></div>
               </div>
@@ -360,14 +389,16 @@
                   <span>Mojang URL</span>
                 </a>
               {/if}
-              <a
-                href={getPlayerSkinImageUrl()}
-                download="{playerData?.name || 'player'}_skin.png"
-                class="btn btn-xs btn-outline btn-primary gap-1"
-              >
-                <Download class="w-3.5 h-3.5" />
-                <span>Download Skin PNG</span>
-              </a>
+              {#if skinImageUrl}
+                <a
+                  href={skinImageUrl}
+                  download="{playerName}_skin.png"
+                  class="btn btn-xs btn-outline btn-primary gap-1"
+                >
+                  <Download class="w-3.5 h-3.5" />
+                  <span>Download Skin PNG</span>
+                </a>
+              {/if}
             </div>
           </div>
         </div>

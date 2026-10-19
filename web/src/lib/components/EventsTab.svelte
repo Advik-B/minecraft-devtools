@@ -88,12 +88,13 @@
 
   function getTopicBadgeClass(topic: string): string {
     if (topic.startsWith('chat')) return 'badge-success'
-    if (topic.startsWith('player')) return 'badge-info'
+    if (topic.startsWith('screen')) return 'badge-info'
+    if (topic.startsWith('player')) return 'badge-error'
     if (topic.startsWith('world')) return 'badge-primary'
     if (topic.startsWith('entity')) return 'badge-accent'
     if (topic.startsWith('block')) return 'badge-secondary'
     if (topic.startsWith('packet')) return 'badge-warning'
-    return 'badge-neutral'
+    return 'badge-ghost'
   }
 
   function copyPayload(id: string, data: unknown, e: MouseEvent) {

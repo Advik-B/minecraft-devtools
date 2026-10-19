@@ -94,7 +94,6 @@ export async function getClient(): Promise<ClientResponse | null> {
   const data = await fetchApi<ClientResponse>('/v1/client')
   if (data) {
     if (data.fps !== undefined) appState.fps = data.fps
-    if (data.session?.username) appState.playerName = data.session.username
   }
   return data
 }
@@ -103,7 +102,6 @@ export async function getPlayer(): Promise<PlayerResponse | null> {
   const data = await fetchApi<PlayerResponse>('/v1/player')
   if (data) {
     appState.inGame = true
-    if (data.name) appState.playerName = data.name
   } else {
     appState.inGame = false
   }
@@ -130,7 +128,12 @@ export async function pressKey(key: string, action = 'press'): Promise<boolean> 
   return !!res
 }
 
-export async function captureScreenshot(): Promise<string | null> {
+/**
+ * Fetches a binary endpoint with the bearer token and returns an object URL for it.
+ * Plain <img src> and <a href> can't send the Authorization header, so images go through here.
+ * The caller owns the URL and should revoke it with URL.revokeObjectURL when done.
+ */
+export async function fetchBlobUrl(path: string): Promise<string | null> {
   const token = appState.token
   if (!token) {
     appState.tokenModalOpen = true
@@ -138,7 +141,7 @@ export async function captureScreenshot(): Promise<string | null> {
   }
 
   try {
-    const res = await fetch('/v1/screenshot', {
+    const res = await fetch(path, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -149,6 +152,10 @@ export async function captureScreenshot(): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+export async function captureScreenshot(): Promise<string | null> {
+  return fetchBlobUrl('/v1/screenshot')
 }
 
 // --- Inventory & Screen APIs ---
@@ -332,14 +339,16 @@ export async function getPlayerSkinInfo(player?: string, embedImage?: boolean): 
   if (player) params.set('player', player)
   if (embedImage) params.set('embed_image', 'true')
   const query = params.toString() ? `?${params.toString()}` : ''
-  return await fetchApi<PlayerSkinResponse>(`/v1/player/skin/info${query}`)
+  const data = await fetchApi<PlayerSkinResponse>(`/v1/player/skin/info${query}`)
+  if (data && !player && data.playerName) appState.playerName = data.playerName
+  return data
 }
 
-export function getPlayerSkinImageUrl(player?: string): string {
+export async function loadPlayerSkinImage(player?: string): Promise<string | null> {
   const params = new URLSearchParams()
   if (player) params.set('player', player)
   const query = params.toString() ? `?${params.toString()}` : ''
-  return `/v1/player/skin${query}`
+  return fetchBlobUrl(`/v1/player/skin${query}`)
 }
 
 export async function getLoadedAtlases(): Promise<TextureAtlasesResponse | null> {
@@ -354,9 +363,9 @@ export async function getAtlasDetails(atlasId?: string, embedImage?: boolean): P
   return await fetchApi<TextureAtlasResponse>(`/v1/textures/atlas${query}`)
 }
 
-export function getAtlasImageUrl(atlasId?: string): string {
+export async function loadAtlasImage(atlasId?: string): Promise<string | null> {
   const params = new URLSearchParams()
   if (atlasId) params.set('id', atlasId)
   const query = params.toString() ? `?${params.toString()}` : ''
-  return `/v1/textures/atlas/image${query}`
+  return fetchBlobUrl(`/v1/textures/atlas/image${query}`)
 }

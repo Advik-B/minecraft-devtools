@@ -1,57 +1,91 @@
+// Mirrors api/v1/HealthResponse.java
 export interface HealthResponse {
-  status: string
   mcdtVersion: string
   gameVersion: string
-  baritone?: string
-  clientUptimeMs?: number
-  eventRingBufferSize?: number
-  eventRingBufferHead?: number
+  uptimeMs: number
+  tick: number
+  queue: {
+    depth: number
+    capacity: number
+    avgTaskMicros: number
+    p99TaskMicros: number
+  }
+  baritone: string
+  permission: string
+  droppedEvents: number
 }
 
+// Mirrors api/v1/dto/ClientDto.java
 export interface ClientResponse {
-  version?: string
-  fps?: number
-  session?: {
-    username?: string
-    uuid?: string
+  fps: number
+  window: {
+    width: number
+    height: number
+    guiScaledWidth: number
+    guiScaledHeight: number
+    guiScale: number
+    fullscreen: boolean
+    focused: boolean
+  }
+  screen: {
+    open: boolean
+    className?: string
+    title?: string
+  }
+  connectionState: 'menu' | 'singleplayer' | 'multiplayer' | string
+  server?: {
+    address: string
+    ping: number
+    version: string
+    motd: string
+    lan: boolean
   }
 }
 
+// Mirrors api/v1/dto/PlayerDto.java
 export interface PlayerResponse {
-  name: string
-  uuid?: string
-  health?: number
-  maxHealth?: number
-  foodLevel?: number
-  saturation?: number
-  level?: number
-  experienceProgress?: number
-  position?: {
-    x: number
-    y: number
-    z: number
-    yaw: number
-    pitch: number
-  }
-  movement?: {
-    isSneaking: boolean
-    isSprinting: boolean
-    isOnGround: boolean
-    isSwimming: boolean
-    isFallFlying: boolean
+  pos: [number, number, number]
+  rotation: { yaw: number; pitch: number }
+  velocity: [number, number, number]
+  health: number
+  maxHealth: number
+  absorption: number
+  food: number
+  saturation: number
+  experience: { level: number; progress: number; total: number }
+  gameMode: string
+  pose: string
+  onGround: boolean
+  sneaking: boolean
+  sprinting: boolean
+  swimming: boolean
+  sleeping: boolean
+  air: { current: number; max: number }
+  effects: Array<{
+    id: string
+    amplifier: number
+    durationTicks: number
+    ambient: boolean
+    visible: boolean
+  }>
+  abilities: {
+    flying: boolean
+    mayfly: boolean
+    instabuild: boolean
+    invulnerable: boolean
   }
 }
 
+// Mirrors api/v1/dto/WorldDto.java
 export interface WorldResponse {
-  dimension?: string
-  time?: number
-  dayTime?: number
-  gameTime?: number
-  isRaining?: boolean
-  isThundering?: boolean
-  difficulty?: string
-  loadedEntitiesCount?: number
-  loadedChunksCount?: number
+  dimension: string
+  time: { dayTime: number; gameTime: number; day: number; timeOfDay: number }
+  weather: { raining: boolean; thundering: boolean; rainLevel: number; thunderLevel: number }
+  difficulty: string
+  hardcore: boolean
+  spawn: { x: number; y: number; z: number }
+  loadedChunks: number
+  entityCount: number
 }
 
 export interface GameEvent {
@@ -150,7 +184,7 @@ export interface EntitiesResponse {
 }
 
 export interface RaycastResponse {
-  hitType: 'MISS' | 'BLOCK' | 'ENTITY' | string
+  hitType: 'miss' | 'block' | 'entity'
   pos: [number, number, number]
   distance: number
   block?: {
@@ -218,7 +252,8 @@ export interface RootDescriptor {
 }
 
 export interface RootsResponse {
-  roots: Record<string, RootDescriptor>
+  // a root is null while it doesn't exist, e.g. screen when no GUI is open
+  roots: Record<string, RootDescriptor | null>
 }
 
 export interface ObjectInspectResponse {

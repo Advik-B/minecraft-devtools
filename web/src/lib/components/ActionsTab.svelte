@@ -221,7 +221,7 @@
       <!-- D-Pad Buttons -->
       <div class="flex flex-col items-center justify-center gap-2 py-2">
         <button
-          class="btn btn-sm btn-outline btn-neutral w-24 gap-1"
+          class="btn btn-sm btn-outline w-24 gap-1"
           onclick={() => handleMove('forward')}
         >
           <ArrowUp class="w-4 h-4" />
@@ -229,7 +229,7 @@
         </button>
         <div class="flex items-center gap-2">
           <button
-            class="btn btn-sm btn-outline btn-neutral w-24 gap-1"
+            class="btn btn-sm btn-outline w-24 gap-1"
             onclick={() => handleMove('left')}
           >
             <ArrowLeft class="w-4 h-4" />
@@ -243,7 +243,7 @@
             <Square class="w-4 h-4 fill-current" />
           </button>
           <button
-            class="btn btn-sm btn-outline btn-neutral w-24 gap-1"
+            class="btn btn-sm btn-outline w-24 gap-1"
             onclick={() => handleMove('right')}
           >
             <ArrowRight class="w-4 h-4" />
@@ -251,7 +251,7 @@
           </button>
         </div>
         <button
-          class="btn btn-sm btn-outline btn-neutral w-24 gap-1"
+          class="btn btn-sm btn-outline w-24 gap-1"
           onclick={() => handleMove('backward')}
         >
           <ArrowDown class="w-4 h-4" />
@@ -265,7 +265,7 @@
           <span>Jump</span>
           <kbd class="kbd kbd-xs">Space</kbd>
         </button>
-        <button class="btn btn-xs btn-outline btn-neutral" onclick={() => handleMove('stop')}>
+        <button class="btn btn-xs btn-outline" onclick={() => handleMove('stop')}>
           <span>Halt All</span>
         </button>
       </div>
@@ -296,9 +296,9 @@
       <div class="space-y-2 pt-2 border-t border-base-300">
         <span class="text-xs font-semibold text-base-content/70">Vertical Tilt:</span>
         <div class="grid grid-cols-3 gap-2">
-          <button class="btn btn-xs btn-neutral btn-outline" onclick={() => handleDeltaPitch(-15)}>Look Up (-15°)</button>
-          <button class="btn btn-xs btn-neutral btn-outline" onclick={() => handleSnapLook(0, 0, 'Level')}>Level (0°)</button>
-          <button class="btn btn-xs btn-neutral btn-outline" onclick={() => handleDeltaPitch(15)}>Look Down (+15°)</button>
+          <button class="btn btn-xs btn-outline" onclick={() => handleDeltaPitch(-15)}>Look Up (-15°)</button>
+          <button class="btn btn-xs btn-outline" onclick={() => handleSnapLook(0, 0, 'Level')}>Level (0°)</button>
+          <button class="btn btn-xs btn-outline" onclick={() => handleDeltaPitch(15)}>Look Down (+15°)</button>
         </div>
       </div>
     </div>

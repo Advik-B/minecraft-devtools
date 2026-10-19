@@ -134,10 +134,10 @@
 
   async function handleFillCurrentCoords() {
     const pl = await getPlayer().catch(() => null)
-    if (pl?.position) {
-      gotoX = Math.round(pl.position.x)
-      gotoY = Math.round(pl.position.y)
-      gotoZ = Math.round(pl.position.z)
+    if (pl) {
+      gotoX = Math.round(pl.pos[0])
+      gotoY = Math.round(pl.pos[1])
+      gotoZ = Math.round(pl.pos[2])
       toastStore.show('Filled current coordinates', 'info', 1000)
     }
   }

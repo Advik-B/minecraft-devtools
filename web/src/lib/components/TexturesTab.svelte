@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { appState } from '../stores.svelte'
-  import { getLoadedAtlases, getAtlasDetails, getAtlasImageUrl } from '../api'
+  import { getLoadedAtlases, getAtlasDetails, loadAtlasImage } from '../api'
   import { toastStore } from '../toast.svelte'
   import type { TextureAtlasesResponse, TextureAtlasResponse, TextureAtlasSprite } from '../types'
   import {
@@ -22,6 +22,7 @@
   let atlases = $state<TextureAtlasesResponse | null>(null)
   let selectedAtlasId = $state<string>('minecraft:textures/atlas/blocks.png')
   let atlasData = $state<TextureAtlasResponse | null>(null)
+  let atlasImageUrl = $state<string | null>(null)
   let loading = $state(false)
   let searchQuery = $state('')
   let selectedSpriteName = $state<string | null>(null)
@@ -46,6 +47,7 @@
     loading = true
     try {
       atlasData = await getAtlasDetails(selectedAtlasId)
+      void refreshAtlasImage(selectedAtlasId)
       if (atlasData && Object.keys(atlasData.sprites).length > 0) {
         if (!selectedSpriteName || !atlasData.sprites[selectedSpriteName]) {
           selectedSpriteName = Object.keys(atlasData.sprites)[0]
@@ -58,8 +60,23 @@
     }
   }
 
+  async function refreshAtlasImage(id: string) {
+    const url = await loadAtlasImage(id).catch(() => null)
+    if (id !== selectedAtlasId) {
+      // the user picked another atlas while this one was loading
+      if (url) URL.revokeObjectURL(url)
+      return
+    }
+    if (atlasImageUrl) URL.revokeObjectURL(atlasImageUrl)
+    atlasImageUrl = url
+  }
+
   onMount(() => {
     loadAtlases()
+  })
+
+  onDestroy(() => {
+    if (atlasImageUrl) URL.revokeObjectURL(atlasImageUrl)
   })
 
   function selectAtlas(id: string) {
@@ -68,7 +85,7 @@
     loadAtlasDetails()
   }
 
-  const filteredSprites = $derived(() => {
+  const filteredSprites = $derived.by(() => {
     if (!atlasData?.sprites) return []
     const q = searchQuery.toLowerCase().trim()
     const entries = Object.entries(atlasData.sprites)
@@ -76,7 +93,7 @@
     return entries.filter(([name]) => name.toLowerCase().includes(q)).slice(0, 300)
   })
 
-  const selectedSprite = $derived<TextureAtlasSprite | null>(() => {
+  const selectedSprite = $derived.by<TextureAtlasSprite | null>(() => {
     if (!atlasData?.sprites || !selectedSpriteName) return null
     return atlasData.sprites[selectedSpriteName] || null
   })
@@ -144,9 +161,9 @@
         </button>
 
         <a
-          href={getAtlasImageUrl(selectedAtlasId)}
+          href={atlasImageUrl}
           download="{selectedAtlasId.split('/').pop() || 'atlas'}"
-          class="btn btn-sm btn-outline btn-primary gap-1.5"
+          class="btn btn-sm btn-outline btn-primary gap-1.5 {atlasImageUrl ? '' : 'btn-disabled'}"
         >
           <Download class="w-3.5 h-3.5" />
           <span>Download PNG</span>
@@ -197,11 +214,13 @@
             style="width: {atlasData.width * zoom}px; height: {atlasData.height * zoom}px; min-width: {atlasData.width * zoom}px; min-height: {atlasData.height * zoom}px;"
           >
             <!-- Stitched Texture Image -->
-            <img
-              src={getAtlasImageUrl(selectedAtlasId)}
-              alt="Texture Atlas"
-              class="w-full h-full object-fill [image-rendering:pixelated] select-none pointer-events-none"
-            />
+            {#if atlasImageUrl}
+              <img
+                src={atlasImageUrl}
+                alt="Texture Atlas"
+                class="w-full h-full object-fill [image-rendering:pixelated] select-none pointer-events-none"
+              />
+            {/if}
 
             <!-- Highlight Overlay for Selected Sprite -->
             {#if selectedSprite}
@@ -308,12 +327,12 @@
         </div>
 
         <div class="text-[11px] text-base-content/60 flex items-center justify-between px-1">
-          <span>Showing {filteredSprites().length} matching sprites</span>
+          <span>Showing {filteredSprites.length} matching sprites</span>
           <span>Max 300 shown</span>
         </div>
 
         <div class="overflow-y-auto max-h-[340px] space-y-1 pr-1">
-          {#each filteredSprites() as [name, sprite]}
+          {#each filteredSprites as [name, sprite]}
             <button
               class="w-full text-left px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center justify-between gap-2 {selectedSpriteName === name ? 'bg-primary text-primary-content font-bold' : 'hover:bg-base-300/60 text-base-content/80'}"
               onclick={() => selectedSpriteName = name}
@@ -322,7 +341,7 @@
               <span class="text-[10px] opacity-75 shrink-0">{sprite.width}&times;{sprite.height}</span>
             </button>
           {/each}
-          {#if filteredSprites().length === 0}
+          {#if filteredSprites.length === 0}
             <div class="p-4 text-center text-xs text-base-content/50">
               No sprites match "{searchQuery}"
             </div>
