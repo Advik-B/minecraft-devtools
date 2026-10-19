@@ -37,7 +37,7 @@ class AppState {
   playerName = $state('')
   fps = $state(0)
   tick = $state(0)
-  activeTab = $state<'telemetry' | 'events' | 'actions' | 'docs'>('telemetry')
+  activeTab = $state<'telemetry' | 'inventory' | 'radar' | 'baritone' | 'actions' | 'reflection' | 'events' | 'docs'>('telemetry')
   wsStatus = $state<'connected' | 'connecting' | 'disconnected'>('disconnected')
 
   setToken(newToken: string) {

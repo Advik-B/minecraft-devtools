@@ -339,6 +339,40 @@ public final class MinecraftGameClient implements GameClient {
 	}
 
 	@Override
+	public EntitiesDto.CategoriesResponse getEntityCategories() {
+		List<String> hostile = new ArrayList<>();
+		List<String> passive = new ArrayList<>();
+		Map<String, String> categories = new LinkedHashMap<>();
+
+		for (var entry : BuiltInRegistries.ENTITY_TYPE.entrySet()) {
+			ResourceLocation rl = entry.getKey().location();
+			net.minecraft.world.entity.EntityType<?> type = entry.getValue();
+			String id = rl.toString();
+			net.minecraft.world.entity.MobCategory mobCat = type.getCategory();
+
+			String cat;
+			if (type == net.minecraft.world.entity.EntityType.PLAYER) {
+				cat = "player";
+			} else if (type == net.minecraft.world.entity.EntityType.ITEM) {
+				cat = "item";
+			} else if (mobCat == net.minecraft.world.entity.MobCategory.MONSTER) {
+				cat = "hostile";
+				hostile.add(id);
+			} else if (mobCat.isFriendly()) {
+				cat = "passive";
+				passive.add(id);
+			} else {
+				cat = "other";
+			}
+			categories.put(id, cat);
+		}
+
+		Collections.sort(hostile);
+		Collections.sort(passive);
+		return new EntitiesDto.CategoriesResponse(hostile, passive, categories);
+	}
+
+	@Override
 	public RaycastDto raycast(double[] from, double[] direction, Double maxDistance, Boolean includeFluids, Boolean includeEntities) {
 		Minecraft client = Minecraft.getInstance();
 		ClientLevel level = client.level;

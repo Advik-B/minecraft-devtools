@@ -5,6 +5,11 @@ import dev.advik.mcdt.api.v1.dto.EntitiesDto.EntityInfo;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -38,6 +43,19 @@ public final class EntitySerializer {
 				new double[]{bb.maxX, bb.maxY, bb.maxZ}
 		);
 
+		String category;
+		if (entity instanceof Player) {
+			category = "player";
+		} else if (entity instanceof ItemEntity) {
+			category = "item";
+		} else if (entity instanceof Enemy || entity.getType().getCategory() == MobCategory.MONSTER) {
+			category = "hostile";
+		} else if (entity.getType().getCategory().isFriendly() || entity instanceof Animal) {
+			category = "passive";
+		} else {
+			category = "other";
+		}
+
 		return new EntityInfo(
 				id,
 				uuid,
@@ -51,7 +69,8 @@ public final class EntitySerializer {
 				health,
 				maxHealth,
 				customName,
-				boundingBox
+				boundingBox,
+				category
 		);
 	}
 }

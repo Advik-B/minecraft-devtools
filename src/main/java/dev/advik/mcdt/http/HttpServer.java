@@ -143,6 +143,7 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/world", new WorldHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/blocks", new BlocksHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/entities", new EntitiesHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/world/entities/categories", new EntityCategoriesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/raycast", new RaycastHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/screen", new ScreenHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/registries", new RegistriesHandler(config, queue, gameClient), McdtRole.READ);

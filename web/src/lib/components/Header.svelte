@@ -1,12 +1,26 @@
 <script lang="ts">
   import { appState } from '../stores.svelte'
-  import { Activity, Radio, Terminal, BookOpen, Key } from 'lucide-svelte'
+  import {
+    Activity,
+    Package,
+    Radar,
+    Bot,
+    Gamepad2,
+    Cpu,
+    Radio,
+    BookOpen,
+    Key
+  } from 'lucide-svelte'
 
   const tabs = [
     { id: 'telemetry', label: 'Telemetry', icon: Activity },
-    { id: 'events', label: 'Event Stream', icon: Radio },
-    { id: 'actions', label: 'Quick Actions', icon: Terminal },
-    { id: 'docs', label: 'API Docs', icon: BookOpen }
+    { id: 'inventory', label: 'Inventory', icon: Package },
+    { id: 'radar', label: 'Radar', icon: Radar },
+    { id: 'baritone', label: 'Baritone', icon: Bot },
+    { id: 'actions', label: 'Controls & Actions', icon: Gamepad2 },
+    { id: 'reflection', label: 'Reflection', icon: Cpu },
+    { id: 'events', label: 'Events', icon: Radio },
+    { id: 'docs', label: 'Docs', icon: BookOpen }
   ] as const
 </script>
 

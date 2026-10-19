@@ -15,6 +15,8 @@ public interface GameClient {
 
 	EntitiesDto getEntities(Double radius, String typeFilter, double[] center, Integer limit);
 
+	EntitiesDto.CategoriesResponse getEntityCategories();
+
 	RaycastDto raycast(double[] from, double[] direction, Double maxDistance, Boolean includeFluids, Boolean includeEntities);
 
 	ScreenDto getScreen();

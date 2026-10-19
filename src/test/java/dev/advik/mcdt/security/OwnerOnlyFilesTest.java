@@ -3,6 +3,7 @@ package dev.advik.mcdt.security;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +29,10 @@ class OwnerOnlyFilesTest {
 		assertArrayEquals(newContent, Files.readAllBytes(target));
 
 		Files.deleteIfExists(target);
-		Files.deleteIfExists(target.getParent());
+		try {
+			Files.deleteIfExists(target.getParent());
+		} catch (IOException ignored) {
+			// On Windows NTFS, file handle release may be asynchronous; @TempDir cleans up on tearDown
+		}
 	}
 }

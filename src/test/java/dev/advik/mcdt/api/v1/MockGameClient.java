@@ -154,6 +154,15 @@ public class MockGameClient implements GameClient {
 	}
 
 	@Override
+	public EntitiesDto.CategoriesResponse getEntityCategories() {
+		return new EntitiesDto.CategoriesResponse(
+				List.of("minecraft:zombie", "minecraft:skeleton"),
+				List.of("minecraft:pig", "minecraft:cow"),
+				Map.of("minecraft:zombie", "hostile", "minecraft:skeleton", "hostile", "minecraft:pig", "passive", "minecraft:cow", "passive")
+		);
+	}
+
+	@Override
 	public RaycastDto raycast(double[] from, double[] direction, Double maxDistance, Boolean includeFluids, Boolean includeEntities) {
 		if (!hasWorld) {
 			throw Problems.noWorld();

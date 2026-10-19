@@ -26,17 +26,19 @@
   let copiedId = $state<string | null>(null)
   let unsubscribe: (() => void) | null = null
 
-  const topicOptions = [
-    { value: 'all', label: 'All Topics' },
-    { value: 'chat', label: 'chat' },
-    { value: 'screen', label: 'screen.*' },
-    { value: 'player', label: 'player.*' },
-    { value: 'world', label: 'world.*' },
-    { value: 'entity', label: 'entity.*' },
-    { value: 'block', label: 'block.*' },
-    { value: 'packet', label: 'packet.*' },
-    { value: 'tick', label: 'tick' }
-  ]
+  const topicOptions = $derived.by(() => {
+    const defaultPrefixes = ['chat', 'screen', 'player', 'world', 'entity', 'block', 'packet', 'tick']
+    const prefixes = new Set<string>(defaultPrefixes)
+    for (const ev of events) {
+      const p = ev.topic.split('.')[0]
+      if (p) prefixes.add(p)
+    }
+    const sorted = Array.from(prefixes).sort()
+    return [
+      { value: 'all', label: 'All Topics' },
+      ...sorted.map(p => ({ value: p, label: p === 'chat' || p === 'tick' ? p : `${p}.*` }))
+    ]
+  })
 
   $effect(() => {
     eventStream.setSubscribeTicks(includeTicks)
@@ -60,7 +62,7 @@
     }
   })
 
-  const filteredEvents = $derived(() => {
+  const filteredEvents = $derived.by(() => {
     return events.filter((ev) => {
       if (filterTopic !== 'all') {
         if (!ev.topic.startsWith(filterTopic)) return false
@@ -126,7 +128,7 @@
               <span>{appState.wsStatus}</span>
             </span>
             <span class="text-xs text-base-content/60 font-mono">
-              ({filteredEvents().length} events)
+              ({filteredEvents.length} events)
             </span>
             {#if isPaused}
               <span class="badge badge-soft badge-warning badge-xs">Stream Paused</span>
@@ -190,7 +192,7 @@
     </div>
 
     <!-- Events Table -->
-    {#if filteredEvents().length === 0}
+    {#if filteredEvents.length === 0}
       <div class="text-center py-12 px-4 rounded-xl border border-dashed border-base-300 bg-base-100/50">
         <div class="w-12 h-12 mx-auto rounded-full bg-base-200 flex items-center justify-center text-base-content/40 mb-3">
           <Inbox class="w-6 h-6" />
@@ -213,7 +215,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each filteredEvents() as ev (ev.id)}
+            {#each filteredEvents as ev (ev.id)}
               {@const isExpanded = !!expandedRows[ev.id]}
               <tr
                 class="hover:bg-base-200/50 cursor-pointer transition-colors"

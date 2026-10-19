@@ -22,6 +22,7 @@ public final class ItemSerializer {
 
 		Integer damage = stack.isDamageableItem() ? stack.getDamageValue() : null;
 		Integer maxDamage = stack.isDamageableItem() ? stack.getMaxDamage() : null;
+		String rarity = stack.getRarity().name().toLowerCase();
 
 		Map<String, Object> components = new LinkedHashMap<>();
 		try {
@@ -43,6 +44,7 @@ public final class ItemSerializer {
 				name,
 				damage,
 				maxDamage,
+				rarity,
 				components.isEmpty() ? null : components
 		);
 	}

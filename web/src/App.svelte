@@ -7,8 +7,12 @@
   import TokenModal from './lib/components/TokenModal.svelte'
   import ToastContainer from './lib/components/ToastContainer.svelte'
   import TelemetryTab from './lib/components/TelemetryTab.svelte'
-  import EventsTab from './lib/components/EventsTab.svelte'
+  import InventoryTab from './lib/components/InventoryTab.svelte'
+  import RadarTab from './lib/components/RadarTab.svelte'
+  import BaritoneTab from './lib/components/BaritoneTab.svelte'
   import ActionsTab from './lib/components/ActionsTab.svelte'
+  import ReflectionTab from './lib/components/ReflectionTab.svelte'
+  import EventsTab from './lib/components/EventsTab.svelte'
   import DocsTab from './lib/components/DocsTab.svelte'
 
   onMount(() => {
@@ -28,10 +32,18 @@
 <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if appState.activeTab === 'telemetry'}
     <TelemetryTab />
-  {:else if appState.activeTab === 'events'}
-    <EventsTab />
+  {:else if appState.activeTab === 'inventory'}
+    <InventoryTab />
+  {:else if appState.activeTab === 'radar'}
+    <RadarTab />
+  {:else if appState.activeTab === 'baritone'}
+    <BaritoneTab />
   {:else if appState.activeTab === 'actions'}
     <ActionsTab />
+  {:else if appState.activeTab === 'reflection'}
+    <ReflectionTab />
+  {:else if appState.activeTab === 'events'}
+    <EventsTab />
   {:else if appState.activeTab === 'docs'}
     <DocsTab />
   {/if}
