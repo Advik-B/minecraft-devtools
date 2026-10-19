@@ -3,8 +3,8 @@
 .gradle/
 build/
 out/
-classes/
-libs/
+libs/*
+!libs/baritone-api-fabric-*.jar
 
 # eclipse
 

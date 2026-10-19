@@ -34,6 +34,31 @@ loom {
 
 fun prop(name: String): String = providers.gradleProperty(name).get()
 
+object ChecksumUtils {
+	fun sha256Of(bytes: ByteArray): String =
+		MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+}
+
+fun ensureBaritoneJar(): File {
+	val version = prop("baritone_version")
+	val sha256 = prop("baritone_sha256")
+	val libsDir = file("libs")
+	libsDir.mkdirs()
+	val jarFile = libsDir.resolve("baritone-api-fabric-$version.jar")
+	if (jarFile.isFile && ChecksumUtils.sha256Of(jarFile.readBytes()) == sha256.lowercase()) {
+		return jarFile
+	}
+	val url = "https://github.com/cabaletta/baritone/releases/download/v$version/baritone-api-fabric-$version.jar"
+	println("Downloading Baritone API Fabric jar from $url...")
+	val bytes = URI(url).toURL().openStream().use { it.readBytes() }
+	val actual = ChecksumUtils.sha256Of(bytes)
+	if (actual != sha256.lowercase()) {
+		throw GradleException("Checksum mismatch for $url: expected $sha256, got $actual")
+	}
+	jarFile.writeBytes(bytes)
+	return jarFile
+}
+
 // Libraries that ship inside the mod jar (Loom jar-in-jar). Loom's `include` is not transitive,
 // so every resolved artifact of this configuration is added to `include` below.
 val bundled: Configuration = configurations.create("bundled") {
@@ -84,8 +109,9 @@ dependencies {
 	testImplementation("io.javalin:javalin-testtools:${prop("javalin_version")}")
 
 	// Baritone API (optional, modCompileOnly)
-	modCompileOnly(files("libs/baritone-api-fabric-${prop("baritone_version")}.jar"))
-	testImplementation(files("libs/baritone-api-fabric-${prop("baritone_version")}.jar"))
+	val baritoneJar = ensureBaritoneJar()
+	modCompileOnly(files(baritoneJar))
+	testImplementation(files(baritoneJar))
 
 	// Optional config UI: compile against it, run it in dev, never ship or require it.
 	modCompileOnly("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
@@ -105,18 +131,15 @@ abstract class DownloadVerified : DefaultTask() {
 	fun download() {
 		val target = outputDir.file(relativePath).get().asFile
 		val expected = sha256.get().lowercase()
-		if (target.isFile && sha256Of(target.readBytes()) == expected) return
+		if (target.isFile && ChecksumUtils.sha256Of(target.readBytes()) == expected) return
 		val bytes = URI(url.get()).toURL().openStream().use { it.readBytes() }
-		val actual = sha256Of(bytes)
+		val actual = ChecksumUtils.sha256Of(bytes)
 		if (actual != expected) {
 			throw GradleException("Checksum mismatch for ${url.get()}: expected $expected, got $actual")
 		}
 		target.parentFile.mkdirs()
 		target.writeBytes(bytes)
 	}
-
-	private fun sha256Of(bytes: ByteArray): String =
-		MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }
 
 val downloadScalar = tasks.register<DownloadVerified>("downloadScalar") {
@@ -139,10 +162,25 @@ val downloadBaritoneApi = tasks.register<DownloadVerified>("downloadBaritoneApi"
 	outputDir = layout.projectDirectory.dir("libs")
 }
 
+val installWeb = tasks.register<Exec>("installWeb") {
+	group = "build setup"
+	description = "Installs WebUI npm dependencies using Bun."
+
+	val webDir = layout.projectDirectory.dir("web")
+	val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+
+	workingDir = webDir.asFile
+	commandLine = if (isWindows) listOf("cmd", "/c", "bun install --frozen-lockfile") else listOf("bun", "install", "--frozen-lockfile")
+
+	inputs.file(webDir.file("package.json"))
+	inputs.file(webDir.file("bun.lock"))
+	outputs.dir(webDir.dir("node_modules"))
+}
 
 val buildWeb = tasks.register<Exec>("buildWeb") {
 	group = "build setup"
 	description = "Builds the Svelte WebUI dashboard using Bun."
+	dependsOn(installWeb)
 
 	val webDir = layout.projectDirectory.dir("web")
 	val isWindows = System.getProperty("os.name").lowercase().contains("windows")
@@ -182,6 +220,10 @@ tasks.processResources {
 	filesMatching("fabric.mod.json") {
 		expand("version" to version)
 	}
+}
+
+tasks.matching { it.name == "sourcesJar" }.configureEach {
+	dependsOn(syncWebAssets)
 }
 
 tasks.withType<JavaCompile>().configureEach {
