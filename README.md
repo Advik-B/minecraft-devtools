@@ -1,165 +1,230 @@
+<div align="center">
+
+<img src="src/main/resources/assets/mcdt/icon_256.png" alt="MCDT logo" width="112" height="112">
+
 # MCDT: Minecraft DevTools
 
-Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a local REST and WebSocket API.
+**Turn the running Minecraft client into a local API.**<br>
+Read game state, drive input, stream events, and inspect the live object graph over REST, WebSocket, and MCP, from any language, with no Java and no restart.
+
+[![Build](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml/badge.svg)](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml)
+![Minecraft 1.21.4](https://img.shields.io/badge/Minecraft-1.21.4-62B47A?logo=modrinth&logoColor=white)
+![Fabric](https://img.shields.io/badge/loader-Fabric-DBD0B4)
+![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
+[![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
+
+[Features](#features) · [Getting started](#getting-started) · [AI agents (MCP)](#use-it-from-an-ai-agent-mcp) · [API](#api-at-a-glance) · [Configuration](#configuration) · [Development](#development)
+
+<img src="docs/images/hero.jpg" alt="The MCDT dashboard inspecting the live LocalPlayer object, floating over a Minecraft scene" width="900">
+
+</div>
+
+## Overview
+
+MCDT is a **client-only Fabric mod**. It runs a small HTTP server inside the game on `127.0.0.1:25580` and exposes the live client as a REST API with an OpenAPI spec, WebSocket streams, and a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. A Svelte dashboard ships in the same jar.
+
+You can `curl` the game, script it from Python, build an overlay in the browser, or let an AI agent play it. You don't write a mod, attach a debugger, or scrape the screen.
+
+<img src="docs/images/in-game-chat.jpg" alt="In-game chat showing messages sent through POST /v1/chat" width="100%">
+
+<sup>Every message in that chat box was sent with <code>curl</code>. The scene itself was set up the same way: the world was created by clicking title-screen widgets through <code>/v1/screen/actions</code>, and the animals were placed with commands sent to <code>/v1/chat</code>.</sup>
+
+> [!WARNING]
+> MCDT is an early `0.1.0-SNAPSHOT`. Automation can break a multiplayer server's rules. By default MCDT blocks write actions on any multiplayer server that is not on your allowlist, but you are responsible for how you use it.
 
 ## Features
 
-### In-Game Configuration Screen
-- **Where:** install [Mod Menu](https://modrinth.com/mod/modmenu) and [YetAnotherConfigLib (YACL) 3.x](https://modrinth.com/mod/yacl), then open *Mods → Minecraft DevTools → Configure*. Both are optional; without them MCDT works as before and you edit `config/mcdt/config.json` by hand.
-- **Categories:** Server, Security, Performance, Integrations. Every setting in `config.json` is editable.
-- **Applying changes:** pressing *Save Changes* writes `config.json`. Settings read live (permission, quit endpoints, request timeout, tick budget, MCP and Baritone toggles, origin and multiplayer allowlists, subscriber queue size) apply immediately. Startup-only settings (enable server, port, bind address, rate limit, max request size, task queue capacity, event ring buffer size, MCP notification throttle) are marked *Requires a game restart* and show a restart prompt.
+- **Read everything.** Player, inventory, world, entities, block regions, raycasts, open screens and widgets, registries, options, skins, texture atlases, and framebuffer screenshots.
+- **Drive the client.** Synthetic keyboard and mouse input, chat and commands, look/move/attack/use, clicks on GUI widgets and container slots, and option changes.
+- **Live object graph.** Browse any object from named roots (`minecraft`, `player`, `level`, …), follow dot-paths like `player.getInventory().items[0]`, read and write fields, invoke methods, and send raw serverbound packets.
+- **Real-time events.** WebSocket streams for chat, screens, entity spawns and removals, block updates, damage and death, world join and leave, inbound packets, and ticks.
+- **Built for AI agents.** A native MCP server at `/mcp` with curated tools (`get_state`, `look`, `move`, `screenshot`, …), subscribable resources, and a stdio shim for desktop clients.
+- **Optional Baritone.** If [Baritone](https://github.com/cabaletta/baritone) 1.13.1 is installed, MCDT exposes goto, mine, follow, explore, farm, and build as background jobs. Without Baritone, those routes return a clean `501`.
+- **A real devtool.** OpenAPI 3.1 at `/openapi.json`, offline Scalar and ReDoc docs, RFC 9457 problem responses, and per-day request logs in `logs/mcdt/`.
+- **Safe by default.** Loopback only, a fresh bearer token every launch, Host and Origin checks, a rate limit, read-only permission until you opt in, and a reflection denylist that redacts session credentials.
+- **Gentle on the game thread.** Every request crosses a bounded queue onto the client thread. The queue drains within a per-tick time budget (2 ms by default). When the queue is full, requests get a `503` instead of piling up.
 
-### Model Context Protocol (MCP) Server (Milestone M6)
-- **Native Dual HTTP & SSE MCP Server:** Standard JSON-RPC 2.0 interface hosted at `/mcp` on the same Javalin port.
-  - `POST /mcp`: Receives JSON-RPC requests, returning synchronous responses in `application/json`.
-  - `GET /mcp`: Server-Sent Events (SSE) stream (`text/event-stream`) advertising endpoint URL (`event: endpoint\ndata: /mcp?sessionId=...`) and streaming real-time notifications.
-- **Curated Agent Tools:**
-  - `get_state`: Consolidated overview of client, player, world, inventory, and Baritone status in a single call.
-  - `look`: Orient yaw and pitch or face target coordinates.
-  - `move`: Timed or continuous movement inputs (forward, back, strafe, jump, sneak, sprint).
-  - `interact`: World and item interactions (attack, use, swing, pick block, drop, swap hands).
-  - `inventory_click`: Slot manipulation in player inventory and open container screens.
-  - `screen_action`: Click widgets, type text into inputs, or close open GUI screens.
-  - `chat`: Send in-game chat messages/commands, or read chat history.
-  - `screenshot`: Vision-enabled viewport capture returning standard MCP image content (`type: image`, `mimeType: image/png`, Base64 data).
-  - `get_player_skin`: Retrieve player skin image content block and model metadata (`wide` vs `slim`).
-  - `get_game_textures`: Retrieve loaded texture atlas metadata and sprite UV coordinates with optional image embedding.
-  - `raycast`: Line-of-sight targeting raycasts.
-  - `baritone_goto`, `baritone_mine`, `baritone_follow`, `baritone_cancel`: Autonomous pathing and actions returning job IDs immediately.
-  - `job_status`: Poll status of background Baritone or movement jobs.
-- **Escape Hatches for Full Reach:**
-  - `rest_call`: Directly execute any `/v1/*` REST endpoint from the agent.
-  - `inspect`: Access live JVM reflection object graph with path traversal.
-- **MCP Resources & Streaming Subscriptions:**
-  - Standard resource endpoints: `mcdt://player`, `mcdt://inventory`, `mcdt://screen`, `mcdt://world`, `mcdt://hud`, `mcdt://player/skin`.
-  - Real-time `notifications/resources/updated` pushed over SSE when world, player, or screen changes occur, throttled per session.
-- **Cross-Platform Stdio Shim Launcher:**
-  - Standalone launchers (`scripts/mcdt-mcp.py` and `scripts/mcdt-mcp.ps1`) for local desktop MCP clients (Claude Desktop, Cursor, Zed).
-  - Auto-discovers running instances, performs health checks, and relays standard I/O JSON-RPC to `/mcp`.
-- **Diagnostics & Logging:**
-  - `GET /v1/mcp/status`: Active session count, tool registry status, and configuration.
-  - `GET /v1/mcp/log`: In-memory ring buffer logging recent tool calls, durations, and outcomes.
+### The dashboard
 
-### High-Level Control & Writes (Milestone M5)
-- **Reflection Field Writes:** `PUT /v1/objects/{handle}/fields/{name}` allowing dynamic mutation of instance or static fields on loaded objects, with rich type coercion for primitives, strings, enums, handles, `BlockPos`, `Vec3`, and `ResourceLocation`. Guarded by `reflect-write` permission.
-- **Dynamic Method Invocation:** `POST /v1/objects/{handle}/invoke` executing arbitrary instance or static methods with typed arguments, returning converted values or handles to return objects.
-- **Raw Network Packet Injection:** `POST /v1/packets` instantiating and transmitting arbitrary Minecraft serverbound packets dynamically (e.g. `ServerboundChatPacket`, `ServerboundPlayerCommandPacket`, `ServerboundSwingPacket`).
-- **Baritone Pathfinding & Automation (Optional Integration):**
-  - Modular, classloader-isolated integration via `BaritoneService` and `BaritoneBridge`. When Baritone is absent, returns RFC 9457 HTTP 501 `baritone-not-installed` with zero runtime classpath errors.
-  - 13 dedicated automation endpoints:
-    - `GET /v1/baritone/status`: Live pathing state, current process, and active goal.
-    - `POST /v1/baritone/path`: Request custom path calculation to a goal.
-    - `POST /v1/baritone/goto`: Walk and pathfind to a target coordinate (`BlockPos` or `xz`).
-    - `POST /v1/baritone/mine`: Autonomous block mining by block ID or tag.
-    - `POST /v1/baritone/follow`: Follow entities or players by ID, type, or username.
-    - `POST /v1/baritone/explore`: Explore unvisited chunks around an origin.
-    - `POST /v1/baritone/farm`: Automated farmland harvesting, tilling, and planting.
-    - `POST /v1/baritone/build`: Build schematics at world positions.
-    - `POST /v1/baritone/cancel`: Immediately stop any running pathfinding or automation process.
-    - `GET /v1/baritone/jobs`: List tracked pathing and automation jobs.
-    - `GET /v1/baritone/jobs/{id}`: Detailed status and outcome of an individual job.
-    - `GET /v1/baritone/settings` & `PATCH /v1/baritone/settings`: Inspect and modify Baritone configuration (e.g., `allowBreak`, `allowSprint`, `primaryTimeoutMS`).
-    - `POST /v1/baritone/command`: Execute native Baritone commands directly through its command pipeline.
-  - Automatically streams `baritone.path_event` notifications onto the event bus.
-- **Multiplayer Safety Policies:**
-  - Configurable server whitelist `allowedMultiplayerServers` in `mcdt.json`.
-  - When connected to an unapproved multiplayer server, destructive actions (`act` and `reflect-write` permissions) are rejected with HTTP 403 `multiplayer-write-disabled` while read-only inspection remains functional.
+Open `http://127.0.0.1:25580/` while the game is running.
 
-### Real-Time Event Streaming & WebSockets (Milestone M4)
-- **Server-Sent Events (SSE):** `GET /v1/events?types=...` streaming real-time game events with standard `text/event-stream` framing.
-- **Bi-Directional WebSocket API:** `GET /v1/ws` allowing concurrent full-duplex event streaming, live subscription management (`subscribe`, `unsubscribe`), and keepalive pings over a single persistent connection.
-- **Rich Core Game Events:**
-  - `tick.pulse`: Emitted at configurable tick intervals with client tick counter, FPS, and delta time.
-  - `player.state`: Emitted when player position, velocity, health, food, or game mode changes.
-  - `player.death` & `player.respawn`: Death notifications with death message, killer entity, and coordinates.
-  - `chat.message`: Incoming chat and system messages with sender, text, and formatted JSON.
-  - `screen.open` & `screen.close`: UI screen transitions and modal changes.
-  - `chunk.load` & `chunk.unload`: World streaming and chunk lifecycle notifications.
-  - `baritone.path_event`: Baritone path planning, progression, cancellation, and completion events.
-- **Reliable Backpressure & Replay:** Fixed-capacity event queues per client with ring-buffer discard policies and configurable replay buffers for late-joining subscribers.
+| Telemetry | Radar |
+| :---: | :---: |
+| <img src="docs/images/dashboard-telemetry.png" alt="Telemetry tab: player vitals and coordinates, world state, task queue diagnostics, and skin"> | <img src="docs/images/dashboard-radar.png" alt="Radar tab: top-down entity scanner, crosshair raycast, and a sortable entity list"> |
+| **Inventory** | **Textures** |
+| <img src="docs/images/dashboard-inventory.png" alt="Inventory tab: held item, equipped armor, and every slot with counts and durability"> | <img src="docs/images/dashboard-textures.png" alt="Textures tab: the stitched block atlas with a searchable sprite list and UV coordinates"> |
+| **Reflection** | **Events** |
+| <img src="docs/images/dashboard-reflection.png" alt="Reflection tab: fields and methods of the live LocalPlayer"> | <img src="docs/images/dashboard-events.png" alt="Events tab: live stream of chat, screen and packet events"> |
+| **Controls & Actions** | **API docs** (`/docs/scalar`) |
+| <img src="docs/images/dashboard-controls.png" alt="Controls tab: chat dispatcher, movement pad, camera, player actions, key simulation"> | <img src="docs/images/api-docs.png" alt="Scalar API reference for the Minecraft DevTools API"> |
 
-### Reflection Layer & Object Graph Inspection (Milestone M3)
-- **Named Root Inspection:** `GET /v1/objects/roots` exposing canonical root handles (`minecraft`, `player`, `level`, `screen`, `options`, `gameRenderer`).
-- **Object Graph Traversal:** `GET /v1/objects/{handle}` inspecting live object instances with depth-limited field evaluation, methods, and cycle detection.
-- **Path Traversal Queries:** `GET /v1/objects/{handle}?path=...` supporting dot-separated fields, zero-argument method calls (getters), and list/array/map indexing (e.g. `minecraft?path=player.getInventory().items[0]`).
-- **Targeted Field Expansion:** `GET /v1/objects/{handle}/fields/{name}` expanding individual object fields with configurable depth.
-- **Static Class Inspection:** `GET /v1/classes/{name}` inspecting static fields and methods of any non-denylisted class.
-- **Handle Lifecycle Management:** `DELETE /v1/objects/{handle}` releasing handles early; automatic 10-minute inactivity expiration, LRU eviction at 50,000 entries, and automatic flush on world disconnect.
-- **NameService Runtime Translation:** On-demand fetching and disk caching of official Mojang 1.21.4 client mappings, translating between runtime intermediary and Mojang names.
-- **Strict Security & Token Redaction:** Denylist blocking dangerous JVM reflection targets (`Runtime`, `ProcessBuilder`, `ClassLoader`, `java.lang.reflect.*`, `java.io.*`, `java.nio.file.*`, `java.net.*`, `Unsafe`), and automatic redaction of player session credentials (`accessToken`, `User` tokens).
+A Baritone tab appears too. It drives pathing, mining, and building when Baritone is installed.
 
-### Actions & Real Input Injection (Milestone M2)
-- **Synthetic Keyboard Injection:** `POST /v1/input/keys` simulating GLFW key presses, releases, taps, and text typing sequences with keymapping and scancode resolution.
-- **Synthetic Mouse Injection:** `POST /v1/input/mouse` driving cursor movement, clicks (left/right/middle), presses, releases, and scroll wheel events.
-- **Chat & Command Dispatch:** `POST /v1/chat` sending in-game chat messages or executing client commands, and `GET /v1/chat` retrieving paginated chat history.
-- **Player Kinematics & Orientation:** `POST /v1/player/look` setting absolute angles, relative angular deltas, or orienting the player towards 3D target coordinates.
-- **Timed Player Movement:** `POST /v1/player/move` driving forward, backward, strafe, jump, sneak, sprint, fly, and dismount inputs over N client ticks or continuously.
-- **Interactive Player Actions:** `POST /v1/player/actions` performing attacks, item usage, arm swinging, pick block, offhand hand swaps, hotbar slot selection (0-8), item dropping, and targeted block/entity interaction.
-- **GUI Screen & Widget Manipulation:** `POST /v1/screen/actions` clicking buttons, editing text fields (`EditBox`), and closing open screens.
-- **Container Slot Operations:** `POST /v1/screen/slots` handling all container click types (`PICKUP`, `QUICK_MOVE`, `SWAP`, `CLONE`, `THROW`, `QUICK_CRAFT`, `PICKUP_ALL`).
-- **Dynamic Options Modification:** `PATCH /v1/options` updating FOV, render distance, GUI scale, audio volumes, and saving changes persistently.
-- **Two-Step Confirmation Quitting:** `POST /v1/session/quit` & `POST /v1/session/quit/confirm` with single-use 30-second security tokens for safe client shutdown.
+## Getting started
 
-### Read-Only Client & World Inspection (Milestone M1)
-- **Engine & Session Diagnostics:** `GET /v1/client` reporting live FPS, window geometry, active screen name, and connection state (`menu`, `singleplayer`, `multiplayer`).
-- **Player State & Kinematics:** `GET /v1/player` returning position, rotation, velocity, health, food, XP, game mode, status flags, and active potion effects.
-- **Inventory Inspection:** `GET /v1/player/inventory` returning hotbar, main storage, armor, and offhand slots with item counts, names, durability, and data components.
-- **World & Environment:** `GET /v1/world` reporting dimension, game time, weather (rain/thunder), difficulty, spawn coordinates, and loaded chunk count.
-- **Bounding Box Block Query:** `GET /v1/world/blocks?from=x,y,z&to=x,y,z` returning palette-compressed block states for up to 32,768 blocks per call.
-- **Spatial Entity Query:** `GET /v1/world/entities?radius=r&type=id&pos=x,y,z` searching entities near the player or arbitrary coordinates with type and distance filtering.
-- **Targeting & Raycasting:** `GET /v1/world/raycast` querying current crosshair hit target or performing arbitrary raycasts with block and entity intersection.
-- **GUI Screen Inspection:** `GET /v1/screen` inspecting the active GUI screen, complete interactive widget hierarchy (buttons, edit boxes, sliders), and container slots.
-- **Registry Enumeration:** `GET /v1/registries` and `GET /v1/registries/{registry}` providing paginated registry entries across all built-in Minecraft registries.
-- **Options & Controls:** `GET /v1/options` exposing game options, audio volumes per category, and key bindings.
-- **Viewport Frame Capture:** `GET /v1/screenshot?scale=0.5` capturing the framebuffer with off-thread PNG compression without stalling the render thread.
-- **Player Skin & Model:** `GET /v1/player/skin` returning the player skin PNG (`image/png`) with `X-Skin-Model` (`wide` or `slim`) and `X-Player-Name` response headers, and `GET /v1/player/skin/info` returning full JSON metadata (model, texture URLs, cape/elytra, official Mojang security). Supports `?player=<name or UUID>`.
-- **Stitched Texture Atlases & UVs:** `GET /v1/textures/atlases` enumerating loaded texture atlases, `GET /v1/textures/atlas?id=blocks` returning sprite UV coordinate maps (pixel and normalized `0.0..1.0` UVs) and animation metadata, and `GET /v1/textures/atlas/image?id=blocks` streaming raw stitched atlas PNG bytes.
+### Prerequisites
 
-### Infrastructure & Security (Milestone M0)
-- **Loopback HTTP Server:** Javalin 7 on Jetty 12 bound to `127.0.0.1:25580` (with automatic port fallback if occupied).
-- **Secure by Default:**
-  - Fresh 256-bit bearer token generated per launch.
-  - DNS rebinding defence (validates `Host` header against loopback / configured bind address).
-  - CSRF defence (rejects unexpected `Origin` headers).
-  - Query parameter token rejection to prevent accidental leakages in URLs.
-  - Permission levels (`read`, `act`, `reflect-write`).
-- **Bounded Task Queue:** Requests reading/writing game state cross onto the client tick thread without blocking the render loop, drained under a configurable time budget (default 2 ms/tick).
-- **Interactive WebUI & Documentation:**
-  - Svelte 5 + Tailwind CSS developer dashboard served at `http://127.0.0.1:<port>/`.
-  - Pinned offline Scalar API reference served at `/docs/scalar` (alias `/docs/scaler`).
-  - ReDoc reference served at `/docs/redoc` (legacy `/redoc` redirects).
-  - OpenAPI 3.1 schema generated at `/openapi.json`.
-- **RFC 9457 Problem JSON:** Typed, consistent error payloads (`application/problem+json`).
-- **Discovery Files:** Process metadata and bearer token written to `~/.mcdt/instances/<pid>.json` and `<gameDir>/config/mcdt/instance.json` with user-only permissions.
-- **Diagnostics:** `GET /v1/health` reporting mod version, Minecraft version, uptime, client tick, queue metrics, and Baritone status.
+- Minecraft **1.21.4** with [Fabric Loader](https://fabricmc.net/use/) **0.19.5+** and [Fabric API](https://modrinth.com/mod/fabric-api)
+- Java **21** or newer
+- Optional: [Mod Menu](https://modrinth.com/mod/modmenu) + [YACL 3](https://modrinth.com/mod/yacl) for an in-game config screen, and [Baritone](https://github.com/cabaletta/baritone) 1.13.1 for pathing
 
-## Development & Testing
+### Install
 
-### Building
+There are no published releases yet, so build the jar from source (see [Development](#development)). You can also download the `Artifacts` bundle from a successful [CI run](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml).
+
 ```bash
-./gradlew build
-```
-Builds the jar with all runtime libraries (Javalin, Jetty 12, Jackson, OpenAPI, Scalar, WebUI) packaged via Loom jar-in-jar (`META-INF/jars`). The Svelte dashboard is built using Bun (`bun run build`).
-
-### Running Tests
-```bash
-./gradlew test
-```
-Runs the JUnit 5 test suite covering `TaskQueue`, `AccessFilter`, `ConfigStore`, `DiscoveryFile`, `BearerToken`, `HttpServer`, `DocsRoutes`, and endpoints.
-
-### Running the Client in Development
-```bash
-./gradlew runClient
+git clone https://github.com/Advik-B/minecraft-devtools.git
+cd minecraft-devtools
+./gradlew build          # gradlew.bat on Windows
 ```
 
-### Querying the API & Dashboard
-Once the game starts, find your instance's port and bearer token in:
-- Linux / macOS: `~/.mcdt/instances/<pid>.json`
-- Windows: `%USERPROFILE%\.mcdt\instances\<pid>.json`
+Copy `build/libs/mcdt-<version>.jar` (the jar without `-sources`) into your `.minecraft/mods/` folder next to Fabric API, then launch the game.
 
-Call the health endpoint:
+### Make your first request
+
+When the game starts, MCDT writes a discovery file with the port and bearer token to `~/.mcdt/instances/<pid>.json` (`%USERPROFILE%\.mcdt\instances\` on Windows). A copy also goes to `<gameDir>/config/mcdt/instance.json`.
+
 ```bash
-curl -H "Authorization: Bearer <TOKEN>" http://127.0.0.1:25580/v1/health
+INSTANCE=$(ls -t ~/.mcdt/instances/*.json | head -1)
+BASE=$(jq -r .baseUrl "$INSTANCE")
+TOKEN=$(jq -r .token "$INSTANCE")
+
+curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/health"
+curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/player"
+curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/screenshot?scale=0.5" -o frame.png
 ```
 
-Or open `http://127.0.0.1:25580/` in your browser to view the live Svelte WebUI dashboard, or `http://127.0.0.1:25580/docs/scalar` for Scalar API docs.
+> [!NOTE]
+> MCDT generates a new token on every launch. Always send it in the `Authorization` header. The REST API rejects tokens in query strings. WebSockets accept `?token=` only as a fallback for browsers.
+
+To open the dashboard, go to `http://127.0.0.1:25580/` and paste the token when it asks. You can also append `#token=<TOKEN>` to the URL.
+
+### Let it act
+
+MCDT starts with read-only `permission: "read"`. To move the player, send chat, or click things, set `"permission": "act"` in `config/mcdt/config.json` or the config screen. Then:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"message":"Hello from curl!"}' "$BASE/v1/chat"
+
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"forward":true,"jump":true,"ticks":20}' "$BASE/v1/player/move"
+```
+
+The [`http/`](http) folder has more ready-to-run requests for IntelliJ, VS Code REST Client, or any `.http` runner.
+
+## Use it from an AI agent (MCP)
+
+MCDT has a built-in MCP server at `/mcp`. `POST` takes JSON-RPC, and `GET` opens an SSE stream for resource notifications. Desktop clients that speak stdio connect through the shim in [`scripts/`](scripts). The shim finds the newest running instance and its token, so you don't have to update your config on each launch.
+
+```jsonc
+// claude_desktop_config.json, Cursor, Zed, ...
+{
+  "mcpServers": {
+    "minecraft": {
+      "command": "python",
+      "args": ["/path/to/minecraft-devtools/scripts/mcdt-mcp.py"]
+    }
+  }
+}
+```
+
+For Claude Code: `claude mcp add minecraft -- python /path/to/minecraft-devtools/scripts/mcdt-mcp.py`
+
+The shim accepts `--url`, `--token`, `--port`, and `--no-sse`. A PowerShell version, `mcdt-mcp.ps1` (`-BaseUrl`, `-Token`, `-Port`), is also included.
+
+| Tools | |
+| --- | --- |
+| Observe | `get_state`, `screenshot` (returns an MCP image), `raycast`, `get_player_skin`, `get_game_textures`, `inspect`, `job_status` |
+| Act | `look`, `move`, `interact`, `inventory_click`, `screen_action`, `chat` |
+| Baritone | `baritone_goto`, `baritone_mine`, `baritone_follow`, `baritone_cancel` (registered only when Baritone is installed) |
+| Escape hatch | `rest_call`: call any `/v1/*` endpoint |
+
+**Resources:** `mcdt://player`, `mcdt://inventory`, `mcdt://screen`, `mcdt://world`, `mcdt://hud`, and `mcdt://player/skin`. Subscribers get throttled `notifications/resources/updated` messages over SSE. `GET /v1/mcp/status` and `GET /v1/mcp/log` show sessions and recent tool calls.
+
+> [!TIP]
+> Tools still follow the configured permission. With the default `read`, an agent can look but not touch. Raise it to `act` when you want the agent to play.
+
+## API at a glance
+
+All routes are under `/v1`. The full, always-current reference is the live OpenAPI spec, at `/docs/scalar`, `/docs/redoc`, or `/openapi.json`.
+
+| Area | Endpoints | Min. permission |
+| --- | --- | --- |
+| System | `GET /health`, `GET /client`, `GET /mcp/status`, `GET /mcp/log` | read |
+| Player | `GET /player`, `/player/inventory`, `/player/skin`, `/player/skin/info` | read |
+| World | `GET /world`, `/world/blocks`, `/world/entities`, `/world/entities/categories`, `/world/raycast` | read |
+| Screen & data | `GET /screen`, `/registries`, `/registries/{registry}`, `/options`, `/screenshot`, `/textures/atlases`, `/textures/atlas`, `/textures/atlas/image` | read |
+| Chat | `GET /chat` (history), `POST /chat` | read / act |
+| Input & actions | `POST /input/keys`, `/input/mouse`, `/player/look`, `/player/move`, `/player/actions`, `/screen/actions`, `/screen/slots`, `PATCH /options` | act |
+| Session | `POST /session/quit`, then `POST /session/quit/confirm` with a single-use token that expires in 30 s | act |
+| Reflection | `GET /objects/roots`, `/objects/{handle}`, `/objects/{handle}/fields/{name}`, `/classes/{name}`, `DELETE /objects/{handle}` | read |
+| Reflection writes | `PUT /objects/{handle}/fields/{name}`, `POST /objects/{handle}/invoke`, `POST /packets` | reflect-write |
+| Baritone | `GET /baritone`, `/baritone/status`, `/baritone/path`, `/baritone/jobs/{id}`, `/baritone/settings` | read |
+| | `POST /baritone/goto`, `mine`, `follow`, `explore`, `farm`, `build`, `cancel`, `command`, `PATCH /baritone/settings` | act |
+
+**WebSockets:** `/v1/events` (event bus), `/v1/player/status`, `/v1/player/inventory`, `/v1/world/stream`, `/v1/input/keys`, and `/v1/input/mouse`. To pick topics on `/v1/events`, send `{"action":"subscribe","topics":["chat","screen.open"]}`. The topics are `chat`, `screen.open`, `screen.close`, `world.join`, `world.leave`, `player.damage`, `player.death`, `entity.spawn`, `entity.remove`, `block.update`, `packet.in`, and `tick`, plus `baritone.path` and `baritone.process` when Baritone is installed.
+
+**Errors** use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json` with stable `type` codes. For example, `409 no-world` means you are not in a world, `503 queue-full` means the queue is full, `504 timeout` means a tick deadline was missed, `501 baritone-not-installed` means Baritone is missing, and `403 multiplayer-write-disabled` means writes are blocked on that server.
+
+## Configuration
+
+Settings live in `<gameDir>/config/mcdt/config.json`. You can also edit them in-game through **Mods → Minecraft DevTools → Configure**, which needs Mod Menu and YACL. Most settings apply live. Settings marked *Requires a game restart* need a restart.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `permission` | `"read"` | Highest level granted to clients: `read`, `act`, or `reflect-write` |
+| `allowedMultiplayerServers` | `[]` | Servers where `act` and `reflect-write` are allowed |
+| `originAllowlist` | `[]` | Extra browser origins, e.g. `http://localhost:5173` |
+| `preferredPort` / `bindAddress` | `25580` / `127.0.0.1` | Falls back to a random port if `25580` is taken |
+| `requestTimeoutMs` | `5000` | How long a request waits for the client thread |
+| `tickBudgetMicros` | `2000` | Time the queue may use per client tick |
+| `enableMcp`, `enableBaritone`, `allowQuit` | `true` | Feature switches |
+| `rateLimitPerSecond` | `200` | Per-client request rate limit |
+
+The file also holds `enabled`, `queueCapacity`, `maxRequestBytes`, `eventRingBufferSize`, `eventSubscriberQueueCapacity`, `mcpLogCalls`, and `mcpNotificationThrottleMs`.
+
+## Development
+
+> [!IMPORTANT]
+> The Gradle build compiles the dashboard, so **[Bun](https://bun.sh) must be on your `PATH`**. A cold build also needs network access to fetch and verify the pinned Baritone and Scalar artifacts.
+
+```bash
+./gradlew build                 # mod jar with the dashboard and all libraries bundled (jar-in-jar)
+./gradlew test                  # JUnit 5 suite (no Minecraft needed) + JaCoCo report
+./gradlew runClient             # dev client in ./run with Mod Menu + YACL
+pwsh scripts/test-live-client.ps1   # smoke-test a running dev client
+```
+
+To work on the dashboard with hot reload:
+
+```bash
+cd web
+bun install
+bun run dev        # Vite on :5173, proxies /v1, /mcp and /docs to :25580
+bun run check      # type-check
+```
+
+Add `http://localhost:5173` to `originAllowlist`, or the API rejects the dev server's requests.
+
+### Project layout
+
+```
+src/main/java/dev/advik/mcdt/
+  api/v1/        one handler per route group, annotated with @OpenApi
+  game/          GameClient seam + the real Minecraft implementation
+  exec/          bounded task queue drained on the client tick
+  http/          Javalin server, routes, WebSockets, RFC 9457 problems
+  security/      bearer auth, Host/Origin checks, rate limiting, roles
+  reflection/    handle table, path evaluator, Mojang name mapping, denylist
+  events/        lock-free event hub behind /v1/events
+  mcp/           JSON-RPC MCP server, tools and resources
+  baritone/      optional integration (only bridge/ touches Baritone)
+web/             Svelte 5 + Tailwind 4 + daisyUI dashboard
+scripts/         MCP stdio shims and the live-client test runner
+http/            sample requests per area
+```
+
+Built with [Fabric](https://fabricmc.net), [Javalin](https://javalin.io), [Jackson](https://github.com/FasterXML/jackson), [Scalar](https://scalar.com), [Svelte](https://svelte.dev), and [daisyUI](https://daisyui.com).
+
+For the design, architecture, and roadmap, read [MCDT.md](MCDT.md). Some sections describe features that are planned but not built yet. Contributors and coding agents should start with [AGENTS.md](AGENTS.md).
