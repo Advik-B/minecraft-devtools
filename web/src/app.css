@@ -1,1 +1,16 @@
-@import "@picocss/pico/css/pico.jade.min.css";
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: dim --default, dark, light;
+}
+
+/* Custom developer dashboard adjustments */
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Smooth transitions for interactive elements */
+button, a, input, select {
+  transition: all 0.15s ease-in-out;
+}

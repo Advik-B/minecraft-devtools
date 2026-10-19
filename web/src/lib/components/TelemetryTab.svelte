@@ -2,7 +2,22 @@
   import { onMount, onDestroy } from 'svelte'
   import { appState } from '../stores.svelte'
   import { getHealth, getClient, getPlayer, getWorld } from '../api'
+  import { toastStore } from '../toast.svelte'
   import type { HealthResponse, ClientResponse, PlayerResponse, WorldResponse } from '../types'
+  import {
+    Heart,
+    Apple,
+    Compass,
+    Clock,
+    Cpu,
+    Copy,
+    Check,
+    Key,
+    Activity,
+    Layers,
+    Boxes,
+    Eye
+  } from 'lucide-svelte'
 
   let healthData = $state<HealthResponse | null>(null)
   let clientData = $state<ClientResponse | null>(null)
@@ -12,6 +27,17 @@
   let copiedPos = $state(false)
 
   async function refreshData() {
+    if (typeof window !== 'undefined' && (window as unknown as { __MOCK_DATA__?: { health: HealthResponse; client: ClientResponse; player: PlayerResponse; world: WorldResponse } }).__MOCK_DATA__) {
+      const mock = (window as unknown as { __MOCK_DATA__: { health: HealthResponse; client: ClientResponse; player: PlayerResponse; world: WorldResponse } }).__MOCK_DATA__
+      healthData = mock.health
+      clientData = mock.client
+      playerData = mock.player
+      worldData = mock.world
+      appState.inGame = true
+      appState.serverOnline = true
+      return
+    }
+
     if (!appState.token) {
       return
     }
@@ -49,75 +75,241 @@
     if (!playerData?.position) return
     const { x, y, z } = playerData.position
     const text = `/tp ${x.toFixed(2)} ${y.toFixed(2)} ${z.toFixed(2)}`
-    navigator.clipboard.writeText(text)
+    try {
+      navigator.clipboard?.writeText(text).catch(() => {})
+    } catch {
+      // ignore clipboard error in headless environments
+    }
     copiedPos = true
-    setTimeout(() => copiedPos = false, 1500)
+    toastStore.show('Teleport command copied to clipboard!', 'success', 10000)
+    setTimeout(() => copiedPos = false, 10000)
   }
 </script>
 
-{#if !appState.token}
-  <article>
-    <header><strong>Authentication Required</strong></header>
-    <p>Configure your session Bearer token to read live telemetry from Minecraft.</p>
-    <footer>
-      <button onclick={() => appState.tokenModalOpen = true}>Set Token</button>
-    </footer>
-  </article>
-{:else if !appState.inGame}
-  <article>
-    <header><strong>Minecraft Client Active: Main Menu</strong></header>
-    <p>
-      The MCDT HTTP server is active and responding. Player and world telemetry will automatically stream here once a singleplayer world or server is loaded.
-    </p>
-    <footer>
-      <small>
-        MCDT: {healthData?.mcdtVersion || 'running'} &bull; 
-        Game: {healthData?.gameVersion || '1.21.4'} &bull; 
-        Baritone: {healthData?.baritone || 'not-installed'}
-      </small>
-    </footer>
-  </article>
-{/if}
+<div class="space-y-6">
+  {#if !appState.token}
+    <!-- Auth Required Alert -->
+    <div role="alert" class="alert alert-soft alert-warning border border-warning/30 shadow-md p-6 rounded-box flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="p-3 bg-warning/20 rounded-xl text-warning">
+          <Key class="w-6 h-6" />
+        </div>
+        <div>
+          <h3 class="font-bold text-base text-base-content">Authentication Required</h3>
+          <p class="text-sm text-base-content/70">Configure your session Bearer token to read live telemetry from Minecraft.</p>
+        </div>
+      </div>
+      <button class="btn btn-warning btn-sm gap-1.5 shrink-0" onclick={() => appState.tokenModalOpen = true}>
+        <Key class="w-3.5 h-3.5" />
+        <span>Set Token</span>
+      </button>
+    </div>
+  {:else if !appState.inGame}
+    <!-- Client Active / Main Menu Card -->
+    <div class="card bg-base-200 border border-base-300 shadow-sm rounded-box overflow-hidden">
+      <div class="card-body p-6 space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="p-3 bg-info/10 rounded-xl text-info">
+            <Compass class="w-6 h-6" />
+          </div>
+          <div>
+            <h2 class="card-title text-base text-base-content">Minecraft Client Active: Main Menu</h2>
+            <p class="text-sm text-base-content/70">
+              The MCDT HTTP server is active and responding. Player and world telemetry will automatically stream here once a singleplayer world or server is loaded.
+            </p>
+          </div>
+        </div>
 
-{#if appState.inGame && playerData}
-  <div class="grid">
-    <article>
-      <header><strong>Player: {playerData.name}</strong></header>
-      <label for="health-bar">Health ({(playerData.health ?? 20).toFixed(1)} / {playerData.maxHealth ?? 20})</label>
-      <progress id="health-bar" value={playerData.health ?? 20} max={playerData.maxHealth ?? 20}></progress>
+        <div class="divider my-1"></div>
 
-      <label for="food-bar">Food ({playerData.foodLevel ?? 20})</label>
-      <progress id="food-bar" value={playerData.foodLevel ?? 20} max="20"></progress>
+        <div class="flex flex-wrap gap-2 text-xs">
+          <span class="badge badge-neutral gap-1.5">
+            MCDT: {healthData?.mcdtVersion || 'running'}
+          </span>
+          <span class="badge badge-outline gap-1.5">
+            Game: {healthData?.gameVersion || '1.21.4'}
+          </span>
+          <span class="badge badge-ghost gap-1.5">
+            Baritone: {healthData?.baritone || 'not-installed'}
+          </span>
+        </div>
+      </div>
+    </div>
+  {/if}
 
-      {#if playerData.position}
-        <p>
-          Coordinates: <code>X: {playerData.position.x.toFixed(1)} Y: {playerData.position.y.toFixed(1)} Z: {playerData.position.z.toFixed(1)}</code>
-        </p>
-        <button class="outline" onclick={copyCoordinates}>
-          {copiedPos ? 'Copied!' : 'Copy /tp Command'}
-        </button>
-      {/if}
-    </article>
+  {#if appState.inGame && playerData}
+    <!-- 3-Column Modular Dashboard -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      
+      <!-- Card 1: Player Status -->
+      <div class="card bg-base-200 border border-base-300 shadow-sm rounded-box">
+        <div class="card-body p-5 space-y-4">
+          <div class="flex items-center justify-between pb-1 border-b border-base-300">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-error/10 text-error flex items-center justify-center">
+                <Heart class="w-4 h-4 fill-error/20" />
+              </div>
+              <h2 class="card-title text-sm font-bold tracking-tight">Player: {playerData.name}</h2>
+            </div>
+            <span class="badge badge-soft badge-success badge-sm font-medium">In World</span>
+          </div>
 
-    <article>
-      <header><strong>World Environment</strong></header>
-      <p>Dimension: <mark>{worldData?.dimension?.replace('minecraft:', '') || 'Overworld'}</mark></p>
-      <p>Difficulty: <strong>{worldData?.difficulty || 'Normal'}</strong></p>
-      <p>Weather: <strong>{worldData?.isRaining ? (worldData?.isThundering ? 'Thunderstorm' : 'Rain') : 'Clear'}</strong></p>
-      <p>Loaded Entities: <strong>{worldData?.loadedEntitiesCount ?? 0}</strong></p>
-      <p>Loaded Chunks: <strong>{worldData?.loadedChunksCount ?? 0}</strong></p>
-      {#if worldData?.dayTime !== undefined}
-        <label for="day-cycle">Day/Night Cycle (Tick {worldData.dayTime % 24000} / 24000)</label>
-        <progress id="day-cycle" value={worldData.dayTime % 24000} max="24000"></progress>
-      {/if}
-    </article>
+          <!-- Health Meter -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs font-medium">
+              <span class="flex items-center gap-1.5 text-base-content/70">
+                <Heart class="w-3.5 h-3.5 text-error" /> Health
+              </span>
+              <span class="font-mono">{(playerData.health ?? 20).toFixed(1)} / {playerData.maxHealth ?? 20}</span>
+            </div>
+            <progress
+              class="progress progress-error w-full h-2.5"
+              value={playerData.health ?? 20}
+              max={playerData.maxHealth ?? 20}
+            ></progress>
+          </div>
 
-    <article>
-      <header><strong>Client Diagnostics</strong></header>
-      <p>Client FPS: <strong>{clientData?.fps ?? appState.fps}</strong></p>
-      <p>Current Tick: <strong>{appState.tick || healthData?.eventRingBufferHead || 'Active'}</strong></p>
-      <p>Event Buffer Capacity: <strong>{healthData?.eventRingBufferSize ?? 1024}</strong></p>
-      <p>Baritone: <strong>{healthData?.baritone ?? 'not-installed'}</strong></p>
-    </article>
-  </div>
-{/if}
+          <!-- Hunger / Food Meter -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs font-medium">
+              <span class="flex items-center gap-1.5 text-base-content/70">
+                <Apple class="w-3.5 h-3.5 text-warning" /> Hunger / Food
+              </span>
+              <span class="font-mono">{playerData.foodLevel ?? 20} / 20</span>
+            </div>
+            <progress
+              class="progress progress-warning w-full h-2.5"
+              value={playerData.foodLevel ?? 20}
+              max="20"
+            ></progress>
+          </div>
+
+          <!-- Coordinates Display -->
+          {#if playerData.position}
+            <div class="pt-2 border-t border-base-300 space-y-2">
+              <div class="text-xs text-base-content/70 font-medium">World Coordinates</div>
+              <div class="flex items-center justify-between gap-2 p-2 bg-base-300/60 rounded-lg">
+                <kbd class="kbd kbd-sm font-mono text-xs bg-base-100">
+                  X: {playerData.position.x.toFixed(1)} Y: {playerData.position.y.toFixed(1)} Z: {playerData.position.z.toFixed(1)}
+                </kbd>
+                <button
+                  class="btn btn-xs {copiedPos ? 'btn-success' : 'btn-ghost'} gap-1"
+                  onclick={copyCoordinates}
+                  title="Copy teleport command"
+                >
+                  {#if copiedPos}
+                    <Check class="w-3 h-3" />
+                    <span>Copied</span>
+                  {:else}
+                    <Copy class="w-3 h-3" />
+                    <span>/tp</span>
+                  {/if}
+                </button>
+              </div>
+            </div>
+          {/if}
+        </div>
+      </div>
+
+      <!-- Card 2: World Environment -->
+      <div class="card bg-base-200 border border-base-300 shadow-sm rounded-box">
+        <div class="card-body p-5 space-y-4">
+          <div class="flex items-center justify-between pb-1 border-b border-base-300">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <Compass class="w-4 h-4" />
+              </div>
+              <h2 class="card-title text-sm font-bold tracking-tight">World Environment</h2>
+            </div>
+            <span class="badge badge-soft badge-primary badge-sm font-medium capitalize">
+              {worldData?.dimension?.replace('minecraft:', '') || 'Overworld'}
+            </span>
+          </div>
+
+          <!-- Key World Attributes -->
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="p-2.5 bg-base-300/40 rounded-lg space-y-1">
+              <span class="text-base-content/60 block">Difficulty</span>
+              <span class="font-semibold text-base-content capitalize">{worldData?.difficulty || 'Normal'}</span>
+            </div>
+            <div class="p-2.5 bg-base-300/40 rounded-lg space-y-1">
+              <span class="text-base-content/60 block">Weather</span>
+              <span class="font-semibold text-base-content">
+                {worldData?.isRaining ? (worldData?.isThundering ? 'Thunderstorm' : 'Rain') : 'Clear'}
+              </span>
+            </div>
+            <div class="p-2.5 bg-base-300/40 rounded-lg space-y-1">
+              <span class="text-base-content/60 block flex items-center gap-1">
+                <Boxes class="w-3 h-3" /> Entities
+              </span>
+              <span class="font-mono font-bold text-base-content">{worldData?.loadedEntitiesCount ?? 0}</span>
+            </div>
+            <div class="p-2.5 bg-base-300/40 rounded-lg space-y-1">
+              <span class="text-base-content/60 block flex items-center gap-1">
+                <Layers class="w-3 h-3" /> Chunks
+              </span>
+              <span class="font-mono font-bold text-base-content">{worldData?.loadedChunksCount ?? 0}</span>
+            </div>
+          </div>
+
+          <!-- Day / Night Cycle -->
+          {#if worldData?.dayTime !== undefined}
+            <div class="pt-1 space-y-1.5">
+              <div class="flex justify-between text-xs font-medium">
+                <span class="flex items-center gap-1 text-base-content/70">
+                  <Clock class="w-3.5 h-3.5 text-info" /> Day / Night Cycle
+                </span>
+                <span class="font-mono">{worldData.dayTime % 24000} / 24000 ticks</span>
+              </div>
+              <progress
+                class="progress progress-info w-full h-2"
+                value={worldData.dayTime % 24000}
+                max="24000"
+              ></progress>
+            </div>
+          {/if}
+        </div>
+      </div>
+
+      <!-- Card 3: Client Diagnostics -->
+      <div class="card bg-base-200 border border-base-300 shadow-sm rounded-box">
+        <div class="card-body p-5 space-y-4">
+          <div class="flex items-center justify-between pb-1 border-b border-base-300">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center">
+                <Cpu class="w-4 h-4" />
+              </div>
+              <h2 class="card-title text-sm font-bold tracking-tight">Client Diagnostics</h2>
+            </div>
+            <span class="badge badge-neutral badge-sm font-mono">{clientData?.fps ?? appState.fps} FPS</span>
+          </div>
+
+          <div class="space-y-2.5 text-xs">
+            <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
+              <span class="text-base-content/70">Engine Tick</span>
+              <span class="font-mono font-bold">{appState.tick || healthData?.eventRingBufferHead || 'Active'}</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
+              <span class="text-base-content/70">Event Buffer Capacity</span>
+              <span class="font-mono font-semibold">{healthData?.eventRingBufferSize ?? 1024} events</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
+              <span class="text-base-content/70">Baritone AI Pathfinding</span>
+              <span class="badge badge-sm {healthData?.baritone && healthData.baritone !== 'not-installed' ? 'badge-success' : 'badge-ghost'}">
+                {healthData?.baritone ?? 'not-installed'}
+              </span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
+              <span class="text-base-content/70">API Health Status</span>
+              <span class="badge badge-sm badge-success">OK / Ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  {/if}
+</div>

@@ -5,6 +5,7 @@
   import { eventStream } from './lib/ws'
   import Header from './lib/components/Header.svelte'
   import TokenModal from './lib/components/TokenModal.svelte'
+  import ToastContainer from './lib/components/ToastContainer.svelte'
   import TelemetryTab from './lib/components/TelemetryTab.svelte'
   import EventsTab from './lib/components/EventsTab.svelte'
   import ActionsTab from './lib/components/ActionsTab.svelte'
@@ -24,7 +25,7 @@
 
 <Header />
 
-<main class="container">
+<main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if appState.activeTab === 'telemetry'}
     <TelemetryTab />
   {:else if appState.activeTab === 'events'}
@@ -36,13 +37,22 @@
   {/if}
 </main>
 
-<footer class="container">
-  <small>
-    Minecraft DevTools (MCDT) &bull; Fabric 1.21.4 &bull; 
-    <a href="/docs/scalar">Scalar Docs</a> &bull; 
-    <a href="/docs/redoc">ReDoc</a> &bull; 
-    <a href="/openapi.json">OpenAPI Spec</a>
-  </small>
+<footer class="bg-base-200 border-t border-base-300 py-4 px-4 sm:px-8 mt-auto">
+  <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-base-content/60">
+    <div class="flex items-center gap-2">
+      <span class="font-semibold text-base-content/80">Minecraft DevTools (MCDT)</span>
+      <span>&bull;</span>
+      <span>Fabric 1.21.4</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <a href="/docs/scalar" class="link link-hover hover:text-primary transition-colors">Scalar Docs</a>
+      <span>&bull;</span>
+      <a href="/docs/redoc" class="link link-hover hover:text-primary transition-colors">ReDoc</a>
+      <span>&bull;</span>
+      <a href="/openapi.json" class="link link-hover hover:text-primary transition-colors">OpenAPI Spec</a>
+    </div>
+  </div>
 </footer>
 
 <TokenModal />
+<ToastContainer />
