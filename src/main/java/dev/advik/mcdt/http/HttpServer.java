@@ -140,6 +140,8 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/client", new ClientHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/player", new PlayerHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/player/inventory", new InventoryHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/player/skin", new PlayerSkinHandlers.ImageHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/player/skin/info", new PlayerSkinHandlers.InfoHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world", new WorldHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/blocks", new BlocksHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/entities", new EntitiesHandler(config, queue, gameClient), McdtRole.READ);
@@ -154,6 +156,9 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.patch("/v1/options", optionsHandler, McdtRole.ACT);
 
 			cfg.routes.get("/v1/screenshot", new ScreenshotHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/textures/atlases", new TexturesAtlasHandlers.AtlasesHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/textures/atlas", new TexturesAtlasHandlers.AtlasHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/textures/atlas/image", new TexturesAtlasHandlers.ImageHandler(config, queue, gameClient), McdtRole.READ);
 
 			ConfirmManager confirmManager = new ConfirmManager();
 			cfg.routes.post("/v1/input/keys", new InputKeysHandler(config, queue, gameClient), McdtRole.ACT);

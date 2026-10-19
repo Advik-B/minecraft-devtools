@@ -22,6 +22,7 @@ public final class McpResourceRegistry {
 	public static final String URI_SCREEN = "mcdt://screen";
 	public static final String URI_WORLD = "mcdt://world";
 	public static final String URI_HUD = "mcdt://hud";
+	public static final String URI_PLAYER_SKIN = "mcdt://player/skin";
 
 	private final GameClient gameClient;
 
@@ -60,6 +61,12 @@ public final class McpResourceRegistry {
 						"HUD & Chat Stream",
 						"Action bar, title, subtitles, boss bars, and recent chat messages.",
 						"application/json"
+				),
+				new ResourceDefinition(
+						URI_PLAYER_SKIN,
+						"Player Skin & Model",
+						"Player skin metadata, model type (wide or slim), texture URLs, and official session details.",
+						"application/json"
 				)
 		));
 	}
@@ -72,6 +79,7 @@ public final class McpResourceRegistry {
 				case URI_INVENTORY -> payload = gameClient.getInventory();
 				case URI_SCREEN -> payload = gameClient.getScreen();
 				case URI_WORLD -> payload = gameClient.getWorld();
+				case URI_PLAYER_SKIN -> payload = gameClient.getPlayerSkinInfo(null, false);
 				case URI_HUD -> {
 					ClientDto client = gameClient.getClient();
 					ChatDto.HistoryResponse chat = gameClient.getChatHistory(0, 10);

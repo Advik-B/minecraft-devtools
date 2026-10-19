@@ -89,6 +89,18 @@ public final class McpToolRegistry {
 			));
 
 			list.add(new ToolDefinition(
+					"get_player_skin",
+					"Retrieve player skin image and metadata. Returns model type (wide or slim), skin texture metadata, and the skin image content block. Optional parameter 'player' specifies a target player name or UUID (defaults to local player).",
+					playerSkinSchema()
+			));
+
+			list.add(new ToolDefinition(
+					"get_game_textures",
+					"Retrieve loaded game texture atlas metadata and sprite UV coordinates (e.g. for blocks, particles, gui). Default atlas is 'blocks'. Optional parameter 'id' selects atlas name/alias, and 'embed_image' (boolean) embeds the stitched texture image.",
+					gameTexturesSchema()
+			));
+
+			list.add(new ToolDefinition(
 					"job_status",
 					"Query the status and execution state of a background job (such as a Baritone task or timed movement) by job_id.",
 					jobStatusSchema()
@@ -208,6 +220,8 @@ public final class McpToolRegistry {
 				case "get_state" -> executeGetState(timeoutMs);
 				case "screenshot" -> executeScreenshot(args, timeoutMs);
 				case "raycast" -> executeRaycast(args, timeoutMs);
+				case "get_player_skin" -> executeGetPlayerSkin(args, timeoutMs);
+				case "get_game_textures" -> executeGetGameTextures(args, timeoutMs);
 				case "job_status" -> executeJobStatus(args);
 				case "inspect" -> executeInspect(args, timeoutMs);
 				case "rest_call" -> executeRestCall(args);
@@ -230,7 +244,7 @@ public final class McpToolRegistry {
 
 	private Permission requiredPermissionForTool(String name) {
 		return switch (name) {
-			case "get_state", "screenshot", "raycast", "job_status", "inspect" -> Permission.READ;
+			case "get_state", "screenshot", "raycast", "job_status", "inspect", "get_player_skin", "get_game_textures" -> Permission.READ;
 			case "rest_call" -> Permission.READ; // Target method checked in handler
 			case "look", "move", "interact", "inventory_click", "screen_action", "chat",
 					"baritone_goto", "baritone_mine", "baritone_follow", "baritone_cancel" -> Permission.ACT;
@@ -307,6 +321,75 @@ public final class McpToolRegistry {
 			return Json.MAPPER.valueToTree(response);
 		}, timeoutMs).thenApply(r -> ToolCallResult.text(r.body().toPrettyString()))
 				.exceptionally(ex -> ToolCallResult.error("Raycast failed: " + ex.getMessage()));
+	}
+
+	private CompletableFuture<ToolCallResult> executeGetPlayerSkin(JsonNode args, long timeoutMs) {
+		String targetPlayer = args != null && args.has("player") && !args.get("player").isNull()
+				? args.get("player").asText()
+				: null;
+
+		CompletableFuture<ToolCallResult> future = new CompletableFuture<>();
+		try {
+			queue.submit(() -> {
+				try {
+					PlayerSkinDto skinInfo = gameClient.getPlayerSkinInfo(targetPlayer, false);
+					byte[] skinBytes = gameClient.getPlayerSkinImage(targetPlayer);
+					String base64 = Base64.getEncoder().encodeToString(skinBytes);
+					String jsonText = Json.MAPPER.valueToTree(skinInfo).toPrettyString();
+
+					List<ContentBlock> blocks = List.of(
+							ContentBlock.text(jsonText),
+							ContentBlock.image(base64, "image/png")
+					);
+					future.complete(new ToolCallResult(blocks, false));
+				} catch (Throwable t) {
+					future.complete(ToolCallResult.error("Failed to get player skin: " + t.getMessage()));
+				}
+				return Json.MAPPER.nullNode();
+			}, timeoutMs).exceptionally(ex -> {
+				future.complete(ToolCallResult.error("Failed to get player skin: " + ex.getMessage()));
+				return null;
+			});
+		} catch (Exception e) {
+			future.complete(ToolCallResult.error("Failed to submit skin task: " + e.getMessage()));
+		}
+		return future;
+	}
+
+	private CompletableFuture<ToolCallResult> executeGetGameTextures(JsonNode args, long timeoutMs) {
+		String atlasId = args != null && args.has("id") && !args.get("id").isNull()
+				? args.get("id").asText()
+				: "blocks";
+		boolean embedImage = args != null && args.has("embed_image") && args.get("embed_image").asBoolean();
+
+		CompletableFuture<ToolCallResult> future = new CompletableFuture<>();
+		try {
+			queue.submit(() -> {
+				try {
+					TextureAtlasDto atlasInfo = gameClient.getAtlasDetails(atlasId, embedImage);
+					String jsonText = Json.MAPPER.valueToTree(atlasInfo).toPrettyString();
+					if (embedImage) {
+						byte[] imageBytes = gameClient.getAtlasImage(atlasId);
+						String base64 = Base64.getEncoder().encodeToString(imageBytes);
+						future.complete(new ToolCallResult(List.of(
+								ContentBlock.text(jsonText),
+								ContentBlock.image(base64, "image/png")
+						), false));
+					} else {
+						future.complete(ToolCallResult.text(jsonText));
+					}
+				} catch (Throwable t) {
+					future.complete(ToolCallResult.error("Failed to get game textures: " + t.getMessage()));
+				}
+				return Json.MAPPER.nullNode();
+			}, timeoutMs).exceptionally(ex -> {
+				future.complete(ToolCallResult.error("Failed to get game textures: " + ex.getMessage()));
+				return null;
+			});
+		} catch (Exception e) {
+			future.complete(ToolCallResult.error("Failed to submit texture task: " + e.getMessage()));
+		}
+		return future;
 	}
 
 	private CompletableFuture<ToolCallResult> executeJobStatus(JsonNode args) {
@@ -681,6 +764,23 @@ public final class McpToolRegistry {
 		ObjectNode props = schema.putObject("properties");
 		props.putObject("entity").put("type", "string").put("description", "Player username or entity name/UUID");
 		props.putObject("entityType").put("type", "string").put("description", "Entity type e.g. 'cow' or 'zombie'");
+		return schema;
+	}
+
+	private static JsonNode playerSkinSchema() {
+		ObjectNode schema = Json.MAPPER.createObjectNode();
+		schema.put("type", "object");
+		ObjectNode props = schema.putObject("properties");
+		props.putObject("player").put("type", "string").put("description", "Optional player username or UUID (defaults to local player)");
+		return schema;
+	}
+
+	private static JsonNode gameTexturesSchema() {
+		ObjectNode schema = Json.MAPPER.createObjectNode();
+		schema.put("type", "object");
+		ObjectNode props = schema.putObject("properties");
+		props.putObject("id").put("type", "string").put("description", "Atlas identifier or alias ('blocks', 'particles', 'gui'). Defaults to 'blocks'");
+		props.putObject("embed_image").put("type", "boolean").put("description", "Whether to return the stitched atlas PNG image block");
 		return schema;
 	}
 }

@@ -256,3 +256,48 @@ export interface RegistryEntryResponse {
   entries: string[]
 }
 
+export interface PlayerSkinResponse {
+  playerName?: string
+  playerUuid?: string
+  model: string
+  textureUrl?: string
+  capeUrl?: string
+  elytraUrl?: string
+  secure?: boolean
+  imageBase64?: string
+}
+
+export interface TextureAtlasSummary {
+  id: string
+  width: number
+  height: number
+  spriteCount: number
+}
+
+export interface TextureAtlasesResponse {
+  total: number
+  atlases: TextureAtlasSummary[]
+}
+
+export interface TextureAtlasSprite {
+  x: number
+  y: number
+  width: number
+  height: number
+  u0: number
+  u1: number
+  v0: number
+  v1: number
+  animated: boolean
+  frameCount: number
+}
+
+export interface TextureAtlasResponse {
+  atlasId: string
+  width: number
+  height: number
+  spriteCount: number
+  sprites: Record<string, TextureAtlasSprite>
+  imageBase64?: string
+}
+

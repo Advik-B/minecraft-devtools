@@ -133,6 +133,8 @@ class McpToolsTest {
 		boolean hasLook = false;
 		boolean hasMove = false;
 		boolean hasBaritoneGoto = false;
+		boolean hasGetPlayerSkin = false;
+		boolean hasGetGameTextures = false;
 
 		for (JsonNode t : tools) {
 			String name = t.get("name").asText();
@@ -141,6 +143,8 @@ class McpToolsTest {
 			if ("look".equals(name)) hasLook = true;
 			if ("move".equals(name)) hasMove = true;
 			if ("baritone_goto".equals(name)) hasBaritoneGoto = true;
+			if ("get_player_skin".equals(name)) hasGetPlayerSkin = true;
+			if ("get_game_textures".equals(name)) hasGetGameTextures = true;
 		}
 
 		assertTrue(hasGetState);
@@ -148,6 +152,8 @@ class McpToolsTest {
 		assertTrue(hasLook);
 		assertTrue(hasMove);
 		assertTrue(hasBaritoneGoto);
+		assertTrue(hasGetPlayerSkin);
+		assertTrue(hasGetGameTextures);
 	}
 
 	@Test
@@ -261,5 +267,34 @@ class McpToolsTest {
 	void testEscapeHatchInspect() throws Exception {
 		JsonNode res = callMcp("tools/call", Map.of("name", "inspect", "arguments", Map.of("handle", "options")));
 		assertFalse(res.get("result").get("isError").asBoolean());
+	}
+
+	@Test
+	void testCallGetPlayerSkin() throws Exception {
+		JsonNode res = callMcp("tools/call", Map.of("name", "get_player_skin", "arguments", Map.of()));
+		JsonNode callResult = res.get("result");
+		assertFalse(callResult.get("isError").asBoolean());
+		assertTrue(callResult.get("content").isArray());
+		assertEquals(2, callResult.get("content").size());
+		assertEquals("text", callResult.get("content").get(0).get("type").asText());
+		assertEquals("image", callResult.get("content").get(1).get("type").asText());
+		assertEquals("image/png", callResult.get("content").get(1).get("mimeType").asText());
+	}
+
+	@Test
+	void testCallGetGameTextures() throws Exception {
+		JsonNode res = callMcp("tools/call", Map.of("name", "get_game_textures", "arguments", Map.of("id", "blocks")));
+		JsonNode callResult = res.get("result");
+		assertFalse(callResult.get("isError").asBoolean());
+		assertTrue(callResult.get("content").get(0).get("text").asText().contains("minecraft:block/stone"));
+	}
+
+	@Test
+	void testCallGetGameTexturesWithEmbeddedImage() throws Exception {
+		JsonNode res = callMcp("tools/call", Map.of("name", "get_game_textures", "arguments", Map.of("id", "blocks", "embed_image", true)));
+		JsonNode callResult = res.get("result");
+		assertFalse(callResult.get("isError").asBoolean());
+		assertEquals(2, callResult.get("content").size());
+		assertEquals("image", callResult.get("content").get(1).get("type").asText());
 	}
 }

@@ -347,12 +347,134 @@ class CuratedReadEndpointsTest {
 				"/v1/registries",
 				"/v1/registries/{registry}",
 				"/v1/options",
-				"/v1/screenshot"
+				"/v1/screenshot",
+				"/v1/player/skin",
+				"/v1/player/skin/info",
+				"/v1/textures/atlases",
+				"/v1/textures/atlas",
+				"/v1/textures/atlas/image"
 		};
 
 		for (String route : expectedRoutes) {
 			assertTrue(body.contains(route), "OpenAPI schema must contain route: " + route);
 		}
+	}
+
+	@Test
+	void getPlayerSkinReturnsPngWithHeaders() throws Exception {
+		clock.advance();
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/v1/player/skin"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.header("Authorization", "Bearer " + token.value())
+				.GET()
+				.build();
+
+		var asyncRes = httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofByteArray());
+		long deadline = System.currentTimeMillis() + 5000;
+		while (!asyncRes.isDone() && System.currentTimeMillis() < deadline) {
+			queue.drain(TimeUnit.MILLISECONDS.toNanos(100));
+			if (!asyncRes.isDone()) {
+				Thread.sleep(10);
+			}
+		}
+
+		assertTrue(asyncRes.isDone());
+		HttpResponse<byte[]> res = asyncRes.get();
+		assertEquals(200, res.statusCode());
+		assertEquals("image/png", res.headers().firstValue("Content-Type").orElse(""));
+		assertEquals("wide", res.headers().firstValue("X-Skin-Model").orElse(""));
+		assertEquals("DevPlayer", res.headers().firstValue("X-Player-Name").orElse(""));
+		assertTrue(res.body().length > 0);
+	}
+
+	@Test
+	void getPlayerSkinInfoReturnsJson() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/player/skin/info");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.headers().firstValue("Content-Type").orElse("").contains("application/json"));
+		assertTrue(res.body().contains("\"playerName\":\"DevPlayer\""));
+		assertTrue(res.body().contains("\"model\":\"wide\""));
+	}
+
+	@Test
+	void getPlayerSkinFormatJsonParamReturnsJson() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/player/skin?format=json");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.headers().firstValue("Content-Type").orElse("").contains("application/json"));
+		assertTrue(res.body().contains("\"playerName\":\"DevPlayer\""));
+	}
+
+	@Test
+	void getPlayerSkinFailsWhenNoPlayer() throws Exception {
+		mockGameClient.hasPlayer = false;
+		clock.advance();
+		HttpResponse<String> res = get("/v1/player/skin");
+		assertEquals(409, res.statusCode());
+		assertTrue(res.body().contains("no-player"));
+	}
+
+	@Test
+	void getPlayerSkinFailsOnUnknownPlayer() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/player/skin?player=unknown_player");
+		assertEquals(404, res.statusCode());
+		assertTrue(res.body().contains("player-not-found"));
+	}
+
+	@Test
+	void getTexturesAtlasesReturnsList() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/textures/atlases");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("minecraft:textures/atlas/blocks.png"));
+	}
+
+	@Test
+	void getTextureAtlasReturnsJsonAndUvs() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/textures/atlas?id=blocks");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("\"atlasId\":\"minecraft:textures/atlas/blocks.png\""));
+		assertTrue(res.body().contains("minecraft:block/stone"));
+		assertTrue(res.body().contains("\"u0\":0.0"));
+		assertTrue(res.body().contains("\"u1\":0.015625"));
+	}
+
+	@Test
+	void getTextureAtlasImageReturnsPng() throws Exception {
+		clock.advance();
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/v1/textures/atlas/image?id=blocks"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.header("Authorization", "Bearer " + token.value())
+				.GET()
+				.build();
+
+		var asyncRes = httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofByteArray());
+		long deadline = System.currentTimeMillis() + 5000;
+		while (!asyncRes.isDone() && System.currentTimeMillis() < deadline) {
+			queue.drain(TimeUnit.MILLISECONDS.toNanos(100));
+			if (!asyncRes.isDone()) {
+				Thread.sleep(10);
+			}
+		}
+
+		assertTrue(asyncRes.isDone());
+		HttpResponse<byte[]> res = asyncRes.get();
+		assertEquals(200, res.statusCode());
+		assertEquals("image/png", res.headers().firstValue("Content-Type").orElse(""));
+		assertTrue(res.body().length > 0);
+	}
+
+	@Test
+	void getTextureAtlasFailsOnNotFound() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/textures/atlas?id=non_existent");
+		assertEquals(404, res.statusCode());
+		assertTrue(res.body().contains("atlas-not-found"));
 	}
 
 	@Test

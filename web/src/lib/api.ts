@@ -16,7 +16,10 @@ import type {
   RootsResponse,
   ObjectInspectResponse,
   ClassInspectResponse,
-  RegistryEntryResponse
+  RegistryEntryResponse,
+  PlayerSkinResponse,
+  TextureAtlasesResponse,
+  TextureAtlasResponse
 } from './types'
 
 export async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T | null> {
@@ -321,4 +324,39 @@ export async function sendPacket(payload: Record<string, unknown>): Promise<bool
     body: JSON.stringify(payload)
   })
   return !!res
+}
+
+// --- Player Skin & Texture APIs ---
+export async function getPlayerSkinInfo(player?: string, embedImage?: boolean): Promise<PlayerSkinResponse | null> {
+  const params = new URLSearchParams()
+  if (player) params.set('player', player)
+  if (embedImage) params.set('embed_image', 'true')
+  const query = params.toString() ? `?${params.toString()}` : ''
+  return await fetchApi<PlayerSkinResponse>(`/v1/player/skin/info${query}`)
+}
+
+export function getPlayerSkinImageUrl(player?: string): string {
+  const params = new URLSearchParams()
+  if (player) params.set('player', player)
+  const query = params.toString() ? `?${params.toString()}` : ''
+  return `/v1/player/skin${query}`
+}
+
+export async function getLoadedAtlases(): Promise<TextureAtlasesResponse | null> {
+  return await fetchApi<TextureAtlasesResponse>('/v1/textures/atlases')
+}
+
+export async function getAtlasDetails(atlasId?: string, embedImage?: boolean): Promise<TextureAtlasResponse | null> {
+  const params = new URLSearchParams()
+  if (atlasId) params.set('id', atlasId)
+  if (embedImage) params.set('embed_image', 'true')
+  const query = params.toString() ? `?${params.toString()}` : ''
+  return await fetchApi<TextureAtlasResponse>(`/v1/textures/atlas${query}`)
+}
+
+export function getAtlasImageUrl(atlasId?: string): string {
+  const params = new URLSearchParams()
+  if (atlasId) params.set('id', atlasId)
+  const query = params.toString() ? `?${params.toString()}` : ''
+  return `/v1/textures/atlas/image${query}`
 }

@@ -46,6 +46,12 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
+import com.mojang.authlib.GameProfile;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.PlayerSkin;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -53,9 +59,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class MinecraftGameClient implements GameClient {
 	private static final MinecraftGameClient INSTANCE = new MinecraftGameClient();
+	private final ConcurrentHashMap<String, byte[]> atlasImageCache = new ConcurrentHashMap<>();
 
 	public static MinecraftGameClient getInstance() {
 		return INSTANCE;
@@ -560,6 +568,261 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		return baos.toByteArray();
+	}
+
+	@Override
+	public PlayerSkinDto getPlayerSkinInfo(String targetPlayer, boolean embedImage) {
+		GameProfile profile = resolvePlayerProfile(targetPlayer);
+		PlayerSkin skin = resolvePlayerSkin(targetPlayer);
+
+		String model = skin.model() != null ? skin.model().id() : "wide";
+		String textureUrl = skin.textureUrl();
+		String capeUrl = skin.capeTexture() != null ? skin.capeTexture().toString() : null;
+		String elytraUrl = skin.elytraTexture() != null ? skin.elytraTexture().toString() : null;
+
+		String base64 = null;
+		if (embedImage) {
+			byte[] bytes = getPlayerSkinImage(targetPlayer);
+			base64 = Base64.getEncoder().encodeToString(bytes);
+		}
+
+		return new PlayerSkinDto(
+				profile.getName(),
+				profile.getId().toString(),
+				model,
+				textureUrl,
+				capeUrl,
+				elytraUrl,
+				skin.secure(),
+				base64
+		);
+	}
+
+	@Override
+	public byte[] getPlayerSkinImage(String targetPlayer) {
+		PlayerSkin skin = resolvePlayerSkin(targetPlayer);
+		return extractTextureBytes(skin.texture(), 64, 64);
+	}
+
+	private PlayerSkin resolvePlayerSkin(String targetPlayer) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+		if (targetPlayer == null || targetPlayer.isBlank()
+				|| targetPlayer.equalsIgnoreCase(client.player.getGameProfile().getName())
+				|| targetPlayer.equalsIgnoreCase(client.player.getStringUUID())) {
+			return client.player.getSkin();
+		}
+
+		if (client.getConnection() != null) {
+			for (net.minecraft.client.multiplayer.PlayerInfo info : client.getConnection().getOnlinePlayers()) {
+				if (info.getProfile().getName().equalsIgnoreCase(targetPlayer)
+						|| info.getProfile().getId().toString().equalsIgnoreCase(targetPlayer)) {
+					return info.getSkin();
+				}
+			}
+		}
+
+		throw Problems.playerNotFound(targetPlayer);
+	}
+
+	private GameProfile resolvePlayerProfile(String targetPlayer) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+		if (targetPlayer == null || targetPlayer.isBlank()
+				|| targetPlayer.equalsIgnoreCase(client.player.getGameProfile().getName())
+				|| targetPlayer.equalsIgnoreCase(client.player.getStringUUID())) {
+			return client.player.getGameProfile();
+		}
+
+		if (client.getConnection() != null) {
+			for (net.minecraft.client.multiplayer.PlayerInfo info : client.getConnection().getOnlinePlayers()) {
+				if (info.getProfile().getName().equalsIgnoreCase(targetPlayer)
+						|| info.getProfile().getId().toString().equalsIgnoreCase(targetPlayer)) {
+					return info.getProfile();
+				}
+			}
+		}
+
+		throw Problems.playerNotFound(targetPlayer);
+	}
+
+	@Override
+	public TextureAtlasesDto getLoadedAtlases() {
+		Minecraft client = Minecraft.getInstance();
+		List<TextureAtlasesDto.AtlasSummary> summaries = new ArrayList<>();
+		if (client.getTextureManager() instanceof TextureManagerAccessor tma) {
+			for (Map.Entry<ResourceLocation, AbstractTexture> entry : tma.getByPath().entrySet()) {
+				if (entry.getValue() instanceof TextureAtlas atlas) {
+					int spriteCount = 0;
+					int width = getAtlasWidth(atlas);
+					int height = getAtlasHeight(atlas);
+					if (atlas instanceof TextureAtlasAccessor taa && taa.getTexturesByName() != null) {
+						spriteCount = taa.getTexturesByName().size();
+					}
+					summaries.add(new TextureAtlasesDto.AtlasSummary(
+							entry.getKey().toString(),
+							width,
+							height,
+							spriteCount
+					));
+				}
+			}
+		}
+
+		if (summaries.isEmpty()) {
+			AbstractTexture blocks = client.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+			if (blocks instanceof TextureAtlas atlas) {
+				int count = 0;
+				if (atlas instanceof TextureAtlasAccessor taa && taa.getTexturesByName() != null) {
+					count = taa.getTexturesByName().size();
+				}
+				summaries.add(new TextureAtlasesDto.AtlasSummary(
+						TextureAtlas.LOCATION_BLOCKS.toString(),
+						getAtlasWidth(atlas),
+						getAtlasHeight(atlas),
+						count
+				));
+			}
+		}
+		summaries.sort(Comparator.comparing(TextureAtlasesDto.AtlasSummary::id));
+		return new TextureAtlasesDto(summaries.size(), summaries);
+	}
+
+	@Override
+	public TextureAtlasDto getAtlasDetails(String atlasId, boolean embedImage) {
+		TextureAtlas atlas = getTextureAtlas(atlasId);
+		String idStr = atlas.location().toString();
+
+		Map<String, TextureAtlasDto.SpriteInfo> sprites = new LinkedHashMap<>();
+		if (atlas instanceof TextureAtlasAccessor taa && taa.getTexturesByName() != null) {
+			for (Map.Entry<ResourceLocation, TextureAtlasSprite> entry : taa.getTexturesByName().entrySet()) {
+				TextureAtlasSprite sprite = entry.getValue();
+				var contents = sprite.contents();
+				int frameCount = (int) contents.getUniqueFrames().count();
+				boolean animated = frameCount > 1;
+
+				sprites.put(entry.getKey().toString(), new TextureAtlasDto.SpriteInfo(
+						sprite.getX(),
+						sprite.getY(),
+						contents.width(),
+						contents.height(),
+						sprite.getU0(),
+						sprite.getU1(),
+						sprite.getV0(),
+						sprite.getV1(),
+						animated,
+						frameCount
+				));
+			}
+		}
+
+		String base64 = null;
+		if (embedImage) {
+			byte[] imageBytes = getAtlasImage(atlasId);
+			base64 = Base64.getEncoder().encodeToString(imageBytes);
+		}
+
+		return new TextureAtlasDto(
+				idStr,
+				getAtlasWidth(atlas),
+				getAtlasHeight(atlas),
+				sprites.size(),
+				sprites,
+				base64
+		);
+	}
+
+	@Override
+	public byte[] getAtlasImage(String atlasId) {
+		TextureAtlas atlas = getTextureAtlas(atlasId);
+		return atlasImageCache.computeIfAbsent(atlas.location().toString(),
+				k -> extractTextureBytes(atlas.location(), getAtlasWidth(atlas), getAtlasHeight(atlas)));
+	}
+
+	private int getAtlasWidth(TextureAtlas atlas) {
+		return atlas instanceof TextureAtlasAccessor taa ? taa.getWidth() : 1024;
+	}
+
+	private int getAtlasHeight(TextureAtlas atlas) {
+		return atlas instanceof TextureAtlasAccessor taa ? taa.getHeight() : 1024;
+	}
+
+	private ResourceLocation resolveAtlasLocation(String atlasId) {
+		if (atlasId == null || atlasId.isBlank() || "blocks".equalsIgnoreCase(atlasId)) {
+			return TextureAtlas.LOCATION_BLOCKS;
+		}
+		if ("particles".equalsIgnoreCase(atlasId)) {
+			return TextureAtlas.LOCATION_PARTICLES;
+		}
+		if (atlasId.contains(":")) {
+			return ResourceLocation.parse(atlasId);
+		}
+		return ResourceLocation.fromNamespaceAndPath("minecraft",
+				atlasId.startsWith("textures/atlas/") ? atlasId : "textures/atlas/" + atlasId + ".png");
+	}
+
+	private TextureAtlas getTextureAtlas(String atlasId) {
+		Minecraft client = Minecraft.getInstance();
+		ResourceLocation loc = resolveAtlasLocation(atlasId);
+		AbstractTexture texture = client.getTextureManager().getTexture(loc);
+		if (texture instanceof TextureAtlas atlas) {
+			return atlas;
+		}
+		if (client.getTextureManager() instanceof TextureManagerAccessor tma) {
+			for (Map.Entry<ResourceLocation, AbstractTexture> entry : tma.getByPath().entrySet()) {
+				if (entry.getValue() instanceof TextureAtlas atlas) {
+					if (entry.getKey().equals(loc)
+							|| entry.getKey().toString().equalsIgnoreCase(atlasId)
+							|| entry.getKey().getPath().equalsIgnoreCase(atlasId)) {
+						return atlas;
+					}
+				}
+			}
+		}
+		throw Problems.atlasNotFound(atlasId != null ? atlasId : "blocks");
+	}
+
+	private byte[] extractTextureBytes(ResourceLocation loc, int defaultWidth, int defaultHeight) {
+		Minecraft client = Minecraft.getInstance();
+		var res = client.getResourceManager().getResource(loc);
+		if (res.isPresent()) {
+			try (var is = res.get().open()) {
+				return is.readAllBytes();
+			} catch (IOException ignored) {}
+		}
+
+		var texture = client.getTextureManager().getTexture(loc);
+		if (texture != null && texture.getId() > 0) {
+			int width = defaultWidth;
+			int height = defaultHeight;
+			if (texture instanceof TextureAtlas atlas) {
+				width = getAtlasWidth(atlas);
+				height = getAtlasHeight(atlas);
+			}
+			texture.bind();
+			NativeImage nativeImage = new NativeImage(width, height, false);
+			nativeImage.downloadTexture(0, false);
+			int srcWidth = nativeImage.getWidth();
+			int srcHeight = nativeImage.getHeight();
+			int[] pixels = nativeImage.makePixelArray();
+			nativeImage.close();
+
+			BufferedImage bufferedImage = new BufferedImage(srcWidth, srcHeight, BufferedImage.TYPE_INT_ARGB);
+			bufferedImage.setRGB(0, 0, srcWidth, srcHeight, pixels, 0, srcWidth);
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			try {
+				ImageIO.write(bufferedImage, "png", baos);
+				return baos.toByteArray();
+			} catch (IOException e) {
+				throw Problems.textureFailed("Failed to encode texture as PNG: " + e.getMessage());
+			}
+		}
+
+		throw Problems.textureFailed("Unable to retrieve texture data for " + loc);
 	}
 
 	// --- Milestone M2 Actions ---

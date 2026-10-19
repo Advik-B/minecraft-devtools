@@ -29,6 +29,16 @@ public interface GameClient {
 
 	byte[] captureScreenshot(float scale);
 
+	PlayerSkinDto getPlayerSkinInfo(String targetPlayer, boolean embedImage);
+
+	byte[] getPlayerSkinImage(String targetPlayer);
+
+	TextureAtlasesDto getLoadedAtlases();
+
+	TextureAtlasDto getAtlasDetails(String atlasId, boolean embedImage);
+
+	byte[] getAtlasImage(String atlasId);
+
 	// --- Milestone M2 Actions ---
 
 	InputKeyDto.Response pressKey(InputKeyDto.Request request);

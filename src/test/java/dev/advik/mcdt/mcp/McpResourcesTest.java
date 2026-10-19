@@ -98,10 +98,10 @@ class McpResourcesTest {
 		String body = Json.MAPPER.writeValueAsString(req);
 
 		Thread drainer = new Thread(() -> {
-			for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < 60; i++) {
 				drainQueue();
 				try {
-					Thread.sleep(10);
+					Thread.sleep(20);
 				} catch (InterruptedException ignored) {}
 			}
 		});
@@ -125,13 +125,14 @@ class McpResourcesTest {
 		JsonNode res = callMcp("resources/list", Map.of());
 		JsonNode resources = res.get("result").get("resources");
 		assertTrue(resources.isArray());
-		assertEquals(5, resources.size());
+		assertEquals(6, resources.size());
 
 		boolean hasPlayer = false;
 		boolean hasInventory = false;
 		boolean hasScreen = false;
 		boolean hasWorld = false;
 		boolean hasHud = false;
+		boolean hasSkin = false;
 
 		for (JsonNode r : resources) {
 			String uri = r.get("uri").asText();
@@ -140,6 +141,7 @@ class McpResourcesTest {
 			if ("mcdt://screen".equals(uri)) hasScreen = true;
 			if ("mcdt://world".equals(uri)) hasWorld = true;
 			if ("mcdt://hud".equals(uri)) hasHud = true;
+			if ("mcdt://player/skin".equals(uri)) hasSkin = true;
 		}
 
 		assertTrue(hasPlayer);
@@ -147,6 +149,17 @@ class McpResourcesTest {
 		assertTrue(hasScreen);
 		assertTrue(hasWorld);
 		assertTrue(hasHud);
+		assertTrue(hasSkin);
+	}
+
+	@Test
+	void testResourcesReadPlayerSkin() throws Exception {
+		JsonNode res = callMcp("resources/read", Map.of("uri", "mcdt://player/skin"));
+		JsonNode contents = res.get("result").get("contents").get(0);
+		assertEquals("mcdt://player/skin", contents.get("uri").asText());
+		assertEquals("application/json", contents.get("mimeType").asText());
+		assertTrue(contents.get("text").asText().contains("DevPlayer"));
+		assertTrue(contents.get("text").asText().contains("wide"));
 	}
 
 	@Test

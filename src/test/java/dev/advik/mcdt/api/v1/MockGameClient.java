@@ -253,6 +253,93 @@ public class MockGameClient implements GameClient {
 		return baos.toByteArray();
 	}
 
+	@Override
+	public PlayerSkinDto getPlayerSkinInfo(String targetPlayer, boolean embedImage) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		if (targetPlayer != null && "unknown_player".equalsIgnoreCase(targetPlayer)) {
+			throw Problems.playerNotFound(targetPlayer);
+		}
+		String name = targetPlayer != null ? targetPlayer : "DevPlayer";
+		String uuid = "12345678-1234-1234-1234-123456789abc";
+		String base64 = embedImage ? java.util.Base64.getEncoder().encodeToString(getPlayerSkinImage(targetPlayer)) : null;
+		return new PlayerSkinDto(
+				name,
+				uuid,
+				"wide",
+				"http://textures.minecraft.net/texture/mock-skin",
+				null,
+				null,
+				true,
+				base64
+		);
+	}
+
+	@Override
+	public byte[] getPlayerSkinImage(String targetPlayer) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		if (targetPlayer != null && "unknown_player".equalsIgnoreCase(targetPlayer)) {
+			throw Problems.playerNotFound(targetPlayer);
+		}
+		BufferedImage img = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		try {
+			ImageIO.write(img, "png", baos);
+		} catch (IOException e) {
+			throw Problems.textureFailed(e.getMessage());
+		}
+		return baos.toByteArray();
+	}
+
+	@Override
+	public TextureAtlasesDto getLoadedAtlases() {
+		return new TextureAtlasesDto(2, List.of(
+				new TextureAtlasesDto.AtlasSummary("minecraft:textures/atlas/blocks.png", 1024, 1024, 2),
+				new TextureAtlasesDto.AtlasSummary("minecraft:textures/atlas/particles.png", 512, 512, 1)
+		));
+	}
+
+	@Override
+	public TextureAtlasDto getAtlasDetails(String atlasId, boolean embedImage) {
+		String resolvedId = (atlasId == null || atlasId.isBlank() || "blocks".equalsIgnoreCase(atlasId))
+				? "minecraft:textures/atlas/blocks.png"
+				: atlasId;
+
+		if (!"minecraft:textures/atlas/blocks.png".equals(resolvedId) && !"minecraft:textures/atlas/particles.png".equals(resolvedId)) {
+			throw Problems.atlasNotFound(atlasId);
+		}
+
+		String base64 = embedImage ? java.util.Base64.getEncoder().encodeToString(getAtlasImage(resolvedId)) : null;
+		Map<String, TextureAtlasDto.SpriteInfo> sprites = Map.of(
+				"minecraft:block/stone", new TextureAtlasDto.SpriteInfo(0, 0, 16, 16, 0.0f, 0.015625f, 0.0f, 0.015625f, false, 1),
+				"minecraft:block/dirt", new TextureAtlasDto.SpriteInfo(16, 0, 16, 16, 0.015625f, 0.03125f, 0.0f, 0.015625f, false, 1)
+		);
+		return new TextureAtlasDto(resolvedId, 1024, 1024, sprites.size(), sprites, base64);
+	}
+
+	@Override
+	public byte[] getAtlasImage(String atlasId) {
+		String resolvedId = (atlasId == null || atlasId.isBlank() || "blocks".equalsIgnoreCase(atlasId))
+				? "minecraft:textures/atlas/blocks.png"
+				: atlasId;
+
+		if (!"minecraft:textures/atlas/blocks.png".equals(resolvedId) && !"minecraft:textures/atlas/particles.png".equals(resolvedId)) {
+			throw Problems.atlasNotFound(atlasId);
+		}
+
+		BufferedImage img = new BufferedImage(1024, 1024, BufferedImage.TYPE_INT_ARGB);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		try {
+			ImageIO.write(img, "png", baos);
+		} catch (IOException e) {
+			throw Problems.textureFailed(e.getMessage());
+		}
+		return baos.toByteArray();
+	}
+
 	// --- Milestone M2 Mock Implementation ---
 
 	public InputKeyDto.Request lastPressedKey;

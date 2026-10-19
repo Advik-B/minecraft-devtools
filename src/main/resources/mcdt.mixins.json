@@ -11,7 +11,9 @@
     "MinecraftMixin",
     "ClientLevelMixin",
     "ConnectionMixin",
-    "LocalPlayerMixin"
+    "LocalPlayerMixin",
+    "TextureManagerAccessor",
+    "TextureAtlasAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

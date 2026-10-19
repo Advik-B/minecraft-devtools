@@ -22,6 +22,8 @@ Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a 
   - `screen_action`: Click widgets, type text into inputs, or close open GUI screens.
   - `chat`: Send in-game chat messages/commands, or read chat history.
   - `screenshot`: Vision-enabled viewport capture returning standard MCP image content (`type: image`, `mimeType: image/png`, Base64 data).
+  - `get_player_skin`: Retrieve player skin image content block and model metadata (`wide` vs `slim`).
+  - `get_game_textures`: Retrieve loaded texture atlas metadata and sprite UV coordinates with optional image embedding.
   - `raycast`: Line-of-sight targeting raycasts.
   - `baritone_goto`, `baritone_mine`, `baritone_follow`, `baritone_cancel`: Autonomous pathing and actions returning job IDs immediately.
   - `job_status`: Poll status of background Baritone or movement jobs.
@@ -29,7 +31,7 @@ Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a 
   - `rest_call`: Directly execute any `/v1/*` REST endpoint from the agent.
   - `inspect`: Access live JVM reflection object graph with path traversal.
 - **MCP Resources & Streaming Subscriptions:**
-  - Standard resource endpoints: `mcdt://player`, `mcdt://inventory`, `mcdt://screen`, `mcdt://world`, `mcdt://hud`.
+  - Standard resource endpoints: `mcdt://player`, `mcdt://inventory`, `mcdt://screen`, `mcdt://world`, `mcdt://hud`, `mcdt://player/skin`.
   - Real-time `notifications/resources/updated` pushed over SSE when world, player, or screen changes occur, throttled per session.
 - **Cross-Platform Stdio Shim Launcher:**
   - Standalone launchers (`scripts/mcdt-mcp.py` and `scripts/mcdt-mcp.ps1`) for local desktop MCP clients (Claude Desktop, Cursor, Zed).
@@ -110,6 +112,8 @@ Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a 
 - **Registry Enumeration:** `GET /v1/registries` and `GET /v1/registries/{registry}` providing paginated registry entries across all built-in Minecraft registries.
 - **Options & Controls:** `GET /v1/options` exposing game options, audio volumes per category, and key bindings.
 - **Viewport Frame Capture:** `GET /v1/screenshot?scale=0.5` capturing the framebuffer with off-thread PNG compression without stalling the render thread.
+- **Player Skin & Model:** `GET /v1/player/skin` returning the player skin PNG (`image/png`) with `X-Skin-Model` (`wide` or `slim`) and `X-Player-Name` response headers, and `GET /v1/player/skin/info` returning full JSON metadata (model, texture URLs, cape/elytra, official Mojang security). Supports `?player=<name or UUID>`.
+- **Stitched Texture Atlases & UVs:** `GET /v1/textures/atlases` enumerating loaded texture atlases, `GET /v1/textures/atlas?id=blocks` returning sprite UV coordinate maps (pixel and normalized `0.0..1.0` UVs) and animation metadata, and `GET /v1/textures/atlas/image?id=blocks` streaming raw stitched atlas PNG bytes.
 
 ### Infrastructure & Security (Milestone M0)
 - **Loopback HTTP Server:** Javalin 7 on Jetty 12 bound to `127.0.0.1:25580` (with automatic port fallback if occupied).

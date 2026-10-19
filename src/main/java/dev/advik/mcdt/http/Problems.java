@@ -43,6 +43,9 @@ public final class Problems {
 	public static final String INVOKE_FAILED = "invoke-failed";
 	public static final String PACKET_FAILED = "packet-failed";
 	public static final String JOB_NOT_FOUND = "job-not-found";
+	public static final String ATLAS_NOT_FOUND = "atlas-not-found";
+	public static final String PLAYER_NOT_FOUND = "player-not-found";
+	public static final String TEXTURE_FAILED = "texture-failed";
 
 	private Problems() {
 	}
@@ -116,6 +119,18 @@ public final class Problems {
 
 	public static ProblemException screenshotFailed(String detail) {
 		return of(500, SCREENSHOT_FAILED, "Screenshot failed", detail);
+	}
+
+	public static ProblemException atlasNotFound(String atlasId) {
+		return of(404, ATLAS_NOT_FOUND, "Texture atlas not found", "Texture atlas '" + atlasId + "' does not exist or is not loaded.");
+	}
+
+	public static ProblemException playerNotFound(String playerNameOrUuid) {
+		return of(404, PLAYER_NOT_FOUND, "Player not found", "No loaded player found matching '" + playerNameOrUuid + "'.");
+	}
+
+	public static ProblemException textureFailed(String detail) {
+		return of(500, TEXTURE_FAILED, "Texture extraction failed", detail);
 	}
 
 	public static ProblemException quitTokenInvalid() {

@@ -9,13 +9,15 @@
     Cpu,
     Radio,
     BookOpen,
-    Key
+    Key,
+    Image
   } from 'lucide-svelte'
 
   const tabs = [
     { id: 'telemetry', label: 'Telemetry', icon: Activity },
     { id: 'inventory', label: 'Inventory', icon: Package },
     { id: 'radar', label: 'Radar', icon: Radar },
+    { id: 'textures', label: 'Textures', icon: Image },
     { id: 'baritone', label: 'Baritone', icon: Bot },
     { id: 'actions', label: 'Controls & Actions', icon: Gamepad2 },
     { id: 'reflection', label: 'Reflection', icon: Cpu },

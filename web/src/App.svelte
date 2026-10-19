@@ -14,6 +14,7 @@
   import ReflectionTab from './lib/components/ReflectionTab.svelte'
   import EventsTab from './lib/components/EventsTab.svelte'
   import DocsTab from './lib/components/DocsTab.svelte'
+  import TexturesTab from './lib/components/TexturesTab.svelte'
 
   onMount(() => {
     getHealth().catch(() => null)
@@ -36,6 +37,8 @@
     <InventoryTab />
   {:else if appState.activeTab === 'radar'}
     <RadarTab />
+  {:else if appState.activeTab === 'textures'}
+    <TexturesTab />
   {:else if appState.activeTab === 'baritone'}
     <BaritoneTab />
   {:else if appState.activeTab === 'actions'}

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { appState } from '../stores.svelte'
-  import { getHealth, getClient, getPlayer, getWorld } from '../api'
+  import { getHealth, getClient, getPlayer, getWorld, getPlayerSkinInfo, getPlayerSkinImageUrl } from '../api'
   import { toastStore } from '../toast.svelte'
-  import type { HealthResponse, ClientResponse, PlayerResponse, WorldResponse } from '../types'
+  import type { HealthResponse, ClientResponse, PlayerResponse, WorldResponse, PlayerSkinResponse } from '../types'
   import {
     Heart,
     Apple,
@@ -16,13 +16,16 @@
     Activity,
     Layers,
     Boxes,
-    Eye
+    Eye,
+    User,
+    Download
   } from 'lucide-svelte'
 
   let healthData = $state<HealthResponse | null>(null)
   let clientData = $state<ClientResponse | null>(null)
   let playerData = $state<PlayerResponse | null>(null)
   let worldData = $state<WorldResponse | null>(null)
+  let skinData = $state<PlayerSkinResponse | null>(null)
   let pollInterval: number | null = null
   let copiedPos = $state(false)
 
@@ -43,17 +46,19 @@
     }
 
     try {
-      const [h, c, p, w] = await Promise.all([
+      const [h, c, p, w, s] = await Promise.all([
         getHealth().catch(() => null),
         getClient().catch(() => null),
         getPlayer().catch(() => null),
-        getWorld().catch(() => null)
+        getWorld().catch(() => null),
+        getPlayerSkinInfo().catch(() => null)
       ])
 
       healthData = h
       clientData = c
       playerData = p
       worldData = w
+      skinData = s
     } catch {
       // ignore
     }
@@ -305,6 +310,64 @@
             <div class="flex items-center justify-between p-2 rounded-lg bg-base-300/40">
               <span class="text-base-content/70">API Health Status</span>
               <span class="badge badge-sm badge-success">OK / Ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Player Skin & Appearance -->
+      <div class="card bg-base-200 border border-base-300 shadow-sm rounded-box md:col-span-2 lg:col-span-3">
+        <div class="card-body p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-base-300 mb-4">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-info/10 text-info flex items-center justify-center">
+                <User class="w-4 h-4" />
+              </div>
+              <h2 class="card-title text-sm font-bold tracking-tight">Player Skin & Model</h2>
+            </div>
+            {#if skinData}
+              <span class="badge badge-soft badge-info badge-sm capitalize font-medium">
+                {skinData.model} Arms
+              </span>
+            {/if}
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div class="flex items-center gap-4">
+              <div class="relative w-16 h-16 bg-base-300/80 rounded-xl overflow-hidden flex items-center justify-center border border-base-300 shrink-0 shadow-inner">
+                <img
+                  src={getPlayerSkinImageUrl()}
+                  alt="Player Skin Texture"
+                  class="w-full h-full object-contain [image-rendering:pixelated]"
+                  onerror={(e) => { (e.currentTarget as HTMLElement).style.display = 'none' }}
+                />
+              </div>
+              <div class="space-y-1 text-xs">
+                <div class="font-semibold text-base-content text-sm">{playerData?.name}</div>
+                <div class="text-base-content/70">Model: <span class="badge badge-xs badge-neutral capitalize font-mono">{skinData?.model || 'wide'}</span></div>
+                <div class="text-base-content/70">Security: <span class="badge badge-xs {skinData?.secure ? 'badge-success' : 'badge-ghost'}">{skinData?.secure ? 'Official Mojang Profile' : 'Default / Custom'}</span></div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              {#if skinData?.textureUrl}
+                <a
+                  href={skinData.textureUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn btn-xs btn-outline btn-ghost gap-1"
+                >
+                  <span>Mojang URL</span>
+                </a>
+              {/if}
+              <a
+                href={getPlayerSkinImageUrl()}
+                download="{playerData?.name || 'player'}_skin.png"
+                class="btn btn-xs btn-outline btn-primary gap-1"
+              >
+                <Download class="w-3.5 h-3.5" />
+                <span>Download Skin PNG</span>
+              </a>
             </div>
           </div>
         </div>
