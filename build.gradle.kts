@@ -30,6 +30,10 @@ loom {
 			sourceSet(sourceSets.main.get())
 		}
 	}
+	runs.configureEach {
+		// Dev runs serve the dashboard straight from web/dist so `bun run build` shows up on reload
+		vmArg("-Dmcdt.webDist=${layout.projectDirectory.dir("web/dist").asFile.absolutePath}")
+	}
 }
 
 fun prop(name: String): String = providers.gradleProperty(name).get()

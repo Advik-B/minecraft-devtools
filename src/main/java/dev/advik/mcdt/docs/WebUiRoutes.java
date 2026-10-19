@@ -19,9 +19,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class WebUiRoutes {
 	private static final String CLASSPATH_PREFIX = "/mcdt-web/dist";
 	private static final Map<String, byte[]> CACHED_ASSETS = new ConcurrentHashMap<>();
-	private static final Path DEV_WEB_DIST = Path.of("web", "dist");
+	/** Set by Gradle on dev runs ({@code -Dmcdt.webDist}); null in a normal install, which serves from the jar. */
+	private static final Path DEV_WEB_DIST = devWebDist();
 
 	private WebUiRoutes() {
+	}
+
+	private static Path devWebDist() {
+		String dir = System.getProperty("mcdt.webDist");
+		return dir == null || dir.isBlank() ? null : Path.of(dir);
 	}
 
 	public static Handler serveApp() {
@@ -113,8 +119,8 @@ public final class WebUiRoutes {
 		}
 
 		// 2. Try development filesystem directory if running in local project
-		File devFile = DEV_WEB_DIST.resolve(cleanPath.substring(1)).toFile();
-		if (devFile.isFile()) {
+		File devFile = DEV_WEB_DIST == null ? null : DEV_WEB_DIST.resolve(cleanPath.substring(1)).toFile();
+		if (devFile != null && devFile.isFile()) {
 			try (InputStream in = new FileInputStream(devFile)) {
 				byte[] bytes = in.readAllBytes();
 				// Don't cache in dev to allow hot edits

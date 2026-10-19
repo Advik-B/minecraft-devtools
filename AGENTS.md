@@ -45,6 +45,7 @@ libs/                       pinned Baritone API jar (committed via a .gitignore 
 - `./gradlew runClient` starts a dev client in `run/`. YACL and Mod Menu are on the dev runtime (`modLocalRuntime`). Baritone is not.
 - A cold Gradle cache needs network access *at configure time*. `ensureBaritoneJar()` in `build.gradle.kts` verifies the Baritone jar against the SHA-256 pinned in `gradle.properties` and downloads it again if the check fails. Scalar is downloaded the same way, pinned by version and SHA.
 - Code compiles with `--release 21`. CI (`.github/workflows/build.yml`) runs `./gradlew build` on ubuntu with JDK 25 (Microsoft) and Bun. The Gradle configuration cache is on.
+- `runClient` serves the dashboard straight from `web/dist` (Gradle passes `-Dmcdt.webDist`), so `cd web && bun run build` followed by a browser reload picks up UI changes without restarting the game.
 - WebUI dev: run `cd web && bun run dev` (Vite on :5173). It proxies `/v1`, `/mcp`, `/docs`, and `/openapi.json` to :25580. Add `http://localhost:5173` to `originAllowlist` in the config, or the API rejects the Origin. Type-check with `bun run check`.
 - Versions of Minecraft, Loader, Fabric API, Javalin, Jackson, YACL, Mod Menu, and Baritone all live in `gradle.properties`.
 
