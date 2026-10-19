@@ -94,10 +94,34 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 
 			String playerName = client.getUser() != null ? client.getUser().getName() : "Player";
 
-			String baritoneStatus = FabricLoader.getInstance().getModContainer("baritone")
-					.map(ModContainer::getMetadata)
-					.map(m -> m.getVersion().getFriendlyString())
-					.orElse("not-installed");
+			boolean baritoneModLoaded = FabricLoader.getInstance().isModLoaded("baritone");
+			boolean baritoneApiAvailable = false;
+			dev.advik.mcdt.baritone.BaritoneService baritoneService;
+
+			if (baritoneModLoaded) {
+				try {
+					Class.forName("baritone.api.BaritoneAPI");
+					baritoneApiAvailable = true;
+				} catch (ClassNotFoundException | LinkageError e) {
+					Mcdt.LOGGER.warn("Baritone is installed but BaritoneAPI is missing. You need the baritone-api-fabric jar, not standalone-fabric.");
+				}
+			}
+
+			if (baritoneApiAvailable) {
+				baritoneService = new dev.advik.mcdt.baritone.bridge.BaritoneBridge(
+						dev.advik.mcdt.reflection.HandleTable.getInstance(),
+						new dev.advik.mcdt.baritone.BaritoneJobManager()
+				);
+			} else {
+				baritoneService = new dev.advik.mcdt.baritone.UnavailableBaritoneService();
+			}
+
+			String baritoneStatus = baritoneApiAvailable
+					? FabricLoader.getInstance().getModContainer("baritone")
+							.map(ModContainer::getMetadata)
+							.map(m -> m.getVersion().getFriendlyString())
+							.orElse("1.13.1")
+					: "not-installed";
 
 			McdtEnvironment env = new McdtEnvironment(
 					mcdtVersion,
@@ -111,7 +135,7 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 					Instant.now()
 			);
 
-			core = McdtCore.start(env);
+			core = McdtCore.start(env, System.getenv(), dev.advik.mcdt.game.MinecraftGameClient.getInstance(), baritoneService);
 			Mcdt.LOGGER.info("MCDT initialized. API available at {}", core.server().baseUrl());
 		} catch (IOException e) {
 			Mcdt.LOGGER.error("Failed to start MCDT core", e);

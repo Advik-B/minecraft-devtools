@@ -74,6 +74,10 @@ dependencies {
 	testImplementation("org.junit.jupiter:junit-jupiter")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testImplementation("io.javalin:javalin-testtools:${prop("javalin_version")}")
+
+	// Baritone API (optional, modCompileOnly)
+	modCompileOnly(files("libs/baritone-api-fabric-${prop("baritone_version")}.jar"))
+	testImplementation(files("libs/baritone-api-fabric-${prop("baritone_version")}.jar"))
 }
 
 /** Downloads a file and fails the build unless it matches a pinned SHA-256. */
@@ -111,8 +115,23 @@ val downloadScalar = tasks.register<DownloadVerified>("downloadScalar") {
 	outputDir = layout.buildDirectory.dir("generated/scalar")
 }
 
+val downloadBaritoneApi = tasks.register<DownloadVerified>("downloadBaritoneApi") {
+	group = "build setup"
+	description = "Downloads the pinned Baritone API Fabric jar."
+	val version = prop("baritone_version")
+	url = "https://github.com/cabaletta/baritone/releases/download/v$version/baritone-api-fabric-$version.jar"
+	sha256 = prop("baritone_sha256")
+	relativePath = "baritone-api-fabric-$version.jar"
+	outputDir = layout.projectDirectory.dir("libs")
+}
+
+
 sourceSets.main {
 	resources.srcDir(downloadScalar)
+}
+
+tasks.compileJava {
+	dependsOn(downloadBaritoneApi)
 }
 
 tasks.processResources {
@@ -128,6 +147,7 @@ tasks.withType<JavaCompile>().configureEach {
 	options.release = 21
 	options.encoding = "UTF-8"
 }
+
 
 tasks.test {
 	useJUnitPlatform()

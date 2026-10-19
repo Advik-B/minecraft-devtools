@@ -6,6 +6,8 @@ import dev.advik.mcdt.api.v1.*;
 import dev.advik.mcdt.reflection.*;
 import dev.advik.mcdt.game.GameClient;
 import dev.advik.mcdt.game.MinecraftGameClient;
+import dev.advik.mcdt.baritone.BaritoneService;
+import dev.advik.mcdt.baritone.UnavailableBaritoneService;
 import dev.advik.mcdt.config.ConfigStore;
 import dev.advik.mcdt.config.McdtConfig;
 import dev.advik.mcdt.docs.DocsRoutes;
@@ -37,6 +39,7 @@ public final class HttpServer implements AutoCloseable {
 	private final TaskQueue queue;
 	private final RequestLogWriter logWriter;
 	private final GameClient gameClient;
+	private final BaritoneService baritoneService;
 	private final Javalin app;
 	private final AtomicInteger boundPort = new AtomicInteger();
 	private volatile Runnable onQuitCallback = () -> {};
@@ -49,7 +52,7 @@ public final class HttpServer implements AutoCloseable {
 			RequestLogWriter logWriter,
 			Map<String, String> envOverrides
 	) {
-		this(env, config, token, queue, logWriter, envOverrides, MinecraftGameClient.getInstance());
+		this(env, config, token, queue, logWriter, envOverrides, MinecraftGameClient.getInstance(), new UnavailableBaritoneService());
 	}
 
 	public HttpServer(
@@ -61,16 +64,30 @@ public final class HttpServer implements AutoCloseable {
 			Map<String, String> envOverrides,
 			GameClient gameClient
 	) {
+		this(env, config, token, queue, logWriter, envOverrides, gameClient, new UnavailableBaritoneService());
+	}
+
+	public HttpServer(
+			McdtEnvironment env,
+			McdtConfig config,
+			BearerToken token,
+			TaskQueue queue,
+			RequestLogWriter logWriter,
+			Map<String, String> envOverrides,
+			GameClient gameClient,
+			BaritoneService baritoneService
+	) {
 		this.env = env;
 		this.config = config;
 		this.token = token;
 		this.queue = queue;
 		this.logWriter = logWriter;
 		this.gameClient = gameClient;
+		this.baritoneService = baritoneService != null ? baritoneService : new UnavailableBaritoneService();
 
 		int targetPort = ConfigStore.effectivePort(config, envOverrides);
 		RateLimiter rateLimiter = new RateLimiter(config.rateLimitPerSecond);
-		AccessFilter accessFilter = new AccessFilter(config, token, rateLimiter, boundPort::get);
+		AccessFilter accessFilter = new AccessFilter(config, token, rateLimiter, boundPort::get, gameClient);
 
 		this.app = Javalin.create(cfg -> {
 			cfg.startup.showJavalinBanner = false;
@@ -157,8 +174,29 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/objects/roots", new ObjectsRootsHandler(config, queue, gameClient, nameService), McdtRole.READ);
 			cfg.routes.get("/v1/objects/{handle}", new ObjectInspectHandler(config, queue, gameClient, handleTable, pathEvaluator, reflectionSerializer), McdtRole.READ);
 			cfg.routes.get("/v1/objects/{handle}/fields/{name}", new ObjectFieldHandler(config, queue, gameClient, handleTable, reflectionCache, reflectionSerializer), McdtRole.READ);
+			cfg.routes.put("/v1/objects/{handle}/fields/{name}", new ObjectFieldSetHandler(config, queue, gameClient, handleTable, reflectionCache, reflectionSerializer), McdtRole.REFLECT_WRITE);
+			cfg.routes.post("/v1/objects/{handle}/invoke", new ObjectInvokeHandler(config, queue, gameClient, handleTable, reflectionCache, reflectionSerializer), McdtRole.REFLECT_WRITE);
 			cfg.routes.get("/v1/classes/{name}", new ClassInspectHandler(config, queue, nameService, reflectionSerializer), McdtRole.READ);
 			cfg.routes.delete("/v1/objects/{handle}", new ObjectDeleteHandler(handleTable), McdtRole.READ);
+
+			// --- Milestone M5 Raw Packet Send ---
+			cfg.routes.post("/v1/packets", new PacketsHandler(config, queue, gameClient, handleTable), McdtRole.REFLECT_WRITE);
+
+			// --- Milestone M5 Baritone Routes ---
+			cfg.routes.get("/v1/baritone", new BaritoneHandlers.StatusHandler(config, queue, baritoneService), McdtRole.READ);
+			cfg.routes.get("/v1/baritone/status", new BaritoneHandlers.StatusHandler(config, queue, baritoneService), McdtRole.READ);
+			cfg.routes.get("/v1/baritone/path", new BaritoneHandlers.PathHandler(config, queue, baritoneService), McdtRole.READ);
+			cfg.routes.post("/v1/baritone/goto", new BaritoneHandlers.GotoHandler(config, queue, baritoneService), McdtRole.ACT);
+			cfg.routes.post("/v1/baritone/mine", new BaritoneHandlers.MineHandler(config, queue, baritoneService), McdtRole.ACT);
+			cfg.routes.post("/v1/baritone/follow", new BaritoneHandlers.FollowHandler(config, queue, baritoneService), McdtRole.ACT);
+			cfg.routes.post("/v1/baritone/explore", new BaritoneHandlers.ExploreHandler(config, queue, baritoneService), McdtRole.ACT);
+			cfg.routes.post("/v1/baritone/farm", new BaritoneHandlers.FarmHandler(config, queue, baritoneService), McdtRole.ACT);
+			cfg.routes.post("/v1/baritone/build", new BaritoneHandlers.BuildHandler(config, queue, baritoneService), McdtRole.ACT);
+			cfg.routes.post("/v1/baritone/cancel", new BaritoneHandlers.CancelHandler(config, queue, baritoneService), McdtRole.ACT);
+			cfg.routes.get("/v1/baritone/jobs/{id}", new BaritoneHandlers.JobHandler(baritoneService), McdtRole.READ);
+			cfg.routes.get("/v1/baritone/settings", new BaritoneHandlers.SettingsGetHandler(baritoneService), McdtRole.READ);
+			cfg.routes.patch("/v1/baritone/settings", new BaritoneHandlers.SettingsPatchHandler(baritoneService), McdtRole.ACT);
+			cfg.routes.post("/v1/baritone/command", new BaritoneHandlers.CommandHandler(config, queue, baritoneService), McdtRole.ACT);
 
 			// --- Milestone M4 WebSocket Routes ---
 			dev.advik.mcdt.events.EventHub eventHub = dev.advik.mcdt.events.EventHub.getInstance();

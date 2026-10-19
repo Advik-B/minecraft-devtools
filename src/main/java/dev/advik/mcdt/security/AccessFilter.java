@@ -18,13 +18,20 @@ public final class AccessFilter implements Handler {
 	private final BearerToken token;
 	private final RateLimiter rateLimiter;
 	private final IntSupplier portSupplier;
+	private final dev.advik.mcdt.game.GameClient gameClient;
 
 	public AccessFilter(McdtConfig config, BearerToken token, RateLimiter rateLimiter, IntSupplier portSupplier) {
+		this(config, token, rateLimiter, portSupplier, null);
+	}
+
+	public AccessFilter(McdtConfig config, BearerToken token, RateLimiter rateLimiter, IntSupplier portSupplier, dev.advik.mcdt.game.GameClient gameClient) {
 		this.config = config;
 		this.token = token;
 		this.rateLimiter = rateLimiter;
 		this.portSupplier = portSupplier;
+		this.gameClient = gameClient;
 	}
+
 
 	@Override
 	public void handle(Context ctx) {
@@ -134,7 +141,18 @@ public final class AccessFilter implements Handler {
 				if (!config.permission.grants(required)) {
 					throw Problems.permissionDenied(required.id(), config.permission.id());
 				}
+				if (gameClient != null && (required == Permission.ACT || required == Permission.REFLECT_WRITE)) {
+					if (gameClient.isMultiplayer()) {
+						String serverAddress = gameClient.getCurrentServerAddress();
+						boolean allowed = serverAddress != null && config.allowedMultiplayerServers.stream()
+								.anyMatch(serverAddress::equalsIgnoreCase);
+						if (!allowed) {
+							throw Problems.multiplayerWriteDisabled(serverAddress);
+						}
+					}
+				}
 			}
 		}
 	}
 }
+

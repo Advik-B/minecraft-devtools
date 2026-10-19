@@ -422,6 +422,7 @@ public class MockGameClient implements GameClient {
 
 	public static class MockPlayer {
 		public final String name = "TestPlayer";
+		public final String token = "secret_token_value";
 		public final MockInventory inventory = new MockInventory();
 		public MockInventory getInventory() { return inventory; }
 	}
@@ -430,7 +431,12 @@ public class MockGameClient implements GameClient {
 		public int fps = 144;
 		public MockPlayer player = new MockPlayer();
 		public MockPlayer getPlayer() { return player; }
+		public int add(int a, int b) { return a + b; }
+		public void setFps(int newFps) { this.fps = newFps; }
+		public String echo(String msg) { return "Echo: " + msg; }
+		public void boom() { throw new RuntimeException("Explosion occurred!"); }
 	}
+
 
 	public static class MockLevel {
 		public final String dimension = "minecraft:overworld";
@@ -481,4 +487,33 @@ public class MockGameClient implements GameClient {
 		roots.put("gameRenderer", mockGameRenderer);
 		return roots;
 	}
+
+	public boolean isSingleplayer = true;
+	public boolean isMultiplayer = false;
+	public String currentServer = null;
+	public final List<Object> sentPackets = new ArrayList<>();
+
+	@Override
+	public boolean isSingleplayer() {
+		return isSingleplayer;
+	}
+
+	@Override
+	public boolean isMultiplayer() {
+		return isMultiplayer;
+	}
+
+	@Override
+	public String getCurrentServerAddress() {
+		return currentServer;
+	}
+
+	@Override
+	public void sendPacket(Object packet) {
+		if (!hasWorld) {
+			throw Problems.noWorld();
+		}
+		sentPackets.add(packet);
+	}
 }
+

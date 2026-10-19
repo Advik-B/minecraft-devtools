@@ -4,6 +4,44 @@ Client-side Fabric mod for Minecraft 1.21.4 that exposes the running game via a 
 
 ## Features
 
+### High-Level Control & Writes (Milestone M5)
+- **Reflection Field Writes:** `PUT /v1/objects/{handle}/fields/{name}` allowing dynamic mutation of instance or static fields on loaded objects, with rich type coercion for primitives, strings, enums, handles, `BlockPos`, `Vec3`, and `ResourceLocation`. Guarded by `reflect-write` permission.
+- **Dynamic Method Invocation:** `POST /v1/objects/{handle}/invoke` executing arbitrary instance or static methods with typed arguments, returning converted values or handles to return objects.
+- **Raw Network Packet Injection:** `POST /v1/packets` instantiating and transmitting arbitrary Minecraft serverbound packets dynamically (e.g. `ServerboundChatPacket`, `ServerboundPlayerCommandPacket`, `ServerboundSwingPacket`).
+- **Baritone Pathfinding & Automation (Optional Integration):**
+  - Modular, classloader-isolated integration via `BaritoneService` and `BaritoneBridge`. When Baritone is absent, returns RFC 9457 HTTP 501 `baritone-not-installed` with zero runtime classpath errors.
+  - 13 dedicated automation endpoints:
+    - `GET /v1/baritone/status`: Live pathing state, current process, and active goal.
+    - `POST /v1/baritone/path`: Request custom path calculation to a goal.
+    - `POST /v1/baritone/goto`: Walk and pathfind to a target coordinate (`BlockPos` or `xz`).
+    - `POST /v1/baritone/mine`: Autonomous block mining by block ID or tag.
+    - `POST /v1/baritone/follow`: Follow entities or players by ID, type, or username.
+    - `POST /v1/baritone/explore`: Explore unvisited chunks around an origin.
+    - `POST /v1/baritone/farm`: Automated farmland harvesting, tilling, and planting.
+    - `POST /v1/baritone/build`: Build schematics at world positions.
+    - `POST /v1/baritone/cancel`: Immediately stop any running pathfinding or automation process.
+    - `GET /v1/baritone/jobs`: List tracked pathing and automation jobs.
+    - `GET /v1/baritone/jobs/{id}`: Detailed status and outcome of an individual job.
+    - `GET /v1/baritone/settings` & `PATCH /v1/baritone/settings`: Inspect and modify Baritone configuration (e.g., `allowBreak`, `allowSprint`, `primaryTimeoutMS`).
+    - `POST /v1/baritone/command`: Execute native Baritone commands directly through its command pipeline.
+  - Automatically streams `baritone.path_event` notifications onto the event bus.
+- **Multiplayer Safety Policies:**
+  - Configurable server whitelist `allowedMultiplayerServers` in `mcdt.json`.
+  - When connected to an unapproved multiplayer server, destructive actions (`act` and `reflect-write` permissions) are rejected with HTTP 403 `multiplayer-write-disabled` while read-only inspection remains functional.
+
+### Real-Time Event Streaming & WebSockets (Milestone M4)
+- **Server-Sent Events (SSE):** `GET /v1/events?types=...` streaming real-time game events with standard `text/event-stream` framing.
+- **Bi-Directional WebSocket API:** `GET /v1/ws` allowing concurrent full-duplex event streaming, live subscription management (`subscribe`, `unsubscribe`), and keepalive pings over a single persistent connection.
+- **Rich Core Game Events:**
+  - `tick.pulse`: Emitted at configurable tick intervals with client tick counter, FPS, and delta time.
+  - `player.state`: Emitted when player position, velocity, health, food, or game mode changes.
+  - `player.death` & `player.respawn`: Death notifications with death message, killer entity, and coordinates.
+  - `chat.message`: Incoming chat and system messages with sender, text, and formatted JSON.
+  - `screen.open` & `screen.close`: UI screen transitions and modal changes.
+  - `chunk.load` & `chunk.unload`: World streaming and chunk lifecycle notifications.
+  - `baritone.path_event`: Baritone path planning, progression, cancellation, and completion events.
+- **Reliable Backpressure & Replay:** Fixed-capacity event queues per client with ring-buffer discard policies and configurable replay buffers for late-joining subscribers.
+
 ### Reflection Layer & Object Graph Inspection (Milestone M3)
 - **Named Root Inspection:** `GET /v1/objects/roots` exposing canonical root handles (`minecraft`, `player`, `level`, `screen`, `options`, `gameRenderer`).
 - **Object Graph Traversal:** `GET /v1/objects/{handle}` inspecting live object instances with depth-limited field evaluation, methods, and cycle detection.

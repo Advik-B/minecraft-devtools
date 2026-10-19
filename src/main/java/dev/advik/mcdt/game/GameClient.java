@@ -56,4 +56,15 @@ public interface GameClient {
 	Object getRootObject(String name);
 
 	java.util.Map<String, Object> getRootObjects();
+
+	// --- Milestone M5 High-Level Control & Writes ---
+
+	boolean isSingleplayer();
+
+	boolean isMultiplayer();
+
+	String getCurrentServerAddress();
+
+	void sendPacket(Object packet);
 }
+

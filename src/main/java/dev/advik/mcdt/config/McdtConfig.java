@@ -29,6 +29,10 @@ public final class McdtConfig {
 	public Permission permission = Permission.READ;
 	/** Extra browser origins allowed to call the API, e.g. {@code http://localhost:5173}. */
 	public List<String> originAllowlist = new ArrayList<>();
+	/** Allowed multiplayer server addresses for act and reflect-write actions. */
+	public List<String> allowedMultiplayerServers = new ArrayList<>();
+	/** Enable or disable Baritone endpoints. */
+	public boolean enableBaritone = true;
 	/** Whether the two-step quit endpoints may shut the game down. */
 	public boolean allowQuit = true;
 	/** Requests per second per token. */
@@ -62,6 +66,10 @@ public final class McdtConfig {
 			originAllowlist = new ArrayList<>();
 		}
 		originAllowlist.removeIf(origin -> origin == null || origin.isBlank());
+		if (allowedMultiplayerServers == null) {
+			allowedMultiplayerServers = new ArrayList<>();
+		}
+		allowedMultiplayerServers.removeIf(s -> s == null || s.isBlank());
 		return this;
 	}
 

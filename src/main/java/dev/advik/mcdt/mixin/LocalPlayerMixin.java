@@ -13,11 +13,9 @@ import java.util.Map;
 
 @Mixin(LocalPlayer.class)
 public abstract class LocalPlayerMixin {
-	@Shadow public abstract float getHealth();
-
 	@Inject(method = "hurtTo", at = @At("HEAD"))
 	private void mcdt$onHurtTo(float health, CallbackInfo ci) {
-		float oldHealth = getHealth();
+		float oldHealth = ((LocalPlayer) (Object) this).getHealth();
 		if (health < oldHealth) {
 			float amount = oldHealth - health;
 			EventHub.getInstance().publish("player.damage", Map.of(

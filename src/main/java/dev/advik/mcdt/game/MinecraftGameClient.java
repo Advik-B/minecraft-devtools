@@ -31,6 +31,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
@@ -1080,4 +1081,36 @@ public final class MinecraftGameClient implements GameClient {
 		roots.put("gameRenderer", client.gameRenderer);
 		return roots;
 	}
+
+	@Override
+	public boolean isSingleplayer() {
+		return Minecraft.getInstance().isSingleplayer();
+	}
+
+	@Override
+	public boolean isMultiplayer() {
+		Minecraft client = Minecraft.getInstance();
+		return client.level != null && !client.isLocalServer();
+	}
+
+	@Override
+	public String getCurrentServerAddress() {
+		Minecraft client = Minecraft.getInstance();
+		ServerData server = client.getCurrentServer();
+		return server != null ? server.ip : null;
+	}
+
+	@Override
+	public void sendPacket(Object packet) {
+		if (packet instanceof Packet<?> p) {
+			Minecraft client = Minecraft.getInstance();
+			if (client.getConnection() == null) {
+				throw Problems.noWorld();
+			}
+			client.getConnection().send(p);
+		} else {
+			throw Problems.badRequest("Object is not a Packet");
+		}
+	}
 }
+

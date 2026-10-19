@@ -36,6 +36,15 @@ public final class McdtCore implements AutoCloseable {
 	}
 
 	public static McdtCore start(McdtEnvironment env, Map<String, String> envOverrides, dev.advik.mcdt.game.GameClient gameClient) throws IOException {
+		return start(env, envOverrides, gameClient, new dev.advik.mcdt.baritone.UnavailableBaritoneService());
+	}
+
+	public static McdtCore start(
+			McdtEnvironment env,
+			Map<String, String> envOverrides,
+			dev.advik.mcdt.game.GameClient gameClient,
+			dev.advik.mcdt.baritone.BaritoneService baritoneService
+	) throws IOException {
 		Files.createDirectories(env.configDir());
 		Files.createDirectories(env.logDir());
 
@@ -49,7 +58,7 @@ public final class McdtCore implements AutoCloseable {
 		TaskQueue queue = new TaskQueue(config.queueCapacity, clock);
 		RequestLogWriter logWriter = new RequestLogWriter(env.logDir());
 
-		HttpServer server = new HttpServer(env, config, token, queue, logWriter, envOverrides, gameClient);
+		HttpServer server = new HttpServer(env, config, token, queue, logWriter, envOverrides, gameClient, baritoneService);
 
 		long pid = ProcessHandle.current().pid();
 		DiscoveryFile discovery = new DiscoveryFile(env.instancesDir(), env.configDir(), pid);

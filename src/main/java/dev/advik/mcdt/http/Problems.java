@@ -37,6 +37,12 @@ public final class Problems {
 	public static final String CLASS_NOT_FOUND = "class-not-found";
 	public static final String FIELD_NOT_FOUND = "field-not-found";
 	public static final String PATH_EVALUATION_FAILED = "path-evaluation-failed";
+	public static final String BARITONE_NOT_INSTALLED = "baritone-not-installed";
+	public static final String MULTIPLAYER_WRITE_DISABLED = "multiplayer-write-disabled";
+	public static final String METHOD_NOT_FOUND = "method-not-found";
+	public static final String INVOKE_FAILED = "invoke-failed";
+	public static final String PACKET_FAILED = "packet-failed";
+	public static final String JOB_NOT_FOUND = "job-not-found";
 
 	private Problems() {
 	}
@@ -171,6 +177,36 @@ public final class Problems {
 	public static ProblemException pathEvaluationFailed(String path, String detail) {
 		return of(400, PATH_EVALUATION_FAILED, "Path evaluation failed",
 				"Failed evaluating path '" + path + "': " + detail);
+	}
+
+	public static ProblemException baritoneNotInstalled() {
+		return of(501, BARITONE_NOT_INSTALLED, "Baritone not installed",
+				"Baritone 1.13.1 is not installed. Download baritone-api-fabric-1.13.1.jar from https://github.com/cabaletta/baritone/releases and place it in your mods folder.");
+	}
+
+	public static ProblemException multiplayerWriteDisabled(String server) {
+		return of(403, MULTIPLAYER_WRITE_DISABLED, "Multiplayer write disabled",
+				"Write operations are disabled on multiplayer server '" + (server != null ? server : "unknown") + "'. Add it to allowedMultiplayerServers in config/mcdt/config.json to allow automation.");
+	}
+
+	public static ProblemException methodNotFound(String methodName, String className) {
+		return of(404, METHOD_NOT_FOUND, "Method not found",
+				"Method '" + methodName + "' was not found on class '" + className + "' with matching parameter types.");
+	}
+
+	public static ProblemException invokeFailed(String methodName, String detail) {
+		return of(400, INVOKE_FAILED, "Method invocation failed",
+				"Failed to invoke '" + methodName + "': " + detail);
+	}
+
+	public static ProblemException packetFailed(String packetName, String detail) {
+		return of(400, PACKET_FAILED, "Packet send failed",
+				"Failed to build or send packet '" + packetName + "': " + detail);
+	}
+
+	public static ProblemException jobNotFound(String jobId) {
+		return of(404, JOB_NOT_FOUND, "Job not found",
+				"Job '" + jobId + "' does not exist or has expired.");
 	}
 
 	public static ProblemException badRequest(String detail) {
