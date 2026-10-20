@@ -140,6 +140,10 @@ public final class ObjectInvokeHandler implements Handler {
 				throw Problems.invokeFailed(chosen.resolvedName(), t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
 			}
 
+			if (ReflectionSecurity.isSensitiveMethod(clazz, chosen.resolvedName())) {
+				result = ReflectionSecurity.REDACTED;
+			}
+
 			Object serializedResult = null;
 			if (method.getReturnType() != void.class) {
 				serializedResult = serializer.serialize(
