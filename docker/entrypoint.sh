@@ -5,10 +5,18 @@ set -eu
 DATA_DIR=/data
 log() { echo "[mcdt-docker] $*"; }
 
-# 1. Install the bundled mods. Older MCDT and Fabric API jars are replaced; other mods (e.g. Baritone) stay.
+# 1. Install the bundled mods. Older MCDT, Fabric API and Baritone jars are replaced; other mods stay.
 mkdir -p "$DATA_DIR/mods"
-rm -f "$DATA_DIR"/mods/mcdt-*.jar "$DATA_DIR"/mods/fabric-api-*.jar
+rm -f "$DATA_DIR"/mods/mcdt-*.jar "$DATA_DIR"/mods/fabric-api-*.jar "$DATA_DIR"/mods/baritone-api-fabric-*.jar
 cp /opt/mcdt/mods/*.jar "$DATA_DIR/mods/"
+case "${MC_BARITONE:-true}" in
+	true) cp /opt/mcdt/baritone/*.jar "$DATA_DIR/mods/" ;;
+	false) ;;
+	*)
+		log "MC_BARITONE must be 'true' or 'false', got '${MC_BARITONE}'."
+		exit 1
+		;;
+esac
 
 # 2. Seed light settings on first start. An existing options.txt is left alone.
 if [ ! -f "$DATA_DIR/options.txt" ]; then

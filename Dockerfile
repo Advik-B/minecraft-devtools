@@ -18,7 +18,9 @@ RUN --mount=type=cache,target=/root/.gradle \
 	chmod +x gradlew \
 	&& ./gradlew build -x test --no-daemon --console=plain \
 	&& mkdir -p /out \
-	&& find build/libs -maxdepth 1 -name 'mcdt-*.jar' ! -name '*-sources.jar' -exec cp {} /out/ \;
+	&& find build/libs -maxdepth 1 -name 'mcdt-*.jar' ! -name '*-sources.jar' -exec cp {} /out/ \; \
+	&& mkdir -p /out/baritone \
+	&& cp libs/baritone-api-fabric-*.jar /out/baritone/
 
 # ---- Runtime ------------------------------------------------------------------------------------
 FROM eclipse-temurin:21-jre-noble
@@ -60,12 +62,15 @@ RUN portablemc --main-dir /opt/minecraft start --dry --jvm-policy system \
 USER root
 RUN curl -fsSL -o "/opt/mcdt/mods/fabric-api-${FABRIC_API_VERSION}.jar" "$FABRIC_API_URL" \
 	&& echo "${FABRIC_API_SHA512}  /opt/mcdt/mods/fabric-api-${FABRIC_API_VERSION}.jar" | sha512sum -c -
-COPY --from=build /out/ /opt/mcdt/mods/
+COPY --from=build /out/*.jar /opt/mcdt/mods/
+# Baritone (LGPL-3.0, unmodified): the jar pinned in libs/, verified by Gradle against baritone_sha256.
+COPY --from=build /out/baritone/ /opt/mcdt/baritone/
 COPY --chmod=0755 docker/entrypoint.sh /opt/mcdt/entrypoint.sh
 USER mcdt
 
 ENV MC_VERSION="fabric:${MINECRAFT_VERSION}:${LOADER_VERSION}" \
 	MC_AUTH=offline \
+	MC_BARITONE=true \
 	MC_MAX_MEMORY=2G \
 	MC_WIDTH=1280 \
 	MC_HEIGHT=720 \
