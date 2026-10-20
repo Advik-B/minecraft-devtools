@@ -35,7 +35,8 @@ fi
 display_num="${DISPLAY#:}"
 display_num="${display_num%%.*}"
 rm -f "/tmp/.X${display_num}-lock" "/tmp/.X11-unix/X${display_num}"
-Xvfb "$DISPLAY" -screen 0 "${MC_WIDTH}x${MC_HEIGHT}x24" -nolisten tcp >/tmp/xvfb.log 2>&1 &
+# setsid keeps Xvfb out of the process group that `docker stop` signals, so the display outlives the game.
+setsid Xvfb "$DISPLAY" -screen 0 "${MC_WIDTH}x${MC_HEIGHT}x24" -nolisten tcp >/tmp/xvfb.log 2>&1 &
 i=0
 while [ ! -S "/tmp/.X11-unix/X${display_num}" ]; do
 	i=$((i + 1))
@@ -99,4 +100,18 @@ if [ -z "${MCDT_TOKEN:-}" ]; then
 	log "MCDT_TOKEN is not set, so the API uses a random token. Read it with: docker exec <container> cat $DATA_DIR/config/mcdt/token"
 fi
 log "Starting ${MC_VERSION}. The API will listen on port ${MCDT_PORT}."
-exec portablemc start "$@" "$MC_VERSION"
+
+# tini -g sends `docker stop`'s SIGTERM to this whole process group. The launcher exits before the game
+# JVM has run its shutdown hooks, so stay alive until the JVM is gone too.
+trap 'log "Stopping..."' TERM INT
+portablemc start "$@" "$MC_VERSION" &
+launcher=$!
+status=0
+while kill -0 "$launcher" 2>/dev/null; do
+	wait "$launcher" || status=$?
+done
+game_running() { grep -qsx java /proc/[0-9]*/comm; }
+while game_running; do
+	sleep 0.2
+done
+exit "$status"

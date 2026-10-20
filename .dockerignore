@@ -1,0 +1,15 @@
+.git
+.gradle
+.idea
+.vscode
+.agents
+build
+out
+bin
+run
+web/node_modules
+web/dist
+*.hprof
+*.jfr
+docker-compose.yml
+.env

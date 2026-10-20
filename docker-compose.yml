@@ -1,0 +1,29 @@
+# Headless MCDT. Put overrides in a .env file next to this one (see the Docker section of README.md).
+services:
+  mcdt:
+    build: .
+    image: mcdt:latest
+    container_name: mcdt
+    restart: unless-stopped
+    # Loopback only by default. To serve other machines, put a TLS reverse proxy in front and set
+    # MCDT_ALLOWED_HOSTS (and MCDT_ORIGIN_ALLOWLIST for the dashboard) to its public name.
+    ports:
+      - "127.0.0.1:${MCDT_HOST_PORT:-25580}:25580"
+    environment:
+      MCDT_TOKEN: ${MCDT_TOKEN:-}
+      MCDT_PERMISSION: ${MCDT_PERMISSION:-}
+      MCDT_ALLOWED_HOSTS: ${MCDT_ALLOWED_HOSTS:-}
+      MCDT_ORIGIN_ALLOWLIST: ${MCDT_ORIGIN_ALLOWLIST:-}
+      MCDT_ALLOWED_MULTIPLAYER_SERVERS: ${MCDT_ALLOWED_MULTIPLAYER_SERVERS:-}
+      MC_AUTH: ${MC_AUTH:-offline}
+      MC_USERNAME: ${MC_USERNAME:-}
+      MC_MAX_MEMORY: ${MC_MAX_MEMORY:-2G}
+      MC_JOIN_SERVER: ${MC_JOIN_SERVER:-}
+      MC_JOIN_WORLD: ${MC_JOIN_WORLD:-}
+    volumes:
+      - mcdt-data:/data
+    shm_size: 512m
+    stop_grace_period: 30s
+
+volumes:
+  mcdt-data:

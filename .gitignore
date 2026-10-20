@@ -43,3 +43,6 @@ replay_*.log
 # agents
 .agents/
 skills-lock.json
+
+# docker
+.env
