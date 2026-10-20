@@ -8,6 +8,7 @@
 Read game state, drive input, stream events, and inspect the live object graph over REST, WebSocket, and MCP, from any language, with no Java and no restart.
 
 [![Build](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml/badge.svg)](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml)
+[![Latest Release](https://img.shields.io/github/v/release/Advik-B/minecraft-devtools?logo=github)](https://github.com/Advik-B/minecraft-devtools/releases/latest)
 ![Minecraft 1.21.4](https://img.shields.io/badge/Minecraft-1.21.4-62B47A?logo=modrinth&logoColor=white)
 ![Fabric](https://img.shields.io/badge/loader-Fabric-DBD0B4)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
@@ -70,15 +71,12 @@ A Baritone tab appears too. It drives pathing, mining, and building when Bariton
 
 ### Install
 
-There are no published releases yet, so build the jar from source (see [Development](#development)). You can also download the `Artifacts` bundle from a successful [CI run](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml).
+1. Download the latest `mcdt-<version>.jar` from [GitHub Releases](https://github.com/Advik-B/minecraft-devtools/releases/latest).
+2. Copy the jar into your `.minecraft/mods/` folder next to Fabric API.
+3. Launch the game.
 
-```bash
-git clone https://github.com/Advik-B/minecraft-devtools.git
-cd minecraft-devtools
-./gradlew build          # gradlew.bat on Windows
-```
-
-Copy `build/libs/mcdt-<version>.jar` (the jar without `-sources`) into your `.minecraft/mods/` folder next to Fabric API, then launch the game.
+> [!TIP]
+> Each release includes the compiled mod jar, the sources jar, the OpenAPI 3.1 specification (`openapi.json`), and SHA-256 checksums (`sha256sums.txt`). If you prefer to build from source or contribute, see [Development](#development).
 
 ### Make your first request
 

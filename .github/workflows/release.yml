@@ -1,0 +1,141 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to build (e.g. v0.1.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: resolve version and synchronize gradle.properties
+        id: ver
+        run: |
+          RAW_TAG="${{ inputs.tag_name || github.ref_name }}"
+          TAG="${RAW_TAG#refs/tags/}"
+          VERSION="${TAG#v}"
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          CURRENT_VERSION=$(sed -n 's/^version=//p' gradle.properties | tr -d '\r')
+          echo "Current version in gradle.properties: $CURRENT_VERSION"
+          echo "Target version from tag: $VERSION"
+
+          if [ "$CURRENT_VERSION" != "$VERSION" ]; then
+            echo "Updating gradle.properties to version $VERSION"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout master
+            git pull origin master
+            sed -i "s/^version=.*/version=$VERSION/" gradle.properties
+            git add gradle.properties
+            git commit -m "chore: bump version to $VERSION [skip ci]"
+            git push origin master
+            if git rev-parse "$TAG" >/dev/null 2>&1; then
+              git tag -f "$TAG"
+              git push origin -f "$TAG"
+            else
+              git tag "$TAG"
+              git push origin "$TAG"
+            fi
+          fi
+
+      - name: find base reference for release notes
+        id: git-ref
+        run: |
+          BASE_REF=$(git describe --tags --abbrev=0 "${{ steps.ver.outputs.tag }}^" 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          echo "base_ref=$BASE_REF" >> $GITHUB_OUTPUT
+          echo "Base reference: $BASE_REF"
+
+      - name: check copilot availability
+        id: copilot-check
+        env:
+          COPILOT_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          if [ -n "$COPILOT_TOKEN" ]; then
+            echo "has_copilot=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_copilot=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: generate copilot release notes
+        if: steps.copilot-check.outputs.has_copilot == 'true'
+        id: copilot_notes
+        uses: github/copilot-release-notes@main
+        continue-on-error: true
+        with:
+          base-ref: ${{ steps.git-ref.outputs.base_ref }}
+          head-ref: ${{ steps.ver.outputs.tag }}
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+
+      - name: prepare release notes file
+        env:
+          NOTES: ${{ steps.copilot_notes.outputs.release-notes }}
+        run: |
+          if [ -n "$NOTES" ]; then
+            printf "%s\n" "$NOTES" > notes.md
+          fi
+
+      - name: setup bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: build mod and export openapi
+        run: ./gradlew build exportOpenApi -Pversion=${{ steps.ver.outputs.version }}
+
+      - name: generate checksums
+        run: |
+          cd build/libs
+          sha256sum mcdt-*.jar openapi.json > sha256sums.txt
+          cat sha256sums.txt
+
+      - name: create github release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          if [ -s notes.md ]; then
+            gh release create "$TAG" \
+              build/libs/mcdt-*.jar \
+              build/libs/openapi.json \
+              build/libs/sha256sums.txt \
+              --title "$TAG" \
+              --notes-file notes.md
+          else
+            gh release create "$TAG" \
+              build/libs/mcdt-*.jar \
+              build/libs/openapi.json \
+              build/libs/sha256sums.txt \
+              --title "$TAG" \
+              --generate-notes
+          fi

@@ -272,6 +272,54 @@ tasks.jar {
 	}
 }
 
+val exportOpenApi = tasks.register("exportOpenApi") {
+	group = "documentation"
+	description = "Exports the OpenAPI 3.1 specification to build/libs/openapi.json."
+	dependsOn(tasks.compileJava)
+
+	val classesDir = tasks.compileJava.flatMap { it.destinationDirectory }
+	val outputFile = layout.buildDirectory.file("libs/openapi.json")
+	val projectVersion = provider { project.version.toString() }
+
+	inputs.dir(classesDir)
+	inputs.property("version", projectVersion)
+	outputs.file(outputFile)
+
+	doLast {
+		val ver = projectVersion.get()
+		val inputFile = classesDir.get().file("openapi-plugin/openapi-default.json").asFile
+		if (!inputFile.isFile) {
+			throw GradleException("OpenAPI definition not found at ${inputFile.absolutePath}")
+		}
+		val slurper = groovy.json.JsonSlurper()
+		@Suppress("UNCHECKED_CAST")
+		val json = slurper.parse(inputFile) as MutableMap<String, Any>
+
+		@Suppress("UNCHECKED_CAST")
+		val info = (json["info"] as? MutableMap<String, Any>) ?: mutableMapOf<String, Any>().also { json["info"] = it }
+		info["title"] = "Minecraft DevTools API"
+		info["version"] = ver
+		info["description"] = "REST and WebSocket interface for the live Minecraft 1.21.4 client."
+
+		@Suppress("UNCHECKED_CAST")
+		val components = (json["components"] as? MutableMap<String, Any>) ?: mutableMapOf<String, Any>().also { json["components"] = it }
+		@Suppress("UNCHECKED_CAST")
+		val securitySchemes = (components["securitySchemes"] as? MutableMap<String, Any>) ?: mutableMapOf<String, Any>().also { components["securitySchemes"] = it }
+		securitySchemes["BearerAuth"] = mapOf(
+			"type" to "http",
+			"scheme" to "bearer"
+		)
+
+		val target = outputFile.get().asFile
+		target.parentFile.mkdirs()
+		target.writeText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json)) + "\n")
+	}
+}
+
+tasks.assemble {
+	dependsOn(exportOpenApi)
+}
+
 // configure the maven publication
 publishing {
 	publications {
