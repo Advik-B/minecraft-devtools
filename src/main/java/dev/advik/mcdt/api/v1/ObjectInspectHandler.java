@@ -9,6 +9,7 @@ import dev.advik.mcdt.http.Problem;
 import dev.advik.mcdt.http.Problems;
 import dev.advik.mcdt.json.Json;
 import dev.advik.mcdt.reflection.HandleTable;
+import dev.advik.mcdt.reflection.NameService;
 import dev.advik.mcdt.reflection.PathEvaluator;
 import dev.advik.mcdt.reflection.ReflectionSerializer;
 import io.javalin.http.Context;
@@ -163,7 +164,7 @@ public final class ObjectInspectHandler implements Handler {
 		if (obj == null || obj instanceof Number || obj instanceof Boolean || obj instanceof Character || obj instanceof String || obj instanceof Enum<?>) {
 			return true;
 		}
-		String name = obj.getClass().getName();
+		String name = NameService.getInstance().resolveClassName(obj.getClass().getName());
 		return name.startsWith("net.minecraft.world.phys.Vec3")
 				|| name.startsWith("net.minecraft.core.BlockPos")
 				|| name.startsWith("net.minecraft.core.Vec3i")

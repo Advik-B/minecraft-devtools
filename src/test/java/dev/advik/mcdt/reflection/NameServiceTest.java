@@ -163,4 +163,23 @@ class NameServiceTest {
 		assertEquals("Ljava/util/List;", NameService.descriptor("java.util.List", classes));
 		assertEquals("[Lfhx;", NameService.descriptor("net.minecraft.client.player.LocalPlayer[]", classes));
 	}
+
+	@Test
+	void resolvesArraysNestedAnonymousAndLambdaClasses() throws Exception {
+		NameService service = new NameService(NameService.RuntimeNames.IDENTITY);
+		service.loadFromReader(new BufferedReader(new StringReader("""
+				net.minecraft.client.OptionInstance -> class_7172:
+				net.minecraft.world.item.ItemStack -> class_1799:
+				net.minecraft.client.Minecraft -> class_310:
+				net.minecraft.client.Minecraft$GameLoadCookie -> class_310$class_8762:
+				""")));
+
+		assertEquals("net.minecraft.client.Minecraft$GameLoadCookie", service.resolveClassName("class_310$class_8762"));
+		assertEquals("net.minecraft.client.Minecraft$1", service.resolveClassName("class_310$1"));
+		assertEquals("net.minecraft.client.OptionInstance$$Lambda/0x00007f1510c9b780",
+				service.resolveClassName("class_7172$$Lambda/0x00007f1510c9b780"));
+		assertEquals("[[Lnet.minecraft.world.item.ItemStack;", service.resolveClassName("[[Lclass_1799;"));
+		assertEquals("[I", service.resolveClassName("[I"));
+		assertEquals("class_9999$1", service.resolveClassName("class_9999$1"));
+	}
 }

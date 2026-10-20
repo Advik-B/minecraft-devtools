@@ -241,7 +241,7 @@ public final class HttpServer implements AutoCloseable {
 
 			// --- Milestone M3 Reflection Routes ---
 			HandleTable handleTable = HandleTable.getInstance();
-			NameService nameService = new NameService();
+			NameService nameService = NameService.getInstance();
 			nameService.initialize(env.configDir(), env.gameVersion());
 			ReflectionCache reflectionCache = new ReflectionCache(nameService);
 			PathEvaluator pathEvaluator = new PathEvaluator(reflectionCache);

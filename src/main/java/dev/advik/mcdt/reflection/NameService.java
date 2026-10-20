@@ -52,6 +52,15 @@ public final class NameService {
 		this.runtimeNames = isDevEnvironment ? RuntimeNames.IDENTITY : fabricRuntimeNames();
 	}
 
+	/** The shared instance, used by the HTTP server, game code and mixins. */
+	public static NameService getInstance() {
+		return Holder.INSTANCE;
+	}
+
+	private static final class Holder {
+		private static final NameService INSTANCE = new NameService();
+	}
+
 	/** For tests: a production-mode service with the given obfuscated-to-runtime translation. */
 	NameService(RuntimeNames runtimeNames) {
 		this.isDevEnvironment = false;
@@ -354,6 +363,11 @@ public final class NameService {
 		}
 	}
 
+	/**
+	 * The Mojang name of a runtime class name. Also handles array names ({@code [Lnet.minecraft.class_1799;}) and
+	 * classes the mappings don't list but whose outer class they do: anonymous and unmapped nested classes
+	 * ({@code class_310$1}) and lambdas ({@code class_7172$$Lambda/0x...}).
+	 */
 	public String resolveClassName(String runtimeClassName) {
 		if (runtimeClassName == null) {
 			return null;
@@ -361,7 +375,47 @@ public final class NameService {
 		if (isDevEnvironment) {
 			return runtimeClassName;
 		}
-		return classIntermediaryToMojang.getOrDefault(runtimeClassName, runtimeClassName);
+		String mapped = classIntermediaryToMojang.get(runtimeClassName);
+		if (mapped != null) {
+			return mapped;
+		}
+		if (runtimeClassName.startsWith("[")) {
+			int dims = 0;
+			while (dims < runtimeClassName.length() && runtimeClassName.charAt(dims) == '[') {
+				dims++;
+			}
+			if (runtimeClassName.charAt(dims) == 'L' && runtimeClassName.endsWith(";")) {
+				String component = runtimeClassName.substring(dims + 1, runtimeClassName.length() - 1);
+				return runtimeClassName.substring(0, dims + 1) + resolveClassName(component) + ";";
+			}
+			return runtimeClassName;
+		}
+		// Longest mapped prefix that ends right before a '$', e.g. "class_7172" of "class_7172$$Lambda/0x1".
+		for (int i = runtimeClassName.lastIndexOf('$'); i > 0; i = runtimeClassName.lastIndexOf('$', i - 1)) {
+			String outer = classIntermediaryToMojang.get(runtimeClassName.substring(0, i));
+			if (outer != null) {
+				return outer + runtimeClassName.substring(i);
+			}
+		}
+		return runtimeClassName;
+	}
+
+	/** The Mojang simple name of a class, e.g. {@code ServerboundSwingPacket} or {@code SystemToast}. */
+	public String simpleClassName(Class<?> clazz) {
+		if (clazz == null) {
+			return null;
+		}
+		if (isDevEnvironment || clazz.isArray()) {
+			return clazz.getSimpleName();
+		}
+		String name = resolveClassName(clazz.getName());
+		String simple = name.substring(name.lastIndexOf('.') + 1);
+		int nested = simple.lastIndexOf('$');
+		if (nested >= 0 && nested + 1 < simple.length() && !Character.isDigit(simple.charAt(nested + 1))
+				&& simple.indexOf("$$") < 0) {
+			simple = simple.substring(nested + 1);
+		}
+		return simple;
 	}
 
 	public String toRuntimeClassName(String mojangClassName) {

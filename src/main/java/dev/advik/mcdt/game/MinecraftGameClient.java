@@ -49,6 +49,7 @@ import net.minecraft.world.phys.Vec3;
 import com.mojang.authlib.GameProfile;
 import dev.advik.mcdt.mixin.StatsCounterAccessor;
 import dev.advik.mcdt.mixin.ClientAdvancementsAccessor;
+import dev.advik.mcdt.reflection.NameService;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementHolder;
@@ -123,7 +124,7 @@ public final class MinecraftGameClient implements GameClient {
 		Screen screen = client.screen;
 		ClientDto.ScreenSummary screenSummary = new ClientDto.ScreenSummary(
 				screen != null,
-				screen != null ? screen.getClass().getName() : null,
+				screen != null ? NameService.getInstance().resolveClassName(screen.getClass().getName()) : null,
 				screen != null ? TextSerializer.toPlainText(screen.getTitle()) : null
 		);
 
@@ -436,7 +437,7 @@ public final class MinecraftGameClient implements GameClient {
 			return ScreenDto.closed();
 		}
 
-		String className = screen.getClass().getName();
+		String className = NameService.getInstance().resolveClassName(screen.getClass().getName());
 		String title = TextSerializer.toPlainText(screen.getTitle());
 		int width = screen.width;
 		int height = screen.height;
@@ -1220,7 +1221,7 @@ public final class MinecraftGameClient implements GameClient {
 		if ("close".equals(action)) {
 			screen.onClose();
 			return new ScreenActionDto.Response(true, action, client.screen != null,
-					client.screen != null ? client.screen.getClass().getName() : null,
+					client.screen != null ? NameService.getInstance().resolveClassName(client.screen.getClass().getName()) : null,
 					client.screen != null ? TextSerializer.toPlainText(client.screen.getTitle()) : null, -1);
 		}
 
@@ -1286,7 +1287,7 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		return new ScreenActionDto.Response(true, action, client.screen != null,
-				client.screen != null ? client.screen.getClass().getName() : null,
+				client.screen != null ? NameService.getInstance().resolveClassName(client.screen.getClass().getName()) : null,
 				client.screen != null ? TextSerializer.toPlainText(client.screen.getTitle()) : null, -1);
 	}
 
@@ -1871,7 +1872,7 @@ public final class MinecraftGameClient implements GameClient {
 					for (Object toastInst : visible) {
 						if (toastInst != null) {
 							toasts.add(new HudDto.ToastInfo(
-									toastInst.getClass().getSimpleName(),
+									NameService.getInstance().simpleClassName(toastInst.getClass()),
 									"Notification",
 									null
 							));

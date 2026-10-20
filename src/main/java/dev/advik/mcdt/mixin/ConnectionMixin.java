@@ -1,6 +1,7 @@
 package dev.advik.mcdt.mixin;
 
 import dev.advik.mcdt.events.EventHub;
+import dev.advik.mcdt.reflection.NameService;
 import io.netty.channel.ChannelHandlerContext;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
@@ -20,7 +21,7 @@ public abstract class ConnectionMixin {
 	@Inject(method = "channelRead0(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/protocol/Packet;)V", at = @At("HEAD"))
 	private void mcdt$onChannelRead0(ChannelHandlerContext ctx, Packet<?> packet, CallbackInfo ci) {
 		if (getReceiving() == PacketFlow.CLIENTBOUND) {
-			String packetName = packet.getClass().getSimpleName();
+			String packetName = NameService.getInstance().simpleClassName(packet.getClass());
 			EventHub.getInstance().publish("packet.in", Map.of(
 					"packet", packetName
 			));

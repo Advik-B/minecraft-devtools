@@ -9,6 +9,7 @@ import dev.advik.mcdt.http.Problems;
 import dev.advik.mcdt.json.Json;
 import dev.advik.mcdt.network.PacketResolver;
 import dev.advik.mcdt.reflection.HandleTable;
+import dev.advik.mcdt.reflection.NameService;
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
 import io.javalin.openapi.*;
@@ -66,9 +67,9 @@ public final class PacketsHandler implements Handler {
 		long timeoutMs = config.requestTimeoutMs;
 		CompletableFuture<Void> future = queue.submit(() -> {
 			gameClient.sendPacket(packet);
-			return Json.MAPPER.valueToTree(new SendResponse(true, packetClass.getName(), 0));
+			return Json.MAPPER.valueToTree(new SendResponse(true, NameService.getInstance().resolveClassName(packetClass.getName()), 0));
 		}, timeoutMs).thenAccept(res -> {
-			SendResponse resp = new SendResponse(true, packetClass.getName(), res.tick());
+			SendResponse resp = new SendResponse(true, NameService.getInstance().resolveClassName(packetClass.getName()), res.tick());
 			ctx.header("X-MCDT-Tick", String.valueOf(res.tick()));
 			ctx.contentType("application/json");
 			ctx.result(Json.MAPPER.valueToTree(resp).toString());

@@ -2,6 +2,7 @@ package dev.advik.mcdt.network;
 
 import dev.advik.mcdt.http.Problems;
 import dev.advik.mcdt.reflection.HandleTable;
+import dev.advik.mcdt.reflection.NameService;
 import dev.advik.mcdt.reflection.TypeConverter;
 import net.minecraft.network.protocol.Packet;
 
@@ -91,7 +92,7 @@ public final class PacketResolver {
 				for (int i = 0; i < components.length; i++) {
 					RecordComponent rc = components[i];
 					paramTypes[i] = rc.getType();
-					String key = rc.getName().toLowerCase(Locale.ROOT).replace("_", "");
+					String key = mojangKey(packetClass, rc.getName());
 					Object rawVal = normalizedData.get(key);
 					args[i] = TypeConverter.convert(rawVal, rc.getType(), handleTable);
 				}
@@ -135,7 +136,7 @@ public final class PacketResolver {
 					ctor.setAccessible(true);
 					Object instance = ctor.newInstance();
 					for (Field f : packetClass.getDeclaredFields()) {
-						String key = f.getName().toLowerCase(Locale.ROOT).replace("_", "");
+						String key = mojangKey(packetClass, f.getName());
 						if (normalizedData.containsKey(key)) {
 							f.setAccessible(true);
 							Object val = TypeConverter.convert(normalizedData.get(key), f.getType(), handleTable);
@@ -146,15 +147,22 @@ public final class PacketResolver {
 				}
 			}
 
-			throw Problems.packetFailed(packetClass.getSimpleName(), "Could not find compatible constructor for provided parameters");
+			throw Problems.packetFailed(NameService.getInstance().simpleClassName(packetClass), "Could not find compatible constructor for provided parameters");
 		} catch (Exception e) {
-			throw Problems.packetFailed(packetClass.getSimpleName(), e.getMessage());
+			throw Problems.packetFailed(NameService.getInstance().simpleClassName(packetClass), e.getMessage());
 		}
+	}
+
+	/** The request-data key for a packet field: its Mojang name, lower-cased without underscores. */
+	private static String mojangKey(Class<?> packetClass, String runtimeFieldName) {
+		String name = NameService.getInstance().resolveFieldName(packetClass, runtimeFieldName);
+		return name.toLowerCase(Locale.ROOT).replace("_", "");
 	}
 
 	private static Class<?> tryLoadClass(String className) {
 		try {
-			return Class.forName(className);
+			// Packet names are Mojang names; in production the runtime class has an intermediary name.
+			return Class.forName(NameService.getInstance().toRuntimeClassName(className));
 		} catch (ClassNotFoundException | LinkageError e) {
 			return null;
 		}
