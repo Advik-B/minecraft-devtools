@@ -5,7 +5,7 @@
 # MCDT: Minecraft DevTools
 
 **Turn the running Minecraft client into a local API.**<br>
-Read game state, drive input, stream events, and inspect the live object graph over REST, WebSocket, and MCP, from any language, with no Java and no restart.
+Read game state, send input, stream events and poke around the live object graph over REST, WebSocket or MCP. Any language works, and you don't need to write Java or restart the game.
 
 [![Build](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml/badge.svg)](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml)
 [![Latest Release](https://img.shields.io/github/v/release/Advik-B/minecraft-devtools?logo=github)](https://github.com/Advik-B/minecraft-devtools/releases/latest)
@@ -14,7 +14,7 @@ Read game state, drive input, stream events, and inspect the live object graph o
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 [![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
-[Features](#features) · [Getting started](#getting-started) · [AI agents (MCP)](#use-it-from-an-ai-agent-mcp) · [API](#api-at-a-glance) · [Configuration](#configuration) · [Development](#development)
+[Features](#features) | [Getting started](#getting-started) | [AI agents (MCP)](#use-it-from-an-ai-agent-mcp) | [API](#api-at-a-glance) | [Configuration](#configuration) | [Development](#development)
 
 <img src="docs/images/hero.jpg" alt="The MCDT dashboard inspecting the live LocalPlayer object, floating over a Minecraft scene" width="900">
 
@@ -22,28 +22,28 @@ Read game state, drive input, stream events, and inspect the live object graph o
 
 ## Overview
 
-MCDT is a **client-only Fabric mod**. It runs a small HTTP server inside the game on `127.0.0.1:25580` and exposes the live client as a REST API with an OpenAPI spec, WebSocket streams, and a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. A Svelte dashboard ships in the same jar.
+MCDT is a **client-only Fabric mod**. Inside the game it runs a small HTTP server on `127.0.0.1:25580`, and that server exposes the live client as a REST API (with an OpenAPI spec), WebSocket streams and a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. The Svelte dashboard is bundled in the same jar.
 
-You can `curl` the game, script it from Python, build an overlay in the browser, or let an AI agent play it. You don't write a mod, attach a debugger, or scrape the screen.
+You can `curl` the game, script it from Python, or build an overlay in the browser. You can also hand it to an AI agent and let it play. You don't have to write a mod or attach a debugger, and nothing needs to scrape the screen.
 
 <img src="docs/images/in-game-chat.jpg" alt="In-game chat showing messages sent through POST /v1/chat" width="100%">
 
-<sup>Every message in that chat box was sent with <code>curl</code>. The scene itself was set up the same way: the world was created by clicking title-screen widgets through <code>/v1/screen/actions</code>, and the animals were placed with commands sent to <code>/v1/chat</code>.</sup>
+<sup>Every message in that chat box was sent with <code>curl</code>. The scene was set up the same way: the world was created by clicking title-screen widgets through <code>/v1/screen/actions</code>, and the animals were placed with commands sent to <code>/v1/chat</code>.</sup>
 
 > [!WARNING]
-> MCDT is an early `0.1.0-SNAPSHOT`. Automation can break a multiplayer server's rules. By default MCDT blocks write actions on any multiplayer server that is not on your allowlist, but you are responsible for how you use it.
+> MCDT is an early `0.1.0-SNAPSHOT`, and automation can break a multiplayer server's rules. Out of the box it blocks write actions on any multiplayer server that isn't on your allowlist, but you're still responsible for how you use it.
 
 ## Features
 
 - **Read everything.** Player, inventory, world, entities, block regions, raycasts, open screens and widgets, registries, options, skins, texture atlases, and framebuffer screenshots.
 - **Drive the client.** Synthetic keyboard and mouse input, chat and commands, look/move/attack/use, clicks on GUI widgets and container slots, and option changes.
-- **Live object graph.** Browse any object from named roots (`minecraft`, `player`, `level`, …), follow dot-paths like `player.getInventory().items[0]`, read and write fields, invoke methods, and send raw serverbound packets.
+- **Live object graph.** Browse any object from named roots (`minecraft`, `player`, `level` and so on), follow dot-paths like `player.getInventory().items[0]`, read and write fields, invoke methods, or send raw serverbound packets.
 - **Real-time events.** WebSocket streams for chat, screens, entity spawns and removals, block updates, damage and death, world join and leave, inbound packets, and ticks.
-- **Built for AI agents.** A native MCP server at `/mcp` with curated tools (`get_state`, `look`, `move`, `screenshot`, …), subscribable resources, and a stdio shim for desktop clients.
-- **Optional Baritone.** If [Baritone](https://github.com/cabaletta/baritone) 1.13.1 is installed, MCDT exposes goto, mine, follow, explore, farm, and build as background jobs. Without Baritone, those routes return a clean `501`.
-- **A real devtool.** OpenAPI 3.1 at `/openapi.json`, offline Scalar and ReDoc docs, RFC 9457 problem responses, and per-day request logs in `logs/mcdt/`.
+- **AI agents.** There's a native MCP server at `/mcp` with a set of hand-picked tools (`get_state`, `look`, `move`, `screenshot` and more), subscribable resources, and a stdio shim for desktop clients.
+- **Optional Baritone.** Install [Baritone](https://github.com/cabaletta/baritone) 1.13.1 and MCDT exposes goto, mine, follow, explore, farm and build as background jobs. Without it, those routes just return a `501`.
+- **Proper dev tooling.** OpenAPI 3.1 at `/openapi.json`, offline Scalar and ReDoc docs, RFC 9457 problem responses, and per-day request logs in `logs/mcdt/`.
 - **Safe by default.** Loopback only, a fresh bearer token every launch, Host and Origin checks, a rate limit, read-only permission until you opt in, and a reflection denylist that redacts session credentials.
-- **Gentle on the game thread.** Every request crosses a bounded queue onto the client thread. The queue drains within a per-tick time budget (2 ms by default). When the queue is full, requests get a `503` instead of piling up.
+- **Gentle on the game thread.** Every request crosses a bounded queue onto the client thread. The queue drains within a per-tick time budget (2 ms by default), and if it fills up, new requests get a `503` instead of piling up.
 
 ### The dashboard
 
@@ -59,7 +59,7 @@ Open `http://127.0.0.1:25580/` while the game is running.
 | **Controls & Actions** | **API docs** (`/docs/scalar`) |
 | <img src="docs/images/dashboard-controls.png" alt="Controls tab: chat dispatcher, movement pad, camera, player actions, key simulation"> | <img src="docs/images/api-docs.png" alt="Scalar API reference for the Minecraft DevTools API"> |
 
-A Baritone tab appears too. It drives pathing, mining, and building when Baritone is installed.
+There's a Baritone tab aswell, which drives pathing, mining, and building when Baritone is installed.
 
 ## Getting started
 
@@ -76,7 +76,7 @@ A Baritone tab appears too. It drives pathing, mining, and building when Bariton
 3. Launch the game.
 
 > [!TIP]
-> Each release includes the compiled mod jar, the sources jar, the OpenAPI 3.1 specification (`openapi.json`), and SHA-256 checksums (`sha256sums.txt`). If you prefer to build from source or contribute, see [Development](#development).
+> Each release ships with the compiled mod jar, the sources jar, the OpenAPI 3.1 specification (`openapi.json`), and SHA-256 checksums (`sha256sums.txt`). If you'd rather build from source or contribute, see [Development](#development).
 
 ### Make your first request
 
@@ -93,20 +93,18 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/v1/screenshot?scale=0.5" -o frame.
 ```
 
 > [!NOTE]
-> MCDT generates a new token on every launch. Always send it in the `Authorization` header. The REST API rejects tokens in query strings. WebSockets accept `?token=` only as a fallback for browsers.
+> The token changes on every launch. Always send it in the `Authorization` header, because the REST API rejects tokens in query strings. WebSockets accept `?token=` only as a fallback for browsers.
 
 To open the dashboard, go to `http://127.0.0.1:25580/` and paste the token when it asks. You can also append `#token=<TOKEN>` to the URL.
 
 ### Let it act
 
-MCDT starts with read-only `permission: "read"`. To move the player, send chat, or click things, set `"permission": "act"` in `config/mcdt/config.json` or the config screen. Then:
+MCDT starts out read-only (`"permission": "read"`). To move the player, send chat, or click things, set `"permission": "act"` in `config/mcdt/config.json` or in the config screen. Then try:
 
 ```bash
-curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-     -d '{"message":"Hello from curl!"}' "$BASE/v1/chat"
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"message":"Hello from curl!"}' "$BASE/v1/chat"
 
-curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-     -d '{"forward":true,"jump":true,"ticks":20}' "$BASE/v1/player/move"
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"forward":true,"jump":true,"ticks":20}' "$BASE/v1/player/move"
 ```
 
 The [`http/`](http) folder has more ready-to-run requests for IntelliJ, VS Code REST Client, or any `.http` runner.
@@ -129,7 +127,7 @@ MCDT has a built-in MCP server at `/mcp`. `POST` takes JSON-RPC, and `GET` opens
 
 For Claude Code: `claude mcp add minecraft -- python /path/to/minecraft-devtools/scripts/mcdt-mcp.py`
 
-The shim accepts `--url`, `--token`, `--port`, and `--no-sse`. A PowerShell version, `mcdt-mcp.ps1` (`-BaseUrl`, `-Token`, `-Port`), is also included.
+The shim accepts `--url`, `--token`, `--port`, and `--no-sse`. There's also a PowerShell version, `mcdt-mcp.ps1`, which takes `-BaseUrl`, `-Token`, and `-Port`.
 
 | Tools | |
 | --- | --- |
@@ -145,7 +143,7 @@ The shim accepts `--url`, `--token`, `--port`, and `--no-sse`. A PowerShell vers
 
 ## API at a glance
 
-All routes are under `/v1`. The full, always-current reference is the live OpenAPI spec, at `/docs/scalar`, `/docs/redoc`, or `/openapi.json`.
+All routes live under `/v1`. For the complete and current list, check the live OpenAPI spec at `/docs/scalar`, `/docs/redoc`, or `/openapi.json`.
 
 | Area | Endpoints | Min. permission |
 | --- | --- | --- |
@@ -167,7 +165,7 @@ All routes are under `/v1`. The full, always-current reference is the live OpenA
 
 ## Configuration
 
-Settings live in `<gameDir>/config/mcdt/config.json`. You can also edit them in-game through **Mods → Minecraft DevTools → Configure**, which needs Mod Menu and YACL. Most settings apply live. Settings marked *Requires a game restart* need a restart.
+Settings live in `<gameDir>/config/mcdt/config.json`. You can also edit them in-game through **Mods > Minecraft DevTools > Configure**, which needs Mod Menu and YACL. Most settings change the mod's behaviour live, but the ones marked *Requires a game restart* don't.
 
 | Setting | Default | Description |
 | --- | --- | --- |
@@ -225,4 +223,4 @@ http/            sample requests per area
 
 Built with [Fabric](https://fabricmc.net), [Javalin](https://javalin.io), [Jackson](https://github.com/FasterXML/jackson), [Scalar](https://scalar.com), [Svelte](https://svelte.dev), and [daisyUI](https://daisyui.com).
 
-For the design, architecture, and roadmap, read [MCDT.md](MCDT.md). Some sections describe features that are planned but not built yet. Contributors and coding agents should start with [AGENTS.md](AGENTS.md).
+For the design, architecture and roadmap, [MCDT.md](MCDT.md) is the place to look, though parts of it describe features that are planned but not built yet. If you're contributing, or you're a coding agent, start with [AGENTS.md](AGENTS.md).
