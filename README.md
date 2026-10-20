@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src/main/resources/assets/mcdt/icon_256.png" alt="MCDT logo" width="112" height="112">
+<img src="src/main/resources/assets/mcdt/icon-transparent.svg" alt="MCDT logo" width="112" height="112">
 
 # MCDT: Minecraft DevTools
 
