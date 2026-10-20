@@ -7,6 +7,7 @@ import dev.advik.mcdt.api.v1.dto.*;
 import dev.advik.mcdt.baritone.BaritoneService;
 import dev.advik.mcdt.config.McdtConfig;
 import dev.advik.mcdt.config.Permission;
+import dev.advik.mcdt.config.ServerAllowlist;
 import dev.advik.mcdt.exec.TaskQueue;
 import dev.advik.mcdt.game.GameClient;
 import dev.advik.mcdt.http.Problems;
@@ -208,9 +209,7 @@ public final class McpToolRegistry {
 
 		if (gameClient.isMultiplayer() && (required == Permission.ACT || required == Permission.REFLECT_WRITE)) {
 			String serverAddress = gameClient.getCurrentServerAddress();
-			boolean allowed = serverAddress != null && config.allowedMultiplayerServers.stream()
-					.anyMatch(serverAddress::equalsIgnoreCase);
-			if (!allowed) {
+			if (!ServerAllowlist.allows(config.allowedMultiplayerServers, serverAddress)) {
 				return CompletableFuture.completedFuture(ToolCallResult.error(
 						"Multiplayer security denied write action: Connected server '"
 								+ (serverAddress != null ? serverAddress : "unknown")

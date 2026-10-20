@@ -18,8 +18,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Handles translation between Mojang names and runtime intermediary/obfuscated names.
@@ -27,6 +30,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class NameService {
 	private static final String MOJANG_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+	/** Fabric's namespace for the obfuscated names that Mojang's mappings map to. */
+	private static final String OFFICIAL_NAMESPACE = "official";
+	private static final Pattern METHOD_LINE = Pattern.compile("^(?:\\d+:\\d+:)?(\\S+) ([^\\s(]+)\\(([^)]*)\\)(?::\\d+:\\d+)?$");
 
 	private final Map<String, String> classIntermediaryToMojang = new ConcurrentHashMap<>();
 	private final Map<String, String> classMojangToIntermediary = new ConcurrentHashMap<>();
@@ -39,9 +45,26 @@ public final class NameService {
 
 	private boolean mappingsLoaded = false;
 	private boolean isDevEnvironment = true;
+	private final RuntimeNames runtimeNames;
 
 	public NameService() {
 		detectEnvironment();
+		this.runtimeNames = isDevEnvironment ? RuntimeNames.IDENTITY : fabricRuntimeNames();
+	}
+
+	/** The shared instance, used by the HTTP server, game code and mixins. */
+	public static NameService getInstance() {
+		return Holder.INSTANCE;
+	}
+
+	private static final class Holder {
+		private static final NameService INSTANCE = new NameService();
+	}
+
+	/** For tests: a production-mode service with the given obfuscated-to-runtime translation. */
+	NameService(RuntimeNames runtimeNames) {
+		this.isDevEnvironment = false;
+		this.runtimeNames = runtimeNames;
 	}
 
 	private void detectEnvironment() {
@@ -173,22 +196,30 @@ public final class NameService {
 	 * Parses ProGuard format lines:
 	 * mojangClass -> obfClass:
 	 *     type mojangField -> obfField
-	 *     [line:]type mojangMethod(...) -> obfMethod
+	 *     [line:line:]type mojangMethod(...)[:line:line] -> obfMethod
+	 * Obfuscated names are translated to the runtime namespace with {@link RuntimeNames}. Fields and methods are
+	 * looked up by their obfuscated descriptor, so classes are read in a first pass.
 	 */
 	public void parseProGuardMappings(BufferedReader reader) throws IOException {
-		MappingResolver resolver = null;
-		try {
-			resolver = FabricLoader.getInstance().getMappingResolver();
-		} catch (Throwable ignored) {
+		List<String> lines = reader.lines().toList();
+
+		Map<String, String> mojangToObf = new HashMap<>();
+		for (String line : lines) {
+			if (!line.startsWith(" ") && !line.startsWith("#")) {
+				int arrow = line.indexOf(" -> ");
+				String trimmed = line.stripTrailing();
+				if (arrow != -1 && trimmed.endsWith(":")) {
+					mojangToObf.put(line.substring(0, arrow).trim(), trimmed.substring(arrow + 4, trimmed.length() - 1).trim());
+				}
+			}
 		}
 
-		String line;
 		String currentMojangClass = null;
 		String currentObfClass = null;
-		String currentIntermediaryClass = null;
+		String currentRuntimeClass = null;
 
-		while ((line = reader.readLine()) != null) {
-			line = line.stripTrailing();
+		for (String rawLine : lines) {
+			String line = rawLine.stripTrailing();
 			if (line.isEmpty() || line.startsWith("#")) {
 				continue;
 			}
@@ -199,72 +230,144 @@ public final class NameService {
 				if (arrow != -1 && line.endsWith(":")) {
 					currentMojangClass = line.substring(0, arrow).trim();
 					currentObfClass = line.substring(arrow + 4, line.length() - 1).trim();
+					currentRuntimeClass = mapOr(runtimeNames.mapClass(currentObfClass), currentObfClass);
 
-					if (resolver != null) {
-						currentIntermediaryClass = resolver.mapClassName("intermediary", currentObfClass);
-					} else {
-						currentIntermediaryClass = currentObfClass;
-					}
-
-					classIntermediaryToMojang.put(currentIntermediaryClass, currentMojangClass);
-					classMojangToIntermediary.put(currentMojangClass, currentIntermediaryClass);
+					classIntermediaryToMojang.put(currentRuntimeClass, currentMojangClass);
+					classMojangToIntermediary.put(currentMojangClass, currentRuntimeClass);
 				}
-			} else if (currentMojangClass != null) {
-				// Member line
-				String trimmed = line.trim();
-				int arrow = trimmed.indexOf(" -> ");
-				if (arrow == -1) {
+				continue;
+			}
+			if (currentMojangClass == null) {
+				continue;
+			}
+
+			// Member line
+			String trimmed = line.trim();
+			int arrow = trimmed.indexOf(" -> ");
+			if (arrow == -1) {
+				continue;
+			}
+			String left = trimmed.substring(0, arrow).trim();
+			String obfMember = trimmed.substring(arrow + 4).trim();
+
+			Matcher method = METHOD_LINE.matcher(left);
+			if (method.matches()) {
+				// Method: e.g. "15:16:void setScreen(net.minecraft.client.gui.screens.Screen):17:18"
+				String mojangMethodName = method.group(2);
+				if (mojangMethodName.startsWith("<")) {
 					continue;
 				}
-
-				String left = trimmed.substring(0, arrow).trim();
-				String obfMember = trimmed.substring(arrow + 4).trim();
-
-				if (left.contains("(") && left.contains(")")) {
-					// Method: e.g. "void setScreen(net.minecraft.client.gui.screens.Screen)" or "15:16:void setScreen(...)"
-					int colon = left.lastIndexOf(':');
-					String methodPart = (colon != -1) ? left.substring(colon + 1).trim() : left;
-					int openParen = methodPart.indexOf('(');
-					if (openParen != -1) {
-						String beforeParen = methodPart.substring(0, openParen).trim();
-						int lastSpace = beforeParen.lastIndexOf(' ');
-						if (lastSpace != -1) {
-							String mojangMethodName = beforeParen.substring(lastSpace + 1).trim();
-
-							String intermediaryMethod = obfMember;
-							if (resolver != null && currentObfClass != null) {
-								try {
-									// Best effort resolution via intermediary
-									intermediaryMethod = resolver.mapMethodName("intermediary", currentObfClass, obfMember, "");
-								} catch (Throwable ignored) {
-								}
-							}
-
-							methodIntermediaryToMojang.put(currentIntermediaryClass + "#" + intermediaryMethod, mojangMethodName);
-							methodMojangToIntermediary.put(currentMojangClass + "#" + mojangMethodName, intermediaryMethod);
-						}
+				StringBuilder desc = new StringBuilder("(");
+				String params = method.group(3);
+				if (!params.isBlank()) {
+					for (String param : params.split(",")) {
+						desc.append(descriptor(param.trim(), mojangToObf));
 					}
-				} else {
-					// Field: e.g. "net.minecraft.client.player.LocalPlayer player"
-					int lastSpace = left.lastIndexOf(' ');
-					if (lastSpace != -1) {
-						String mojangFieldName = left.substring(lastSpace + 1).trim();
-						String intermediaryField = obfMember;
-						if (resolver != null && currentObfClass != null) {
-							try {
-								intermediaryField = resolver.mapFieldName("intermediary", currentObfClass, obfMember, "");
-							} catch (Throwable ignored) {
-							}
-						}
+				}
+				desc.append(')').append(descriptor(method.group(1), mojangToObf));
+				String runtimeMethod = mapOr(runtimeNames.mapMethod(currentObfClass, obfMember, desc.toString()), obfMember);
 
-						fieldIntermediaryToMojang.put(currentIntermediaryClass + "#" + intermediaryField, mojangFieldName);
-						fieldMojangToIntermediary.put(currentMojangClass + "#" + mojangFieldName, intermediaryField);
-					}
+				methodIntermediaryToMojang.put(currentRuntimeClass + "#" + runtimeMethod, mojangMethodName);
+				methodMojangToIntermediary.put(currentRuntimeClass + "#" + mojangMethodName, runtimeMethod);
+			} else if (!left.contains("(")) {
+				// Field: e.g. "net.minecraft.client.player.LocalPlayer player"
+				int lastSpace = left.lastIndexOf(' ');
+				if (lastSpace != -1) {
+					String mojangFieldName = left.substring(lastSpace + 1).trim();
+					String desc = descriptor(left.substring(0, lastSpace).trim(), mojangToObf);
+					String runtimeField = mapOr(runtimeNames.mapField(currentObfClass, obfMember, desc), obfMember);
+
+					fieldIntermediaryToMojang.put(currentRuntimeClass + "#" + runtimeField, mojangFieldName);
+					fieldMojangToIntermediary.put(currentRuntimeClass + "#" + mojangFieldName, runtimeField);
 				}
 			}
 		}
 	}
 
+	/** JVM descriptor of a ProGuard type name, with Minecraft classes replaced by their obfuscated names. */
+	static String descriptor(String type, Map<String, String> mojangToObf) {
+		int dimensions = 0;
+		while (type.endsWith("[]")) {
+			dimensions++;
+			type = type.substring(0, type.length() - 2);
+		}
+		String base = switch (type) {
+			case "void" -> "V";
+			case "boolean" -> "Z";
+			case "byte" -> "B";
+			case "char" -> "C";
+			case "short" -> "S";
+			case "int" -> "I";
+			case "long" -> "J";
+			case "float" -> "F";
+			case "double" -> "D";
+			default -> "L" + mojangToObf.getOrDefault(type, type).replace('.', '/') + ";";
+		};
+		return "[".repeat(dimensions) + base;
+	}
+
+	private static String mapOr(String mapped, String fallback) {
+		return mapped != null ? mapped : fallback;
+	}
+
+	/** Translates obfuscated ({@code official}) names into the runtime namespace. */
+	interface RuntimeNames {
+		RuntimeNames IDENTITY = new RuntimeNames() {
+			@Override
+			public String mapClass(String obfClass) {
+				return obfClass;
+			}
+
+			@Override
+			public String mapField(String obfOwner, String obfName, String obfDescriptor) {
+				return obfName;
+			}
+
+			@Override
+			public String mapMethod(String obfOwner, String obfName, String obfDescriptor) {
+				return obfName;
+			}
+		};
+
+		String mapClass(String obfClass);
+
+		String mapField(String obfOwner, String obfName, String obfDescriptor);
+
+		String mapMethod(String obfOwner, String obfName, String obfDescriptor);
+	}
+
+	private static RuntimeNames fabricRuntimeNames() {
+		try {
+			MappingResolver resolver = FabricLoader.getInstance().getMappingResolver();
+			if (!resolver.getNamespaces().contains(OFFICIAL_NAMESPACE)) {
+				return RuntimeNames.IDENTITY;
+			}
+			return new RuntimeNames() {
+				@Override
+				public String mapClass(String obfClass) {
+					return resolver.mapClassName(OFFICIAL_NAMESPACE, obfClass);
+				}
+
+				@Override
+				public String mapField(String obfOwner, String obfName, String obfDescriptor) {
+					return resolver.mapFieldName(OFFICIAL_NAMESPACE, obfOwner, obfName, obfDescriptor);
+				}
+
+				@Override
+				public String mapMethod(String obfOwner, String obfName, String obfDescriptor) {
+					return resolver.mapMethodName(OFFICIAL_NAMESPACE, obfOwner, obfName, obfDescriptor);
+				}
+			};
+		} catch (Throwable ignored) {
+			return RuntimeNames.IDENTITY;
+		}
+	}
+
+	/**
+	 * The Mojang name of a runtime class name. Also handles array names ({@code [Lnet.minecraft.class_1799;}) and
+	 * classes the mappings don't list but whose outer class they do: anonymous and unmapped nested classes
+	 * ({@code class_310$1}) and lambdas ({@code class_7172$$Lambda/0x...}).
+	 */
 	public String resolveClassName(String runtimeClassName) {
 		if (runtimeClassName == null) {
 			return null;
@@ -272,7 +375,47 @@ public final class NameService {
 		if (isDevEnvironment) {
 			return runtimeClassName;
 		}
-		return classIntermediaryToMojang.getOrDefault(runtimeClassName, runtimeClassName);
+		String mapped = classIntermediaryToMojang.get(runtimeClassName);
+		if (mapped != null) {
+			return mapped;
+		}
+		if (runtimeClassName.startsWith("[")) {
+			int dims = 0;
+			while (dims < runtimeClassName.length() && runtimeClassName.charAt(dims) == '[') {
+				dims++;
+			}
+			if (runtimeClassName.charAt(dims) == 'L' && runtimeClassName.endsWith(";")) {
+				String component = runtimeClassName.substring(dims + 1, runtimeClassName.length() - 1);
+				return runtimeClassName.substring(0, dims + 1) + resolveClassName(component) + ";";
+			}
+			return runtimeClassName;
+		}
+		// Longest mapped prefix that ends right before a '$', e.g. "class_7172" of "class_7172$$Lambda/0x1".
+		for (int i = runtimeClassName.lastIndexOf('$'); i > 0; i = runtimeClassName.lastIndexOf('$', i - 1)) {
+			String outer = classIntermediaryToMojang.get(runtimeClassName.substring(0, i));
+			if (outer != null) {
+				return outer + runtimeClassName.substring(i);
+			}
+		}
+		return runtimeClassName;
+	}
+
+	/** The Mojang simple name of a class, e.g. {@code ServerboundSwingPacket} or {@code SystemToast}. */
+	public String simpleClassName(Class<?> clazz) {
+		if (clazz == null) {
+			return null;
+		}
+		if (isDevEnvironment || clazz.isArray()) {
+			return clazz.getSimpleName();
+		}
+		String name = resolveClassName(clazz.getName());
+		String simple = name.substring(name.lastIndexOf('.') + 1);
+		int nested = simple.lastIndexOf('$');
+		if (nested >= 0 && nested + 1 < simple.length() && !Character.isDigit(simple.charAt(nested + 1))
+				&& simple.indexOf("$$") < 0) {
+			simple = simple.substring(nested + 1);
+		}
+		return simple;
 	}
 
 	public String toRuntimeClassName(String mojangClassName) {

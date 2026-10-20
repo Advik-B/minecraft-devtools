@@ -41,6 +41,13 @@ class PathEvaluatorTest {
 		public SampleInventory getInventory() { return inventory; }
 	}
 
+	static class SampleSession {
+		public final String accessToken = "secret-access-token";
+		public final String name = "Steve";
+		public String getAccessToken() { return accessToken; }
+		public String getSessionId() { return "token:" + accessToken + ":uuid"; }
+	}
+
 	static class SampleRoot {
 		public final SamplePlayer player = new SamplePlayer();
 		public final Map<String, Object> tags = Map.of("version", 1, "custom", "test");
@@ -208,5 +215,15 @@ class PathEvaluatorTest {
 		);
 		assertEquals(400, e.problem().status());
 		assertTrue(e.problem().detail().contains("Path evaluated to null"));
+	}
+
+	@Test
+	void testCredentialsAreRedactedInPaths() {
+		SampleSession session = new SampleSession();
+		assertEquals(ReflectionSecurity.REDACTED, evaluator.evaluate(session, "accessToken"));
+		assertEquals(ReflectionSecurity.REDACTED, evaluator.evaluate(session, "getAccessToken()"));
+		assertEquals(ReflectionSecurity.REDACTED, evaluator.evaluate(session, "getSessionId()"));
+		assertEquals(ReflectionSecurity.REDACTED, evaluator.evaluate(session, "sessionId"));
+		assertEquals("Steve", evaluator.evaluate(session, "name"));
 	}
 }

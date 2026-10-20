@@ -30,6 +30,11 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
 			String dimension = client.level != null ? client.level.dimension().location().toString() : "unknown";
 			boolean isSingleplayer = client.isSingleplayer();
+			McdtCore instance = core;
+			if (!isSingleplayer && instance != null) {
+				dev.advik.mcdt.config.ServerAllowlist.warnOnJoin(instance.config().allowedMultiplayerServers,
+						client.getCurrentServer() != null ? client.getCurrentServer().ip : null);
+			}
 			dev.advik.mcdt.events.EventHub.getInstance().publish("world.join", java.util.Map.of(
 					"dimension", dimension,
 					"singleplayer", isSingleplayer
@@ -87,7 +92,9 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 					.map(m -> m.getVersion().getFriendlyString())
 					.orElse("0.1.0-SNAPSHOT");
 
-			String gameVersion = client.getLaunchedVersion();
+			// The game's own version id (e.g. "1.21.4"). getLaunchedVersion() is the launcher profile name, which for
+			// Fabric is something like "fabric-loader-0.19.5-1.21.4" and is not in Mojang's version manifest.
+			String gameVersion = net.minecraft.SharedConstants.getCurrentVersion().getName();
 			if (gameVersion == null || gameVersion.isBlank()) {
 				gameVersion = "1.21.4";
 			}

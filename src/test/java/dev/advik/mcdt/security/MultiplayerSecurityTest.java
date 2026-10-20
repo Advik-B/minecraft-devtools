@@ -145,4 +145,31 @@ class MultiplayerSecurityTest {
 		HttpResponse<String> packetResp = send("/v1/packets", "POST", "{\"packet\":\"ServerboundSwingPacket\",\"data\":{\"hand\":\"MAIN_HAND\"}}");
 		assertEquals(200, packetResp.statusCode());
 	}
+
+	@Test
+	void testMultiplayerWriteAllowedByWildcardPattern() throws Exception {
+		mockGameClient.isSingleplayer = false;
+		mockGameClient.isMultiplayer = true;
+		mockGameClient.currentServer = "eu.hypixel.net";
+		config.allowedMultiplayerServers.add("*.hypixel.net");
+
+		assertEquals(200, send("/v1/player/actions", "POST", "{\"action\":\"swing\"}").statusCode());
+
+		mockGameClient.currentServer = "play.other.net";
+		HttpResponse<String> blocked = send("/v1/player/actions", "POST", "{\"action\":\"swing\"}");
+		assertEquals(403, blocked.statusCode());
+		assertTrue(blocked.body().contains("multiplayer-write-disabled"));
+	}
+
+	@Test
+	void testMultiplayerWriteAllowedOnAnyServerWithStar() throws Exception {
+		mockGameClient.isSingleplayer = false;
+		mockGameClient.isMultiplayer = true;
+		mockGameClient.currentServer = "random.server.net:25570";
+		config.allowedMultiplayerServers.add("*");
+
+		assertEquals(200, send("/v1/player/actions", "POST", "{\"action\":\"swing\"}").statusCode());
+		assertEquals(200, send("/v1/packets", "POST",
+				"{\"packet\":\"ServerboundSwingPacket\",\"data\":{\"hand\":\"MAIN_HAND\"}}").statusCode());
+	}
 }

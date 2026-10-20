@@ -61,6 +61,9 @@ public final class PathEvaluator {
 		// Field or property access
 		ReflectionCache.FieldMetadata field = metadata.getField(segment);
 		if (field != null) {
+			if (ReflectionSecurity.isSensitiveField(targetClass, field.resolvedName())) {
+				return ReflectionSecurity.REDACTED;
+			}
 			try {
 				return field.getValue(target);
 			} catch (Throwable t) {
@@ -79,6 +82,9 @@ public final class PathEvaluator {
 		}
 
 		if (getter != null) {
+			if (ReflectionSecurity.isSensitiveMethod(targetClass, getter.resolvedName())) {
+				return ReflectionSecurity.REDACTED;
+			}
 			try {
 				return getter.invoke(target);
 			} catch (Throwable t) {
@@ -100,6 +106,9 @@ public final class PathEvaluator {
 			throw Problems.pathEvaluationFailed(fullPath, "Zero-argument method '" + methodName + "()' not found on class '" + metadata.resolvedClassName() + "'");
 		}
 
+		if (ReflectionSecurity.isSensitiveMethod(target.getClass(), method.resolvedName())) {
+			return ReflectionSecurity.REDACTED;
+		}
 		try {
 			return method.invoke(target);
 		} catch (Throwable t) {

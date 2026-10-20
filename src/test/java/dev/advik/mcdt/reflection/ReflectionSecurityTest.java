@@ -73,4 +73,30 @@ class ReflectionSecurityTest {
 		assertFalse(ReflectionSecurity.isSensitiveObject("plain string"));
 		assertTrue(ReflectionSecurity.isSensitiveObject(BearerToken.of("secret-token")));
 	}
+
+	@Test
+	void testSensitiveMethodRedaction() {
+		assertFalse(ReflectionSecurity.isSensitiveMethod(null, null));
+		assertTrue(ReflectionSecurity.isSensitiveMethod(null, "getAccessToken"));
+		assertTrue(ReflectionSecurity.isSensitiveMethod(null, "getSessionId"));
+		assertTrue(ReflectionSecurity.isSensitiveMethod(null, "getXuid"));
+		assertTrue(ReflectionSecurity.isSensitiveMethod(null, "getClientId"));
+		assertFalse(ReflectionSecurity.isSensitiveMethod(null, "getName"));
+		assertFalse(ReflectionSecurity.isSensitiveMethod(null, "getFps"));
+	}
+
+	@Test
+	void testSessionClassIsIdentifiedByTypeAndFailsClosed() {
+		// In production the User class and its members have intermediary names, so unknown members are hidden.
+		Class<?> user = net.minecraft.client.User.class;
+		assertTrue(ReflectionSecurity.isSessionClass(user));
+		assertTrue(ReflectionSecurity.isSensitiveField(user, "field_1982"));
+		assertTrue(ReflectionSecurity.isSensitiveField(user, "uuid"));
+		assertFalse(ReflectionSecurity.isSensitiveField(user, "name"));
+		assertFalse(ReflectionSecurity.isSensitiveField(user, "type"));
+		assertTrue(ReflectionSecurity.isSensitiveMethod(user, "method_1674"));
+		assertTrue(ReflectionSecurity.isSensitiveMethod(user, "getProfileId"));
+		assertFalse(ReflectionSecurity.isSensitiveMethod(user, "getName"));
+		assertFalse(ReflectionSecurity.isSessionClass(String.class));
+	}
 }

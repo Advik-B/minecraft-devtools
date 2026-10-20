@@ -48,6 +48,7 @@ libs/                       pinned Baritone API jar (committed via a .gitignore 
 - `runClient` serves the dashboard straight from `web/dist` (Gradle passes `-Dmcdt.webDist`), so `cd web && bun run build` followed by a browser reload picks up UI changes without restarting the game.
 - WebUI dev: run `cd web && bun run dev` (Vite on :5173). It proxies `/v1`, `/mcp`, `/docs`, and `/openapi.json` to :25580. Add `http://localhost:5173` to `originAllowlist` in the config, or the API rejects the Origin. Type-check with `bun run check`.
 - Versions of Minecraft, Loader, Fabric API, Javalin, Jackson, YACL, Mod Menu, and Baritone all live in `gradle.properties`.
+- Docker: `Dockerfile` builds the jar (JDK 25 + Bun) and runs a headless client with Xvfb, Mesa, and portablemc. `docker/entrypoint.sh` launches it. If you bump Minecraft, Loader, or Fabric API in `gradle.properties`, update the matching `ARG`s and the Fabric API SHA-512 in the `Dockerfile` too. The image ships the pinned `libs/` Baritone jar, so a `baritone_version` bump reaches it automatically. `MCDT_*` environment overrides are applied in `ConfigStore.applyEnv`. `MCDT_TOKEN` is handled in `McdtCore`.
 
 ## Core invariants: do not break these
 
@@ -103,6 +104,6 @@ libs/                       pinned Baritone API jar (committed via a .gitignore 
 
 - The README says `mcdt.json` in one place, but the config file is `config/mcdt/config.json` in the game directory. The bearer token is in `config/mcdt/token`, and discovery files are in `~/.mcdt/instances/`.
 - `run/`, `build/`, `web/node_modules`, `web/dist`, `.agents/`, and `skills-lock.json` are gitignored. A local daisyUI agent skill lives in `.agents/skills/daisyui/`. Use it for WebUI styling work if it is present.
-- `NameService.initialize` runs inside the `HttpServer` constructor. In production (intermediary namespace) it synchronously downloads the Mojang client mappings from piston-meta on first launch, caches them in `config/mcdt/mappings/`, and falls back to intermediary names if the download fails. Dev runs and tests (named namespace) skip it. Curated endpoints never depend on the mappings.
+- `NameService.initialize` runs inside the `HttpServer` constructor. In production (intermediary namespace) it synchronously downloads the Mojang client mappings from piston-meta on first launch, caches them in `config/mcdt/mappings/`, and falls back to intermediary names if the download fails. Dev runs and tests (named namespace) skip it. Curated endpoints, events, and `/v1/packets` use `NameService.getInstance()` only to show or accept Mojang class names, and they fall back to runtime names. Never use class *names* for security decisions: `ReflectionSecurity` identifies the session `User` class by type, because its name is intermediary in production.
 - The README lists `GET /v1/baritone/jobs` (a list endpoint), but only `/v1/baritone/jobs/{id}` is registered. This is one more reason to check `HttpServer` before you trust the docs.
 - The license is CC0-1.0 (`LICENSE`, `fabric.mod.json`).

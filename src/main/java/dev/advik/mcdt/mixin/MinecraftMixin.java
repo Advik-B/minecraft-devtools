@@ -1,6 +1,7 @@
 package dev.advik.mcdt.mixin;
 
 import dev.advik.mcdt.events.EventHub;
+import dev.advik.mcdt.reflection.NameService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import org.jetbrains.annotations.Nullable;
@@ -21,12 +22,12 @@ public abstract class MinecraftMixin {
 		Screen oldScreen = this.screen;
 		if (oldScreen != null && (newScreen == null || oldScreen != newScreen)) {
 			EventHub.getInstance().publish("screen.close", Map.of(
-					"screen", oldScreen.getClass().getName()
+					"screen", NameService.getInstance().resolveClassName(oldScreen.getClass().getName())
 			));
 		}
 		if (newScreen != null && (oldScreen == null || oldScreen != newScreen)) {
 			EventHub.getInstance().publish("screen.open", Map.of(
-					"screen", newScreen.getClass().getName(),
+					"screen", NameService.getInstance().resolveClassName(newScreen.getClass().getName()),
 					"title", newScreen.getTitle().getString()
 			));
 		}

@@ -2,6 +2,7 @@ package dev.advik.mcdt.security;
 
 import dev.advik.mcdt.config.McdtConfig;
 import dev.advik.mcdt.config.Permission;
+import dev.advik.mcdt.config.ServerAllowlist;
 import dev.advik.mcdt.http.Problems;
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
@@ -59,7 +60,13 @@ public final class AccessFilter implements Handler {
 		if (hostHeader == null || hostHeader.isBlank()) {
 			throw Problems.badHost("missing");
 		}
+		if (!isHostAllowed(config, hostHeader)) {
+			throw Problems.badHost(hostHeader);
+		}
+	}
 
+	/** Whether a Host header names loopback, the bind address, or an entry in {@code allowedHosts}. */
+	public static boolean isHostAllowed(McdtConfig config, String hostHeader) {
 		// Extract hostname without port (handles "127.0.0.1:25580", "[::1]:25580", "localhost")
 		String hostName = hostHeader.trim();
 		if (hostName.startsWith("[")) {
@@ -77,10 +84,7 @@ public final class AccessFilter implements Handler {
 		boolean isLoopback = "127.0.0.1".equalsIgnoreCase(hostName) || "localhost".equalsIgnoreCase(hostName)
 				|| "::1".equalsIgnoreCase(hostName);
 		boolean matchesBind = config.bindAddress != null && config.bindAddress.equalsIgnoreCase(hostName);
-
-		if (!isLoopback && !matchesBind) {
-			throw Problems.badHost(hostHeader);
-		}
+		return isLoopback || matchesBind || config.allowedHosts.stream().anyMatch(hostName::equalsIgnoreCase);
 	}
 
 	private void checkOrigin(Context ctx) {
@@ -89,13 +93,7 @@ public final class AccessFilter implements Handler {
 			return;
 		}
 
-		int port = portSupplier.getAsInt();
-		boolean isSelf = origin.equalsIgnoreCase("http://127.0.0.1:" + port)
-				|| origin.equalsIgnoreCase("http://localhost:" + port);
-
-		boolean isAllowed = isSelf || config.originAllowlist.stream().anyMatch(origin::equalsIgnoreCase);
-
-		if (!isAllowed) {
+		if (!isOriginAllowed(config, portSupplier.getAsInt(), origin)) {
 			throw Problems.originNotAllowed(origin);
 		}
 
@@ -103,6 +101,13 @@ public final class AccessFilter implements Handler {
 		ctx.header("Access-Control-Allow-Origin", origin);
 		ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
 		ctx.header("Access-Control-Allow-Headers", "Authorization, Content-Type, Origin, Accept");
+	}
+
+	/** Whether a browser Origin is the API itself (on loopback) or an entry in {@code originAllowlist}. */
+	public static boolean isOriginAllowed(McdtConfig config, int port, String origin) {
+		boolean isSelf = origin.equalsIgnoreCase("http://127.0.0.1:" + port)
+				|| origin.equalsIgnoreCase("http://localhost:" + port);
+		return isSelf || config.originAllowlist.stream().anyMatch(origin::equalsIgnoreCase);
 	}
 
 	private void checkBearer(Context ctx) {
@@ -144,9 +149,7 @@ public final class AccessFilter implements Handler {
 				if (gameClient != null && (required == Permission.ACT || required == Permission.REFLECT_WRITE)) {
 					if (gameClient.isMultiplayer()) {
 						String serverAddress = gameClient.getCurrentServerAddress();
-						boolean allowed = serverAddress != null && config.allowedMultiplayerServers.stream()
-								.anyMatch(serverAddress::equalsIgnoreCase);
-						if (!allowed) {
+						if (!ServerAllowlist.allows(config.allowedMultiplayerServers, serverAddress)) {
 							throw Problems.multiplayerWriteDisabled(serverAddress);
 						}
 					}

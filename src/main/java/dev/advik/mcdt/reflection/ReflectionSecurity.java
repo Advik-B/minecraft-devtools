@@ -48,7 +48,36 @@ public final class ReflectionSecurity {
 			"clientid"
 	);
 
+	/** Members of Minecraft's session {@code User} that are safe to show; everything else on it is redacted. */
+	private static final Set<String> SAFE_SESSION_MEMBERS = Set.of("name", "getName", "type", "getType");
+
+	/**
+	 * Minecraft's session class, identified by type rather than name: it is {@code net.minecraft.client.User} in dev
+	 * but has an intermediary name in production, where name checks only work if the mappings happen to load.
+	 */
+	private static final Class<?> SESSION_CLASS = loadSessionClass();
+
 	private ReflectionSecurity() {
+	}
+
+	private static Class<?> loadSessionClass() {
+		try {
+			return net.minecraft.client.User.class;
+		} catch (Throwable t) {
+			return null;
+		}
+	}
+
+	/** Whether {@code clazz} holds login credentials: Minecraft's {@code User} or an authlib/session class. */
+	static boolean isSessionClass(Class<?> clazz) {
+		if (clazz == null) {
+			return false;
+		}
+		if (SESSION_CLASS != null && SESSION_CLASS.isAssignableFrom(clazz)) {
+			return true;
+		}
+		String className = NameService.getInstance().resolveClassName(clazz.getName());
+		return className.contains("User") || className.contains("authlib") || className.contains("Session");
 	}
 
 	/**
@@ -100,15 +129,35 @@ public final class ReflectionSecurity {
 			return true;
 		}
 
-		if (declaringClass != null) {
-			String className = declaringClass.getName();
-			if (className.contains("User") || className.contains("authlib") || className.contains("Session")) {
-				if (lower.contains("token") || lower.contains("xuid") || lower.contains("uuid") || lower.contains("secret")) {
-					return true;
-				}
+		if (SESSION_CLASS != null && declaringClass != null && SESSION_CLASS.isAssignableFrom(declaringClass)) {
+			// Fail closed: without mappings the field names are intermediary, so anything not known-safe is hidden.
+			return !SAFE_SESSION_MEMBERS.contains(fieldName);
+		}
+		if (isSessionClass(declaringClass)) {
+			if (lower.contains("token") || lower.contains("xuid") || lower.contains("uuid") || lower.contains("secret")) {
+				return true;
 			}
 		}
 
+		return false;
+	}
+
+	/**
+	 * Determines whether a method's return value contains sensitive credentials and must be redacted, e.g.
+	 * {@code User.getAccessToken()} or {@code User.getSessionId()} (which embeds the token).
+	 */
+	public static boolean isSensitiveMethod(Class<?> declaringClass, String methodName) {
+		if (methodName == null) {
+			return false;
+		}
+		String lower = methodName.toLowerCase(Locale.ROOT);
+		if (lower.contains("token") || lower.contains("sessionid") || lower.contains("xuid") || lower.contains("clientid")
+				|| lower.contains("secret")) {
+			return true;
+		}
+		if (SESSION_CLASS != null && declaringClass != null && SESSION_CLASS.isAssignableFrom(declaringClass)) {
+			return !SAFE_SESSION_MEMBERS.contains(methodName);
+		}
 		return false;
 	}
 

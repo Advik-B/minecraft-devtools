@@ -50,4 +50,44 @@ class McdtCoreTest {
 		// Close core
 		core.close();
 	}
+
+	@Test
+	void usesFixedTokenFromEnvironment(@TempDir Path tempDir) throws Exception {
+		McdtEnvironment env = environment(tempDir);
+		String fixed = "0123456789abcdef0123456789abcdef";
+
+		McdtCore core = McdtCore.start(env, Map.of("MCDT_TOKEN", fixed, "MCDT_PORT", "0"), new MockGameClient());
+		try {
+			assertTrue(core.token().matches(fixed));
+			assertEquals(fixed, Files.readString(env.configDir().resolve("token")));
+		} finally {
+			core.close();
+		}
+	}
+
+	@Test
+	void ignoresTooShortFixedToken(@TempDir Path tempDir) throws Exception {
+		McdtEnvironment env = environment(tempDir);
+
+		McdtCore core = McdtCore.start(env, Map.of("MCDT_TOKEN", "short", "MCDT_PORT", "0"), new MockGameClient());
+		try {
+			assertFalse(core.token().matches("short"));
+		} finally {
+			core.close();
+		}
+	}
+
+	private static McdtEnvironment environment(Path tempDir) {
+		return new McdtEnvironment(
+				"0.1.0-SNAPSHOT",
+				"1.21.4",
+				tempDir,
+				tempDir.resolve("config"),
+				tempDir.resolve("logs"),
+				tempDir.resolve("home"),
+				"DevPlayer",
+				"not-installed",
+				Instant.now()
+		);
+	}
 }

@@ -118,6 +118,7 @@ public final class McdtConfigScreen {
 						() -> draft.maxRequestBytes, v -> draft.maxRequestBytes = v,
 						o -> LongFieldControllerBuilder.create(o).range(1_024L, 64L * 1_048_576)))
 				.group(stringList("originAllowlist", () -> draft.originAllowlist, v -> draft.originAllowlist = v))
+				.group(stringList("allowedHosts", () -> draft.allowedHosts, v -> draft.allowedHosts = v))
 				.group(stringList("allowedMultiplayerServers",
 						() -> draft.allowedMultiplayerServers, v -> draft.allowedMultiplayerServers = v))
 				.build();

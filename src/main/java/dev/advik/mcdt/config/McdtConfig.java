@@ -29,7 +29,12 @@ public final class McdtConfig {
 	public volatile Permission permission = Permission.READ;
 	/** Extra browser origins allowed to call the API, e.g. {@code http://localhost:5173}. */
 	public volatile List<String> originAllowlist = new ArrayList<>();
-	/** Allowed multiplayer server addresses for act and reflect-write actions. */
+	/** Extra Host header names accepted besides loopback and the bind address, e.g. a reverse proxy's domain. */
+	public volatile List<String> allowedHosts = new ArrayList<>();
+	/**
+	 * Allowed multiplayer server addresses for act and reflect-write actions. {@code *} is a wildcard (e.g.
+	 * {@code *.example.com}), and {@code *} alone allows every server. See {@link ServerAllowlist}.
+	 */
 	public volatile List<String> allowedMultiplayerServers = new ArrayList<>();
 	/** Enable or disable Baritone endpoints. */
 	public volatile boolean enableBaritone = true;
@@ -78,6 +83,10 @@ public final class McdtConfig {
 			originAllowlist = new ArrayList<>();
 		}
 		originAllowlist.removeIf(origin -> origin == null || origin.isBlank());
+		if (allowedHosts == null) {
+			allowedHosts = new ArrayList<>();
+		}
+		allowedHosts.removeIf(host -> host == null || host.isBlank());
 		if (allowedMultiplayerServers == null) {
 			allowedMultiplayerServers = new ArrayList<>();
 		}
