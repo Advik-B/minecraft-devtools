@@ -1,6 +1,7 @@
 package dev.advik.mcdt.api.v1;
 
 import dev.advik.mcdt.McdtEnvironment;
+import dev.advik.mcdt.api.v1.dto.WorldsDto;
 import dev.advik.mcdt.config.McdtConfig;
 import dev.advik.mcdt.config.Permission;
 import dev.advik.mcdt.exec.TaskQueue;
@@ -84,6 +85,10 @@ class CuratedActionEndpointsTest {
 
 	private HttpResponse<String> patch(String path, String jsonBody) throws Exception {
 		return send(path, "PATCH", jsonBody, "Bearer " + token.value());
+	}
+
+	private HttpResponse<String> delete(String path) throws Exception {
+		return send(path, "DELETE", null, "Bearer " + token.value());
 	}
 
 	private HttpResponse<String> send(String path, String method, String jsonBody, String authHeader) throws Exception {
@@ -320,5 +325,197 @@ class CuratedActionEndpointsTest {
 		// Hotbar slot out of bounds (< 0 or > 8)
 		HttpResponse<String> hotbarRes = post("/v1/player/actions", "{\"action\":\"select_hotbar\",\"slot\":15}");
 		assertEquals(400, hotbarRes.statusCode());
+	}
+
+	@Test
+	void testUpdateCamera() throws Exception {
+		clock.advance();
+		HttpResponse<String> patchRes = patch("/v1/camera", "{\"perspective\":\"third_person_back\",\"fov\":90.0}");
+		assertEquals(200, patchRes.statusCode());
+		assertTrue(patchRes.body().contains("third_person_back"));
+		assertTrue(patchRes.body().contains("90"));
+
+		// Invalid perspective
+		HttpResponse<String> badRes = post("/v1/camera", "{\"perspective\":\"invalid_view\"}");
+		assertEquals(400, badRes.statusCode());
+		assertTrue(badRes.body().contains("invalid-parameter"));
+	}
+
+	@Test
+	void testUpdateWindow() throws Exception {
+		clock.advance();
+		HttpResponse<String> patchRes = patch("/v1/window", "{\"fullscreen\":true}");
+		assertEquals(200, patchRes.statusCode());
+		assertTrue(patchRes.body().contains("\"fullscreen\":true"));
+	}
+
+	@Test
+	void testUpdateDebug() throws Exception {
+		clock.advance();
+		HttpResponse<String> patchRes = patch("/v1/debug", "{\"hitboxes\":true,\"chunkBorders\":true}");
+		assertEquals(200, patchRes.statusCode());
+		assertTrue(patchRes.body().contains("\"hitboxes\":true"));
+		assertTrue(patchRes.body().contains("\"chunkBorders\":true"));
+	}
+
+	@Test
+	void testUpdateKeybinds() throws Exception {
+		clock.advance();
+		HttpResponse<String> patchRes = patch("/v1/keybinds", "{\"rebinds\":{\"key.forward\":\"key.keyboard.up\"}}");
+		assertEquals(200, patchRes.statusCode());
+		assertTrue(patchRes.body().contains("keybinds"));
+
+		HttpResponse<String> resetRes = post("/v1/keybinds", "{\"resetAll\":true}");
+		assertEquals(200, resetRes.statusCode());
+	}
+
+	@Test
+	void testUpdateResourcePacks() throws Exception {
+		clock.advance();
+		HttpResponse<String> patchRes = patch("/v1/resourcepacks", "{\"enabled\":[\"vanilla\"],\"reload\":true}");
+		assertEquals(200, patchRes.statusCode());
+		assertTrue(patchRes.body().contains("enabled"));
+	}
+
+	@Test
+	void testPhase2RequiresActPermission() throws Exception {
+		config.permission = Permission.READ;
+
+		HttpResponse<String> camRes = patch("/v1/camera", "{\"perspective\":\"third_person_back\"}");
+		assertEquals(403, camRes.statusCode());
+		assertTrue(camRes.body().contains("permission-denied"));
+
+		HttpResponse<String> winRes = patch("/v1/window", "{\"fullscreen\":true}");
+		assertEquals(403, winRes.statusCode());
+		assertTrue(winRes.body().contains("permission-denied"));
+
+		HttpResponse<String> dbgRes = patch("/v1/debug", "{\"hitboxes\":true}");
+		assertEquals(403, dbgRes.statusCode());
+		assertTrue(dbgRes.body().contains("permission-denied"));
+
+		HttpResponse<String> kbRes = patch("/v1/keybinds", "{\"resetAll\":true}");
+		assertEquals(403, kbRes.statusCode());
+		assertTrue(kbRes.body().contains("permission-denied"));
+
+		HttpResponse<String> rpRes = patch("/v1/resourcepacks", "{\"reload\":true}");
+		assertEquals(403, rpRes.statusCode());
+		assertTrue(rpRes.body().contains("permission-denied"));
+
+		HttpResponse<String> recipeRes = post("/v1/recipes/place", "{\"recipeId\":1}");
+		assertEquals(403, recipeRes.statusCode());
+		assertTrue(recipeRes.body().contains("permission-denied"));
+
+		HttpResponse<String> sessRes = post("/v1/session/pause", "{\"paused\":true}");
+		assertEquals(403, sessRes.statusCode());
+		assertTrue(sessRes.body().contains("permission-denied"));
+
+		HttpResponse<String> wldRes = post("/v1/worlds/New%20World/load", "");
+		assertEquals(403, wldRes.statusCode());
+		assertTrue(wldRes.body().contains("permission-denied"));
+
+		HttpResponse<String> srvRes = post("/v1/servers/connect", "{\"address\":\"127.0.0.1:25565\"}");
+		assertEquals(403, srvRes.statusCode());
+		assertTrue(srvRes.body().contains("permission-denied"));
+	}
+
+	@Test
+	void testSessionActions() throws Exception {
+		clock.advance();
+		HttpResponse<String> pauseRes = post("/v1/session/pause", "{\"paused\":true}");
+		assertEquals(200, pauseRes.statusCode());
+		assertTrue(pauseRes.body().contains("\"paused\":true"));
+
+		clock.advance();
+		HttpResponse<String> lanRes = post("/v1/session/lan", "{\"port\":25565}");
+		assertEquals(200, lanRes.statusCode());
+		assertTrue(lanRes.body().contains("\"port\":25565"));
+
+		clock.advance();
+		HttpResponse<String> discRes = post("/v1/session/disconnect", "");
+		assertEquals(200, discRes.statusCode());
+		assertTrue(discRes.body().contains("\"success\":true"));
+	}
+
+	@Test
+	void testWorldActionsAndTwoStepDelete() throws Exception {
+		clock.advance();
+		HttpResponse<String> loadRes = post("/v1/worlds/New%20World/load", "");
+		assertEquals(200, loadRes.statusCode());
+		assertTrue(loadRes.body().contains("\"success\":true"));
+
+		// Step 1: Request delete token
+		HttpResponse<String> delReq = delete("/v1/worlds/WorldToDelete");
+		assertEquals(202, delReq.statusCode());
+		assertTrue(delReq.body().contains("confirmToken"));
+
+		// Parse token
+		String body = delReq.body();
+		int tokenIdx = body.indexOf("\"confirmToken\":\"") + 16;
+		String token = body.substring(tokenIdx, body.indexOf('"', tokenIdx));
+
+		// Add world to mock so delete succeeds
+		mockGameClient.mockWorldsList.add(new WorldsDto.WorldSummaryInfo("WorldToDelete", "Delete Me", 0, "survival", false, false, "1.21.4", false));
+
+		// Step 2: Confirm delete
+		clock.advance();
+		HttpResponse<String> confRes = post("/v1/worlds/WorldToDelete/delete/confirm", "{\"confirmToken\":\"" + token + "\"}");
+		assertEquals(200, confRes.statusCode());
+		assertTrue(confRes.body().contains("\"success\":true"));
+
+		// Token reuse fails
+		HttpResponse<String> reuseRes = post("/v1/worlds/WorldToDelete/delete/confirm", "{\"confirmToken\":\"" + token + "\"}");
+		assertEquals(409, reuseRes.statusCode());
+		assertTrue(reuseRes.body().contains("quit-token-invalid"));
+	}
+
+	@Test
+	void testServerActionsAndTwoStepDelete() throws Exception {
+		clock.advance();
+		// Add server
+		HttpResponse<String> addRes = post("/v1/servers", "{\"name\":\"Hypixel\",\"address\":\"mc.hypixel.net\"}");
+		assertEquals(200, addRes.statusCode());
+		assertTrue(addRes.body().contains("Hypixel"));
+
+		// Update server
+		clock.advance();
+		HttpResponse<String> updRes = patch("/v1/servers/0", "{\"name\":\"Updated Server\"}");
+		assertEquals(200, updRes.statusCode());
+		assertTrue(updRes.body().contains("Updated Server"));
+
+		// Connect server
+		clock.advance();
+		HttpResponse<String> connRes = post("/v1/servers/connect", "{\"address\":\"127.0.0.1:25565\"}");
+		assertEquals(200, connRes.statusCode());
+		assertTrue(connRes.body().contains("\"success\":true"));
+
+		// Step 1: Request delete token
+		HttpResponse<String> delReq = delete("/v1/servers/0");
+		assertEquals(202, delReq.statusCode());
+		assertTrue(delReq.body().contains("confirmToken"));
+
+		String body = delReq.body();
+		int tokenIdx = body.indexOf("\"confirmToken\":\"") + 16;
+		String token = body.substring(tokenIdx, body.indexOf('"', tokenIdx));
+
+		// Step 2: Confirm delete
+		clock.advance();
+		HttpResponse<String> confRes = post("/v1/servers/0/delete/confirm", "{\"confirmToken\":\"" + token + "\"}");
+		assertEquals(200, confRes.statusCode());
+		assertTrue(confRes.body().contains("\"success\":true"));
+	}
+
+	@Test
+	void testPlaceRecipe() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = post("/v1/recipes/place", "{\"recipeId\":1,\"useMaxItems\":false}");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("\"success\":true"));
+		assertTrue(res.body().contains("\"recipeId\":1"));
+
+		// When no container screen is open
+		mockGameClient.isScreenOpen = false;
+		HttpResponse<String> noScreenRes = post("/v1/recipes/place", "{\"recipeId\":1}");
+		assertEquals(409, noScreenRes.statusCode());
+		assertTrue(noScreenRes.body().contains("no-container"));
 	}
 }

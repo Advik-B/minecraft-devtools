@@ -46,6 +46,8 @@ public final class Problems {
 	public static final String ATLAS_NOT_FOUND = "atlas-not-found";
 	public static final String PLAYER_NOT_FOUND = "player-not-found";
 	public static final String TEXTURE_FAILED = "texture-failed";
+	public static final String VIEW_BLOCKS_DISABLED = "view-blocks-disabled";
+	public static final String BATCH_LIMIT_EXCEEDED = "batch-limit-exceeded";
 
 	private Problems() {
 	}
@@ -131,6 +133,15 @@ public final class Problems {
 
 	public static ProblemException textureFailed(String detail) {
 		return of(500, TEXTURE_FAILED, "Texture extraction failed", detail);
+	}
+
+	public static ProblemException viewBlocksDisabled() {
+		return of(403, VIEW_BLOCKS_DISABLED, "View blocks disabled", "The /v1/view/blocks endpoint is disabled in the configuration.");
+	}
+
+	public static ProblemException batchLimitExceeded(int count, int limit) {
+		return of(400, BATCH_LIMIT_EXCEEDED, "Batch limit exceeded",
+				"Batch contains " + count + " requests, which exceeds the limit of " + limit + " requests.");
 	}
 
 	public static ProblemException quitTokenInvalid() {

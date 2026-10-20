@@ -200,7 +200,7 @@ class McpResourcesTest {
 		JsonNode res = callMcp("resources/read", Map.of("uri", "mcdt://hud"));
 		JsonNode contents = res.get("result").get("contents").get(0);
 		assertEquals("mcdt://hud", contents.get("uri").asText());
-		assertTrue(contents.get("text").asText().contains("recentChat"));
+		assertTrue(contents.get("text").asText().contains("Action bar test text"));
 	}
 
 	@Test

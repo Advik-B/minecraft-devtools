@@ -49,6 +49,10 @@ public final class McdtConfig {
 	public volatile boolean mcpLogCalls = true;
 	/** Minimum milliseconds between resource update notifications per URI per session. */
 	public long mcpNotificationThrottleMs = 250;
+	/** Enable or disable the /v1/view/blocks endpoint. */
+	public volatile boolean enableViewBlocks = true;
+	/** Maximum resolution (width * height rays) allowed for /v1/view/blocks (default 512x288 = 147456). */
+	public volatile int maxViewBlocksRays = 147_456;
 
 	/** Clamps out-of-range values to safe ones. Returns {@code this}. */
 	public McdtConfig normalize() {
@@ -66,6 +70,7 @@ public final class McdtConfig {
 		eventRingBufferSize = (int) clamp(eventRingBufferSize, 64, 65_536);
 		eventSubscriberQueueCapacity = (int) clamp(eventSubscriberQueueCapacity, 16, 4_096);
 		mcpNotificationThrottleMs = clamp(mcpNotificationThrottleMs, 50, 10_000);
+		maxViewBlocksRays = (int) clamp(maxViewBlocksRays, 100, 1_000_000);
 		if (permission == null) {
 			permission = Permission.READ;
 		}

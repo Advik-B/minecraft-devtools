@@ -42,3 +42,62 @@ Host: 127.0.0.1:25580
 GET {{baseUrl}}/v1/registries/minecraft:block?limit=10
 Authorization: Bearer {{token}}
 Host: 127.0.0.1:25580
+
+### 8. Camera perspective and FOV
+GET {{baseUrl}}/v1/camera
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 9. Update camera perspective
+PATCH {{baseUrl}}/v1/camera
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "perspective": "third_person_back",
+  "fov": 85.0
+}
+
+### 10. Window state
+GET {{baseUrl}}/v1/window
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 11. Debug overlay and renderers (F3, hitboxes, chunk borders)
+GET {{baseUrl}}/v1/debug
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 12. Toggle hitboxes and chunk borders
+PATCH {{baseUrl}}/v1/debug
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "hitboxes": true,
+  "chunkBorders": true
+}
+
+### 13. Key mappings list
+GET {{baseUrl}}/v1/keybinds
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 14. Rebind key mapping
+PATCH {{baseUrl}}/v1/keybinds
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "rebinds": {
+    "key.forward": "key.keyboard.up"
+  }
+}
+
+### 15. Resource packs
+GET {{baseUrl}}/v1/resourcepacks
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580

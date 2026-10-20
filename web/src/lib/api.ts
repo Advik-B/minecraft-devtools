@@ -19,7 +19,27 @@ import type {
   RegistryEntryResponse,
   PlayerSkinResponse,
   TextureAtlasesResponse,
-  TextureAtlasResponse
+  TextureAtlasResponse,
+  ViewBlocksResponse,
+  ViewBlocksSummaryResponse,
+  HudResponse,
+  BatchResponse,
+  CameraResponse,
+  WindowResponse,
+  DebugResponse,
+  KeybindsResponse,
+  ResourcePacksResponse,
+  StatsResponse,
+  AdvancementsResponse,
+  RecipesResponse,
+  RecipePlaceRequest,
+  RecipePlaceResponse,
+  SessionResponse,
+  WorldsListResponse,
+  WorldLoadResponse,
+  ConfirmTokenResponse,
+  ServersListResponse,
+  ServerConnectResponse
 } from './types'
 
 export async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T | null> {
@@ -369,3 +389,203 @@ export async function loadAtlasImage(atlasId?: string): Promise<string | null> {
   const query = params.toString() ? `?${params.toString()}` : ''
   return fetchBlobUrl(`/v1/textures/atlas/image${query}`)
 }
+
+export async function getViewBlocks(params: Record<string, string | number | boolean> = {}): Promise<ViewBlocksResponse | null> {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) q.set(k, String(v))
+  }
+  const query = q.toString() ? `?${q.toString()}` : ''
+  return await fetchApi<ViewBlocksResponse>(`/v1/view/blocks${query}`)
+}
+
+export async function getViewBlocksSummary(maxDistance?: number): Promise<ViewBlocksSummaryResponse | null> {
+  const query = maxDistance ? `?maxDistance=${maxDistance}` : ''
+  return await fetchApi<ViewBlocksSummaryResponse>(`/v1/view/blocks/summary${query}`)
+}
+
+export async function getHud(include?: string[]): Promise<HudResponse | null> {
+  const query = include && include.length > 0 ? `?include=${encodeURIComponent(include.join(','))}` : ''
+  return await fetchApi<HudResponse>(`/v1/hud${query}`)
+}
+
+export async function sendBatch(requests: Array<{ id: string; path: string }>): Promise<BatchResponse | null> {
+  return await fetchApi<BatchResponse>('/v1/batch', {
+    method: 'POST',
+    body: JSON.stringify({ requests })
+  })
+}
+
+// --- Phase 2: Camera, Window, Debug, Keybinds, Resource Packs ---
+export async function getCamera(): Promise<CameraResponse | null> {
+  return await fetchApi<CameraResponse>('/v1/camera')
+}
+
+export async function updateCamera(options: { perspective?: string; fov?: number }): Promise<CameraResponse | null> {
+  return await fetchApi<CameraResponse>('/v1/camera', {
+    method: 'PATCH',
+    body: JSON.stringify(options)
+  })
+}
+
+export async function getWindow(): Promise<WindowResponse | null> {
+  return await fetchApi<WindowResponse>('/v1/window')
+}
+
+export async function updateWindow(options: { fullscreen?: boolean }): Promise<WindowResponse | null> {
+  return await fetchApi<WindowResponse>('/v1/window', {
+    method: 'PATCH',
+    body: JSON.stringify(options)
+  })
+}
+
+export async function getDebug(): Promise<DebugResponse | null> {
+  return await fetchApi<DebugResponse>('/v1/debug')
+}
+
+export async function updateDebug(options: { hitboxes?: boolean; chunkBorders?: boolean }): Promise<DebugResponse | null> {
+  return await fetchApi<DebugResponse>('/v1/debug', {
+    method: 'PATCH',
+    body: JSON.stringify(options)
+  })
+}
+
+export async function getKeybinds(): Promise<KeybindsResponse | null> {
+  return await fetchApi<KeybindsResponse>('/v1/keybinds')
+}
+
+export async function updateKeybinds(options: { rebinds?: Record<string, string>; resetAll?: boolean; resetKeys?: string[] }): Promise<KeybindsResponse | null> {
+  return await fetchApi<KeybindsResponse>('/v1/keybinds', {
+    method: 'PATCH',
+    body: JSON.stringify(options)
+  })
+}
+
+export async function getResourcePacks(): Promise<ResourcePacksResponse | null> {
+  return await fetchApi<ResourcePacksResponse>('/v1/resourcepacks')
+}
+
+export async function updateResourcePacks(options: { enabled?: string[]; reload?: boolean }): Promise<ResourcePacksResponse | null> {
+  return await fetchApi<ResourcePacksResponse>('/v1/resourcepacks', {
+    method: 'PATCH',
+    body: JSON.stringify(options)
+  })
+}
+
+// --- Phase 3: Stats, Advancements, Recipes ---
+export async function getStats(category?: string): Promise<StatsResponse | null> {
+  const query = category ? `?category=${encodeURIComponent(category)}` : ''
+  return await fetchApi<StatsResponse>(`/v1/stats${query}`)
+}
+
+export async function getAdvancements(done?: boolean, search?: string): Promise<AdvancementsResponse | null> {
+  const q = new URLSearchParams()
+  if (done !== undefined && done !== null) q.set('done', String(done))
+  if (search) q.set('search', search)
+  const query = q.toString() ? `?${q.toString()}` : ''
+  return await fetchApi<AdvancementsResponse>(`/v1/advancements${query}`)
+}
+
+export async function getRecipes(craftable?: boolean, category?: string, search?: string): Promise<RecipesResponse | null> {
+  const q = new URLSearchParams()
+  if (craftable !== undefined && craftable !== null) q.set('craftable', String(craftable))
+  if (category) q.set('category', category)
+  if (search) q.set('search', search)
+  const query = q.toString() ? `?${q.toString()}` : ''
+  return await fetchApi<RecipesResponse>(`/v1/recipes${query}`)
+}
+
+export async function placeRecipe(request: RecipePlaceRequest): Promise<RecipePlaceResponse | null> {
+  return await fetchApi<RecipePlaceResponse>('/v1/recipes/place', {
+    method: 'POST',
+    body: JSON.stringify(request)
+  })
+}
+
+// --- Phase 4: Session, Worlds, Servers ---
+export async function getSession(): Promise<SessionResponse | null> {
+  return await fetchApi<SessionResponse>('/v1/session')
+}
+
+export async function pauseSession(paused = true): Promise<SessionResponse | null> {
+  return await fetchApi<SessionResponse>('/v1/session/pause', {
+    method: 'POST',
+    body: JSON.stringify({ paused })
+  })
+}
+
+export async function disconnectSession(): Promise<{ success: boolean } | null> {
+  return await fetchApi<{ success: boolean }>('/v1/session/disconnect', {
+    method: 'POST'
+  })
+}
+
+export async function openLan(options: { port?: number; gameMode?: string; allowCommands?: boolean } = {}): Promise<{ success: boolean; port: number } | null> {
+  return await fetchApi<{ success: boolean; port: number }>('/v1/session/lan', {
+    method: 'POST',
+    body: JSON.stringify(options)
+  })
+}
+
+export async function getWorlds(): Promise<WorldsListResponse | null> {
+  return await fetchApi<WorldsListResponse>('/v1/worlds')
+}
+
+export async function loadWorld(levelId: string): Promise<WorldLoadResponse | null> {
+  return await fetchApi<WorldLoadResponse>(`/v1/worlds/${encodeURIComponent(levelId)}/load`, {
+    method: 'POST'
+  })
+}
+
+export async function requestDeleteWorld(levelId: string): Promise<ConfirmTokenResponse | null> {
+  return await fetchApi<ConfirmTokenResponse>(`/v1/worlds/${encodeURIComponent(levelId)}`, {
+    method: 'DELETE'
+  })
+}
+
+export async function confirmDeleteWorld(levelId: string, confirmToken: string): Promise<{ success: boolean; levelId: string } | null> {
+  return await fetchApi<{ success: boolean; levelId: string }>(`/v1/worlds/${encodeURIComponent(levelId)}/delete/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ confirmToken })
+  })
+}
+
+export async function getServers(): Promise<ServersListResponse | null> {
+  return await fetchApi<ServersListResponse>('/v1/servers')
+}
+
+export async function addServer(name: string, address: string): Promise<ServersListResponse | null> {
+  return await fetchApi<ServersListResponse>('/v1/servers', {
+    method: 'POST',
+    body: JSON.stringify({ name, address })
+  })
+}
+
+export async function updateServer(index: number, options: { name?: string; address?: string }): Promise<ServersListResponse | null> {
+  return await fetchApi<ServersListResponse>(`/v1/servers/${index}`, {
+    method: 'PATCH',
+    body: JSON.stringify(options)
+  })
+}
+
+export async function connectServer(address: string): Promise<ServerConnectResponse | null> {
+  return await fetchApi<ServerConnectResponse>('/v1/servers/connect', {
+    method: 'POST',
+    body: JSON.stringify({ address })
+  })
+}
+
+export async function requestDeleteServer(index: number): Promise<ConfirmTokenResponse | null> {
+  return await fetchApi<ConfirmTokenResponse>(`/v1/servers/${index}`, {
+    method: 'DELETE'
+  })
+}
+
+export async function confirmDeleteServer(index: number, confirmToken: string): Promise<{ success: boolean; index: number } | null> {
+  return await fetchApi<{ success: boolean; index: number }>(`/v1/servers/${index}/delete/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ confirmToken })
+  })
+}
+
+

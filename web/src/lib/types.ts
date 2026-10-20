@@ -336,3 +336,279 @@ export interface TextureAtlasResponse {
   imageBase64?: string
 }
 
+// --- Phase 1: View Blocks, HUD, Batch ---
+export interface ViewBlocksResponse {
+  tick: number
+  camera: {
+    pos: [number, number, number]
+    yaw: number
+    pitch: number
+    fov: number
+  }
+  res: [number, number]
+  palette: string[]
+  blocks: Array<{
+    pos: [number, number, number]
+    p: number
+    faces: string[]
+    distance: number
+    coverage: number
+  }>
+  entities: Array<{
+    id: number
+    uuid: string
+    type: string
+    name: string
+    distance: number
+    coverage: number
+  }>
+  sky: number
+  labels?: number[]
+  depth?: number[]
+}
+
+export interface ViewBlocksSummaryResponse {
+  tick: number
+  camera: {
+    pos: [number, number, number]
+    yaw: number
+    pitch: number
+    fov: number
+  }
+  counts: Record<string, number>
+  nearest: Record<string, { pos: [number, number, number]; distance: number }>
+  crosshair?: RaycastResponse
+}
+
+export interface HudResponse {
+  tick: number
+  actionBar?: string
+  title?: {
+    title?: string
+    subtitle?: string
+    fadeInTicks: number
+    stayTicks: number
+    fadeOutTicks: number
+  }
+  bossBars?: Array<{
+    uuid: string
+    name: string
+    percent: number
+    color: string
+    overlay: string
+    darkenScreen: boolean
+    playMusic: boolean
+    createWorldFog: boolean
+  }>
+  scoreboard?: {
+    objective: string
+    title: string
+    scores: Array<{ owner: string; score: number; display?: string }>
+  }
+  tabList?: {
+    header?: string
+    footer?: string
+    players: Array<{ name: string; uuid: string; latency: number; gameMode: string; displayName?: string }>
+  }
+  subtitles?: Array<{ text: string; volume: number; location?: [number, number, number] }>
+  heldItem?: {
+    mainhand?: {
+      id: string
+      count: number
+      name?: string
+      damage?: number
+      maxDamage?: number
+      components?: Record<string, unknown>
+    }
+    offhand?: {
+      id: string
+      count: number
+      name?: string
+      damage?: number
+      maxDamage?: number
+      components?: Record<string, unknown>
+    }
+    selectedHotbarSlot: number
+  }
+  toasts?: Array<{ type: string; title: string; description?: string }>
+}
+
+export interface BatchRequest {
+  requests: Array<{ id: string; path: string }>
+}
+
+export interface BatchResponse {
+  tick: number
+  results: Record<string, { status: number; data?: unknown; problem?: unknown }>
+}
+
+// --- Phase 2: Camera, Window, Debug, Keybinds, Resource Packs ---
+export interface CameraResponse {
+  perspective: 'first_person' | 'third_person_back' | 'third_person_front' | string
+  fov: number
+  eyePosition: [number, number, number]
+  rotation: { yaw: number; pitch: number }
+}
+
+export interface WindowResponse {
+  width: number
+  height: number
+  guiScaledWidth: number
+  guiScaledHeight: number
+  guiScale: number
+  fullscreen: boolean
+  focused: boolean
+}
+
+export interface DebugResponse {
+  f3Left: string[]
+  f3Right: string[]
+  hitboxes: boolean
+  chunkBorders: boolean
+}
+
+export interface KeyMappingDetail {
+  name: string
+  category: string
+  boundKey: string
+  defaultKey: string
+  isDefault: boolean
+  isUnbound: boolean
+}
+
+export interface KeybindsResponse {
+  total: number
+  keybinds: KeyMappingDetail[]
+}
+
+export interface ResourcePackInfo {
+  id: string
+  title: string
+  description: string
+  isRequired: boolean
+  isFixedPosition: boolean
+  compatibility: string
+}
+
+export interface ResourcePacksResponse {
+  available: ResourcePackInfo[]
+  enabled: string[]
+}
+
+// --- Phase 3: Stats, Advancements, Recipes ---
+export interface StatsResponse {
+  custom: Record<string, number>
+  mined: Record<string, number>
+  crafted: Record<string, number>
+  used: Record<string, number>
+  broken: Record<string, number>
+  killed: Record<string, number>
+  killedBy: Record<string, number>
+}
+
+export interface AdvancementInfo {
+  id: string
+  title: string
+  description: string
+  type: string
+  icon: string
+  parent?: string | null
+  done: boolean
+  percent: number
+  completedCriteria: string[]
+  remainingCriteria: string[]
+}
+
+export interface AdvancementsResponse {
+  total: number
+  completed: number
+  advancements: AdvancementInfo[]
+}
+
+export interface RecipeResultItem {
+  id: string
+  count: number
+}
+
+export interface RecipeInfo {
+  id: number
+  category: string
+  result: RecipeResultItem
+  craftable: boolean
+  ingredients: string[]
+}
+
+export interface RecipesResponse {
+  total: number
+  recipes: RecipeInfo[]
+}
+
+export interface RecipePlaceRequest {
+  recipeId: number
+  useMaxItems?: boolean
+}
+
+export interface RecipePlaceResponse {
+  success: boolean
+  recipeId: number
+  containerId: number
+}
+
+// --- Phase 4: Session, Worlds, Servers ---
+export interface SessionResponse {
+  state: 'menu' | 'singleplayer' | 'multiplayer' | string
+  paused: boolean
+  lan: boolean
+  lanPort?: number | null
+  serverAddress?: string | null
+  serverName?: string | null
+  worldName?: string | null
+}
+
+export interface WorldSummaryInfo {
+  levelId: string
+  levelName: string
+  lastPlayed: number
+  gameMode: string
+  hardcore: boolean
+  commands: boolean
+  versionName: string
+  locked: boolean
+}
+
+export interface WorldsListResponse {
+  total: number
+  worlds: WorldSummaryInfo[]
+}
+
+export interface WorldLoadResponse {
+  success: boolean
+  levelId: string
+}
+
+export interface ConfirmTokenResponse {
+  confirmToken: string
+  expiresAt: string
+}
+
+export interface ServerEntryInfo {
+  index: number
+  name: string
+  address: string
+  ping: number
+  status: string
+  playerCount: string
+}
+
+export interface ServersListResponse {
+  total: number
+  servers: ServerEntryInfo[]
+}
+
+export interface ServerConnectResponse {
+  success: boolean
+  address: string
+}
+
+
+

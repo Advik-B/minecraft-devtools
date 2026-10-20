@@ -47,10 +47,41 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 import com.mojang.authlib.GameProfile;
+import dev.advik.mcdt.mixin.StatsCounterAccessor;
+import dev.advik.mcdt.mixin.ClientAdvancementsAccessor;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.advancements.AdvancementProgress;
+import net.minecraft.advancements.DisplayInfo;
+import net.minecraft.client.ClientRecipeBook;
+import net.minecraft.client.gui.screens.recipebook.RecipeCollection;
+import net.minecraft.client.multiplayer.ClientAdvancements;
+import net.minecraft.stats.Stat;
+import net.minecraft.stats.Stats;
+import net.minecraft.stats.StatsCounter;
+import net.minecraft.util.context.ContextMap;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.crafting.display.*;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.GenericMessageScreen;
+import net.minecraft.client.multiplayer.ServerList;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.LevelSummary;
+import net.minecraft.world.level.GameType;
+import net.minecraft.util.HttpUtil;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.PlayerSkin;
+import net.minecraft.client.CameraType;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackRepository;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -59,7 +90,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public final class MinecraftGameClient implements GameClient {
 	private static final MinecraftGameClient INSTANCE = new MinecraftGameClient();
@@ -1408,6 +1441,1077 @@ public final class MinecraftGameClient implements GameClient {
 		} else {
 			throw Problems.badRequest("Object is not a Packet");
 		}
+	}
+
+	@Override
+	public ViewBlocksDto.Response getViewBlocks(
+			String res,
+			Double maxDistance,
+			Boolean fluids,
+			Boolean passThrough,
+			Boolean entities,
+			Boolean grid,
+			Double minCoverage
+	) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.level == null) throw Problems.noWorld();
+		LocalPlayer player = client.player;
+		if (player == null) throw Problems.noPlayer();
+
+		int width = 128;
+		int height = 72;
+		if (res != null && !res.isBlank()) {
+			String[] parts = res.trim().toLowerCase().split("x");
+			if (parts.length == 2) {
+				try {
+					width = Integer.parseInt(parts[0]);
+					height = Integer.parseInt(parts[1]);
+				} catch (NumberFormatException e) {
+					throw Problems.invalidParameter("res", "Expected format WxH (e.g. 128x72)");
+				}
+			} else {
+				throw Problems.invalidParameter("res", "Expected format WxH (e.g. 128x72)");
+			}
+		}
+
+		if (width <= 0 || height <= 0 || width > 512 || height > 288) {
+			throw Problems.invalidParameter("res", "Resolution must be between 1x1 and 512x288");
+		}
+
+		double maxDist = maxDistance != null ? Math.min(128.0, Math.max(1.0, maxDistance)) : 64.0;
+		boolean includeFluids = fluids == null || fluids;
+		boolean allowPassThrough = passThrough == null || passThrough;
+		double minCov = minCoverage != null ? Math.max(0.0, minCoverage) : 0.0;
+
+		long tick = client.level.getGameTime();
+		Vec3 eyePos = player.getEyePosition();
+		float yaw = player.getYRot();
+		float pitch = player.getXRot();
+		float fov = (float) client.options.fov().get();
+
+		ViewBlocksDto.CameraInfo camera = new ViewBlocksDto.CameraInfo(
+				new double[]{eyePos.x, eyePos.y, eyePos.z},
+				yaw,
+				pitch,
+				fov
+		);
+
+		double yawRad = Math.toRadians(yaw);
+		double pitchRad = Math.toRadians(pitch);
+		double fx = -Math.sin(yawRad) * Math.cos(pitchRad);
+		double fy = -Math.sin(pitchRad);
+		double fz = Math.cos(yawRad) * Math.cos(pitchRad);
+		Vec3 forward = new Vec3(fx, fy, fz).normalize();
+		Vec3 right = new Vec3(Math.cos(yawRad), 0, Math.sin(yawRad)).normalize();
+		Vec3 up = right.cross(forward).normalize();
+
+		double aspect = (double) width / (double) height;
+		double tanHalfFov = Math.tan(Math.toRadians(fov / 2.0));
+
+		List<String> palette = new ArrayList<>();
+		Map<String, Integer> paletteIndices = new HashMap<>();
+
+		record BlockRecord(int x, int y, int z, int paletteIndex, Set<String> faces, double minDistance, int[] hitCount) {}
+		Map<Long, BlockRecord> hitBlocks = new HashMap<>();
+
+		int totalRays = width * height;
+		int skyRays = 0;
+		List<Integer> labelsList = Boolean.TRUE.equals(grid) ? new ArrayList<>(totalRays) : null;
+		List<Double> depthList = Boolean.TRUE.equals(grid) ? new ArrayList<>(totalRays) : null;
+
+		BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+
+		for (int row = 0; row < height; row++) {
+			double v = (1.0 - 2.0 * (row + 0.5) / height) * tanHalfFov;
+			for (int col = 0; col < width; col++) {
+				double u = (2.0 * (col + 0.5) / width - 1.0) * aspect * tanHalfFov;
+				Vec3 dir = forward.add(right.scale(u)).add(up.scale(v)).normalize();
+
+				double ox = eyePos.x;
+				double oy = eyePos.y;
+				double oz = eyePos.z;
+
+				int mapX = (int) Math.floor(ox);
+				int mapY = (int) Math.floor(oy);
+				int mapZ = (int) Math.floor(oz);
+
+				double deltaDistX = Math.abs(1.0 / (dir.x == 0 ? 1e-9 : dir.x));
+				double deltaDistY = Math.abs(1.0 / (dir.y == 0 ? 1e-9 : dir.y));
+				double deltaDistZ = Math.abs(1.0 / (dir.z == 0 ? 1e-9 : dir.z));
+
+				int stepX;
+				double sideDistX;
+				if (dir.x < 0) {
+					stepX = -1;
+					sideDistX = (ox - mapX) * deltaDistX;
+				} else {
+					stepX = 1;
+					sideDistX = (mapX + 1.0 - ox) * deltaDistX;
+				}
+
+				int stepY;
+				double sideDistY;
+				if (dir.y < 0) {
+					stepY = -1;
+					sideDistY = (oy - mapY) * deltaDistY;
+				} else {
+					stepY = 1;
+					sideDistY = (mapY + 1.0 - oy) * deltaDistY;
+				}
+
+				int stepZ;
+				double sideDistZ;
+				if (dir.z < 0) {
+					stepZ = -1;
+					sideDistZ = (oz - mapZ) * deltaDistZ;
+				} else {
+					stepZ = 1;
+					sideDistZ = (mapZ + 1.0 - oz) * deltaDistZ;
+				}
+
+				boolean hitOpaque = false;
+				double hitDist = maxDist;
+				int primaryPaletteIdx = -1;
+
+				while (!hitOpaque) {
+					int side;
+					if (sideDistX < sideDistY) {
+						if (sideDistX < sideDistZ) {
+							sideDistX += deltaDistX;
+							mapX += stepX;
+							side = 0;
+						} else {
+							sideDistZ += deltaDistZ;
+							mapZ += stepZ;
+							side = 2;
+						}
+					} else {
+						if (sideDistY < sideDistZ) {
+							sideDistY += deltaDistY;
+							mapY += stepY;
+							side = 1;
+						} else {
+							sideDistZ += deltaDistZ;
+							mapZ += stepZ;
+							side = 2;
+						}
+					}
+
+					double currentDist = switch (side) {
+						case 0 -> sideDistX - deltaDistX;
+						case 1 -> sideDistY - deltaDistY;
+						default -> sideDistZ - deltaDistZ;
+					};
+
+					if (currentDist > maxDist) break;
+
+					mutablePos.set(mapX, mapY, mapZ);
+					if (!client.level.hasChunkAt(mutablePos)) break;
+
+					BlockState state = client.level.getBlockState(mutablePos);
+					if (state.isAir()) continue;
+
+					boolean isLiquid = !state.getFluidState().isEmpty();
+					if (isLiquid && !includeFluids) continue;
+
+					boolean occludes = state.canOcclude() && !isLiquid;
+
+					String faceName = switch (side) {
+						case 0 -> stepX < 0 ? "east" : "west";
+						case 1 -> stepY < 0 ? "up" : "down";
+						default -> stepZ < 0 ? "south" : "north";
+					};
+
+					String stateString = BlockStateSerializer.toString(state);
+					int pIdx = paletteIndices.computeIfAbsent(stateString, s -> {
+						palette.add(s);
+						return palette.size() - 1;
+					});
+
+					long packed = BlockPos.asLong(mapX, mapY, mapZ);
+					BlockRecord rec = hitBlocks.get(packed);
+					if (rec == null) {
+						Set<String> faces = new HashSet<>();
+						faces.add(faceName);
+						rec = new BlockRecord(mapX, mapY, mapZ, pIdx, faces, currentDist, new int[]{1});
+						hitBlocks.put(packed, rec);
+					} else {
+						rec.faces.add(faceName);
+						rec.hitCount[0]++;
+					}
+
+					if (primaryPaletteIdx == -1) {
+						primaryPaletteIdx = pIdx;
+						hitDist = currentDist;
+					}
+
+					if (occludes || !allowPassThrough) {
+						hitOpaque = true;
+						break;
+					}
+				}
+
+				if (!hitOpaque && primaryPaletteIdx == -1) {
+					skyRays++;
+					if (labelsList != null) labelsList.add(-1);
+					if (depthList != null) depthList.add(maxDist);
+				} else {
+					if (labelsList != null) labelsList.add(primaryPaletteIdx);
+					if (depthList != null) depthList.add(hitDist);
+				}
+			}
+		}
+
+		double skyFraction = (double) skyRays / totalRays;
+
+		List<ViewBlocksDto.BlockHit> blockHits = new ArrayList<>();
+		for (BlockRecord rec : hitBlocks.values()) {
+			double coverage = (double) rec.hitCount[0] / totalRays;
+			if (coverage >= minCov) {
+				blockHits.add(new ViewBlocksDto.BlockHit(
+						new int[]{rec.x, rec.y, rec.z},
+						rec.paletteIndex,
+						new ArrayList<>(rec.faces),
+						Math.round(rec.minDistance * 10.0) / 10.0,
+						Math.round(coverage * 10000.0) / 10000.0
+				));
+			}
+		}
+
+		blockHits.sort((a, b) -> Double.compare(b.coverage(), a.coverage()));
+
+		return new ViewBlocksDto.Response(
+				tick,
+				camera,
+				new int[]{width, height},
+				palette,
+				blockHits,
+				List.of(),
+				Math.round(skyFraction * 1000.0) / 1000.0,
+				labelsList,
+				depthList
+		);
+	}
+
+	@Override
+	public ViewBlocksDto.SummaryResponse getViewBlocksSummary(Double maxDistance) {
+		ViewBlocksDto.Response view = getViewBlocks("64x36", maxDistance, true, true, false, false, 0.0);
+		Map<String, Integer> counts = new HashMap<>();
+		Map<String, ViewBlocksDto.NearestBlock> nearest = new HashMap<>();
+
+		for (ViewBlocksDto.BlockHit b : view.blocks()) {
+			String state = view.palette().get(b.p());
+			String blockId = state.contains("[") ? state.substring(0, state.indexOf('[')) : state;
+			counts.put(blockId, counts.getOrDefault(blockId, 0) + 1);
+
+			ViewBlocksDto.NearestBlock currNearest = nearest.get(blockId);
+			if (currNearest == null || b.distance() < currNearest.distance()) {
+				nearest.put(blockId, new ViewBlocksDto.NearestBlock(b.pos(), b.distance()));
+			}
+		}
+
+		RaycastDto crosshair = raycast(null, null, maxDistance, true, true);
+
+		return new ViewBlocksDto.SummaryResponse(
+				view.tick(),
+				view.camera(),
+				counts,
+				nearest,
+				crosshair
+		);
+	}
+
+	@Override
+	public HudDto.Response getHud(java.util.Set<String> include) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) throw Problems.noPlayer();
+		LocalPlayer player = client.player;
+		long tick = client.level != null ? client.level.getGameTime() : 0L;
+
+		boolean all = include == null || include.isEmpty();
+
+		String actionBar = null;
+		HudDto.TitleInfo titleInfo = null;
+		List<HudDto.BossBarInfo> bossBars = null;
+		HudDto.TabList tabList = null;
+		List<HudDto.SubtitleEntry> subtitles = null;
+
+		if (client.gui instanceof GuiAccessor guiAccessor) {
+			net.minecraft.network.chat.Component actionMsg = guiAccessor.getOverlayMessageString();
+			if (actionMsg != null && guiAccessor.getOverlayMessageTime() > 0) {
+				actionBar = TextSerializer.toPlainText(actionMsg);
+			}
+
+			if (all || include.contains("title")) {
+				net.minecraft.network.chat.Component titleComp = guiAccessor.getTitle();
+				net.minecraft.network.chat.Component subComp = guiAccessor.getSubtitle();
+				if (titleComp != null || subComp != null) {
+					titleInfo = new HudDto.TitleInfo(
+							titleComp != null ? TextSerializer.toPlainText(titleComp) : null,
+							subComp != null ? TextSerializer.toPlainText(subComp) : null,
+							guiAccessor.getTitleFadeInTime(),
+							guiAccessor.getTitleStayTime(),
+							guiAccessor.getTitleFadeOutTime()
+					);
+				}
+			}
+
+			if (all || include.contains("bossbars")) {
+				bossBars = new ArrayList<>();
+				if (client.gui.getBossOverlay() instanceof BossHealthOverlayAccessor bossAccessor) {
+					Map<UUID, net.minecraft.client.gui.components.LerpingBossEvent> events = bossAccessor.getEvents();
+					if (events != null) {
+						for (Map.Entry<UUID, net.minecraft.client.gui.components.LerpingBossEvent> entry : events.entrySet()) {
+							net.minecraft.client.gui.components.LerpingBossEvent ev = entry.getValue();
+							bossBars.add(new HudDto.BossBarInfo(
+									entry.getKey().toString(),
+									TextSerializer.toPlainText(ev.getName()),
+									ev.getProgress(),
+									ev.getColor().getName(),
+									ev.getOverlay().getName(),
+									ev.shouldDarkenScreen(),
+									ev.shouldPlayBossMusic(),
+									ev.shouldCreateWorldFog()
+							));
+						}
+					}
+				}
+			}
+
+			if (all || include.contains("tablist")) {
+				String header = null;
+				String footer = null;
+				if (client.gui.getTabList() instanceof PlayerTabOverlayAccessor tabAccessor) {
+					if (tabAccessor.getHeader() != null) header = TextSerializer.toPlainText(tabAccessor.getHeader());
+					if (tabAccessor.getFooter() != null) footer = TextSerializer.toPlainText(tabAccessor.getFooter());
+				}
+				List<HudDto.TabList.PlayerEntry> players = new ArrayList<>();
+				if (client.getConnection() != null) {
+					for (net.minecraft.client.multiplayer.PlayerInfo info : client.getConnection().getListedOnlinePlayers()) {
+						players.add(new HudDto.TabList.PlayerEntry(
+								info.getProfile().getName(),
+								info.getProfile().getId().toString(),
+								info.getLatency(),
+								info.getGameMode() != null ? info.getGameMode().getName() : "unknown",
+								info.getTabListDisplayName() != null ? TextSerializer.toPlainText(info.getTabListDisplayName()) : null
+						));
+					}
+				}
+				tabList = new HudDto.TabList(header, footer, players);
+			}
+
+			if (all || include.contains("subtitles")) {
+				subtitles = new ArrayList<>();
+				if (guiAccessor.getSubtitleOverlay() instanceof SubtitleOverlayAccessor subAccessor) {
+					List<?> subList = subAccessor.getSubtitles();
+					if (subList != null) {
+						for (Object item : subList) {
+							if (item != null) {
+								try {
+									java.lang.reflect.Method getTextMethod = item.getClass().getMethod("getText");
+									Object textObj = getTextMethod.invoke(item);
+									if (textObj instanceof net.minecraft.network.chat.Component comp) {
+										subtitles.add(new HudDto.SubtitleEntry(
+												TextSerializer.toPlainText(comp),
+												1.0,
+												null
+										));
+									}
+								} catch (Exception ignored) {}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		HudDto.ScoreboardSidebar scoreboard = null;
+		if (all || include.contains("scoreboard")) {
+			if (client.level != null) {
+				net.minecraft.world.scores.Scoreboard sb = client.level.getScoreboard();
+				net.minecraft.world.scores.Objective obj = sb.getDisplayObjective(net.minecraft.world.scores.DisplaySlot.SIDEBAR);
+				if (obj != null) {
+					List<HudDto.ScoreboardSidebar.ScoreEntry> scoreEntries = new ArrayList<>();
+					for (net.minecraft.world.scores.PlayerScoreEntry pse : sb.listPlayerScores(obj)) {
+						if (!pse.isHidden()) {
+							scoreEntries.add(new HudDto.ScoreboardSidebar.ScoreEntry(
+									pse.owner(),
+									pse.value(),
+									pse.display() != null ? TextSerializer.toPlainText(pse.display()) : Integer.toString(pse.value())
+							));
+						}
+					}
+					scoreboard = new HudDto.ScoreboardSidebar(
+							obj.getName(),
+							TextSerializer.toPlainText(obj.getDisplayName()),
+							scoreEntries
+					);
+				}
+			}
+		}
+
+		HudDto.HeldItemInfo heldItem = null;
+		if (all || include.contains("helditem")) {
+			ItemStack main = player.getMainHandItem();
+			ItemStack off = player.getOffhandItem();
+			int selected = player.getInventory().selected;
+			heldItem = new HudDto.HeldItemInfo(
+					!main.isEmpty() ? ItemSerializer.toSlotInfo(selected, main) : null,
+					!off.isEmpty() ? ItemSerializer.toSlotInfo(40, off) : null,
+					selected
+			);
+		}
+
+		List<HudDto.ToastInfo> toasts = null;
+		if (all || include.contains("toasts")) {
+			toasts = new ArrayList<>();
+			if (client.getToastManager() instanceof ToastManagerAccessor toastAccessor) {
+				List<?> visible = toastAccessor.getVisibleToasts();
+				if (visible != null) {
+					for (Object toastInst : visible) {
+						if (toastInst != null) {
+							toasts.add(new HudDto.ToastInfo(
+									toastInst.getClass().getSimpleName(),
+									"Notification",
+									null
+							));
+						}
+					}
+				}
+			}
+		}
+
+		return new HudDto.Response(
+				tick,
+				actionBar,
+				titleInfo,
+				bossBars,
+				scoreboard,
+				tabList,
+				subtitles,
+				heldItem,
+				toasts
+		);
+	}
+
+	@Override
+	public CameraDto.Response getCamera() {
+		Minecraft client = Minecraft.getInstance();
+		CameraType type = client.options.getCameraType();
+		String perspective = switch (type) {
+			case FIRST_PERSON -> "first_person";
+			case THIRD_PERSON_BACK -> "third_person_back";
+			case THIRD_PERSON_FRONT -> "third_person_front";
+		};
+
+		double fov = client.options.fov().get();
+		double[] eyePos = client.player != null
+				? new double[]{client.player.getEyePosition().x, client.player.getEyePosition().y, client.player.getEyePosition().z}
+				: new double[]{0, 0, 0};
+		CameraDto.Rotation rot = client.player != null
+				? new CameraDto.Rotation(client.player.getYRot(), client.player.getXRot())
+				: new CameraDto.Rotation(0, 0);
+
+		return new CameraDto.Response(perspective, fov, eyePos, rot);
+	}
+
+	@Override
+	public CameraDto.Response updateCamera(CameraDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		if (request.perspective() != null) {
+			String p = request.perspective().trim().toLowerCase();
+			CameraType targetType = switch (p) {
+				case "first_person" -> CameraType.FIRST_PERSON;
+				case "third_person_back" -> CameraType.THIRD_PERSON_BACK;
+				case "third_person_front" -> CameraType.THIRD_PERSON_FRONT;
+				default -> throw Problems.invalidParameter("perspective", "Must be one of: first_person, third_person_back, third_person_front");
+			};
+			client.options.setCameraType(targetType);
+		}
+
+		if (request.fov() != null) {
+			int clampedFov = (int) Math.round(Math.max(30.0, Math.min(110.0, request.fov())));
+			client.options.fov().set(clampedFov);
+		}
+
+		return getCamera();
+	}
+
+	@Override
+	public WindowDto.Response getWindow() {
+		Minecraft client = Minecraft.getInstance();
+		Window w = client.getWindow();
+		return new WindowDto.Response(
+				w.getWidth(),
+				w.getHeight(),
+				w.getGuiScaledWidth(),
+				w.getGuiScaledHeight(),
+				w.getGuiScale(),
+				w.isFullscreen(),
+				client.isWindowActive()
+		);
+	}
+
+	@Override
+	public WindowDto.Response updateWindow(WindowDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		if (request.fullscreen() != null) {
+			if (request.fullscreen() != client.getWindow().isFullscreen()) {
+				client.getWindow().toggleFullScreen();
+				client.options.fullscreen().set(request.fullscreen());
+			}
+		}
+		return getWindow();
+	}
+
+	@Override
+	public DebugDto.Response getDebug() {
+		Minecraft client = Minecraft.getInstance();
+		List<String> left = List.of();
+		List<String> right = List.of();
+
+		if (client.gui != null && client.gui.getDebugOverlay() instanceof DebugScreenOverlayAccessor dbgAccessor) {
+			try {
+				if (client.level != null && client.getConnection() != null) {
+					left = dbgAccessor.invokeGetGameInformation();
+				}
+				right = dbgAccessor.invokeGetSystemInformation();
+			} catch (Exception ignored) {
+			}
+		}
+
+		boolean hitboxes = client.getEntityRenderDispatcher().shouldRenderHitBoxes();
+		boolean chunkBorders = false;
+		if (client.debugRenderer instanceof DebugRendererAccessor dra) {
+			chunkBorders = dra.getRenderChunkborder();
+		}
+
+		return new DebugDto.Response(left, right, hitboxes, chunkBorders);
+	}
+
+	@Override
+	public DebugDto.Response updateDebug(DebugDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		if (request.hitboxes() != null) {
+			client.getEntityRenderDispatcher().setRenderHitBoxes(request.hitboxes());
+		}
+		if (request.chunkBorders() != null) {
+			if (client.debugRenderer instanceof DebugRendererAccessor dra) {
+				dra.setRenderChunkborder(request.chunkBorders());
+			}
+		}
+		return getDebug();
+	}
+
+	@Override
+	public KeybindsDto.Response getKeybinds() {
+		Minecraft client = Minecraft.getInstance();
+		List<KeybindsDto.KeyMappingDetail> list = new ArrayList<>();
+		for (KeyMapping km : client.options.keyMappings) {
+			list.add(new KeybindsDto.KeyMappingDetail(
+					km.getName(),
+					km.getCategory(),
+					km.getTranslatedKeyMessage().getString(),
+					km.getDefaultKey().getName(),
+					km.isDefault(),
+					km.isUnbound()
+			));
+		}
+		return new KeybindsDto.Response(list.size(), list);
+	}
+
+	@Override
+	public KeybindsDto.Response updateKeybinds(KeybindsDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		if (Boolean.TRUE.equals(request.resetAll())) {
+			for (KeyMapping km : client.options.keyMappings) {
+				km.setKey(km.getDefaultKey());
+			}
+			KeyMapping.resetMapping();
+			client.options.save();
+		}
+
+		if (request.resetKeys() != null) {
+			for (String keyName : request.resetKeys()) {
+				for (KeyMapping km : client.options.keyMappings) {
+					if (km.getName().equalsIgnoreCase(keyName)) {
+						km.setKey(km.getDefaultKey());
+					}
+				}
+			}
+			KeyMapping.resetMapping();
+			client.options.save();
+		}
+
+		if (request.rebinds() != null) {
+			for (Map.Entry<String, String> entry : request.rebinds().entrySet()) {
+				for (KeyMapping km : client.options.keyMappings) {
+					if (km.getName().equalsIgnoreCase(entry.getKey())) {
+						if ("none".equalsIgnoreCase(entry.getValue()) || entry.getValue().isBlank()) {
+							km.setKey(InputConstants.UNKNOWN);
+						} else {
+							InputConstants.Key k = InputConstants.getKey(entry.getValue());
+							km.setKey(k);
+						}
+					}
+				}
+			}
+			KeyMapping.resetMapping();
+			client.options.save();
+		}
+
+		return getKeybinds();
+	}
+
+	@Override
+	public ResourcePacksDto.Response getResourcePacks() {
+		Minecraft client = Minecraft.getInstance();
+		PackRepository repo = client.getResourcePackRepository();
+		List<ResourcePacksDto.PackInfo> available = new ArrayList<>();
+		for (Pack pack : repo.getAvailablePacks()) {
+			available.add(new ResourcePacksDto.PackInfo(
+					pack.getId(),
+					TextSerializer.toPlainText(pack.getTitle()),
+					TextSerializer.toPlainText(pack.getDescription()),
+					pack.isRequired(),
+					pack.isFixedPosition(),
+					pack.getCompatibility().name()
+			));
+		}
+		List<String> enabled = new ArrayList<>(repo.getSelectedIds());
+		return new ResourcePacksDto.Response(available, enabled);
+	}
+
+	@Override
+	public ResourcePacksDto.Response updateResourcePacks(ResourcePacksDto.Request request) {
+		Minecraft client = Minecraft.getInstance();
+		PackRepository repo = client.getResourcePackRepository();
+		if (request.enabled() != null) {
+			repo.setSelected(request.enabled());
+			client.options.resourcePacks.clear();
+			client.options.resourcePacks.addAll(request.enabled());
+			client.options.save();
+		}
+		if (Boolean.TRUE.equals(request.reload()) || request.enabled() != null) {
+			client.reloadResourcePacks();
+		}
+		return getResourcePacks();
+	}
+
+	@Override
+	public StatsDto.Response getStats(String category) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+		StatsCounter statsCounter = client.player.getStats();
+		Object2IntMap<Stat<?>> map = ((StatsCounterAccessor) statsCounter).getStats();
+
+		Map<String, Integer> custom = new LinkedHashMap<>();
+		Map<String, Integer> mined = new LinkedHashMap<>();
+		Map<String, Integer> crafted = new LinkedHashMap<>();
+		Map<String, Integer> used = new LinkedHashMap<>();
+		Map<String, Integer> broken = new LinkedHashMap<>();
+		Map<String, Integer> killed = new LinkedHashMap<>();
+		Map<String, Integer> killedBy = new LinkedHashMap<>();
+
+		for (Object2IntMap.Entry<Stat<?>> entry : map.object2IntEntrySet()) {
+			Stat<?> stat = entry.getKey();
+			int val = entry.getIntValue();
+			if (stat.getType() == Stats.CUSTOM) {
+				custom.put(((ResourceLocation) stat.getValue()).toString(), val);
+			} else if (stat.getType() == Stats.BLOCK_MINED) {
+				mined.put(BuiltInRegistries.BLOCK.getKey((Block) stat.getValue()).toString(), val);
+			} else if (stat.getType() == Stats.ITEM_CRAFTED) {
+				crafted.put(BuiltInRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
+			} else if (stat.getType() == Stats.ITEM_USED) {
+				used.put(BuiltInRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
+			} else if (stat.getType() == Stats.ITEM_BROKEN) {
+				broken.put(BuiltInRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
+			} else if (stat.getType() == Stats.ENTITY_KILLED) {
+				killed.put(BuiltInRegistries.ENTITY_TYPE.getKey((EntityType<?>) stat.getValue()).toString(), val);
+			} else if (stat.getType() == Stats.ENTITY_KILLED_BY) {
+				killedBy.put(BuiltInRegistries.ENTITY_TYPE.getKey((EntityType<?>) stat.getValue()).toString(), val);
+			}
+		}
+
+		if (category != null && !category.isBlank()) {
+			String cat = category.toLowerCase().trim();
+			return switch (cat) {
+				case "custom" -> new StatsDto.Response(custom, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+				case "mined" -> new StatsDto.Response(Map.of(), mined, Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+				case "crafted" -> new StatsDto.Response(Map.of(), Map.of(), crafted, Map.of(), Map.of(), Map.of(), Map.of());
+				case "used" -> new StatsDto.Response(Map.of(), Map.of(), Map.of(), used, Map.of(), Map.of(), Map.of());
+				case "broken" -> new StatsDto.Response(Map.of(), Map.of(), Map.of(), Map.of(), broken, Map.of(), Map.of());
+				case "killed" -> new StatsDto.Response(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), killed, Map.of());
+				case "killed_by" -> new StatsDto.Response(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), killedBy);
+				default -> throw Problems.invalidParameter("category", "Must be one of: custom, mined, crafted, used, broken, killed, killed_by");
+			};
+		}
+
+		return new StatsDto.Response(custom, mined, crafted, used, broken, killed, killedBy);
+	}
+
+	@Override
+	public AdvancementsDto.Response getAdvancements(Boolean done, String search) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null || client.getConnection() == null) {
+			throw Problems.noPlayer();
+		}
+		ClientAdvancements clientAdvancements = client.getConnection().getAdvancements();
+		Map<AdvancementHolder, AdvancementProgress> progressMap = ((ClientAdvancementsAccessor) clientAdvancements).getProgress();
+
+		List<AdvancementsDto.AdvancementInfo> list = new ArrayList<>();
+		for (Map.Entry<AdvancementHolder, AdvancementProgress> entry : progressMap.entrySet()) {
+			AdvancementHolder holder = entry.getKey();
+			AdvancementProgress progress = entry.getValue();
+			String id = holder.id().toString();
+			Advancement adv = holder.value();
+
+			String title = id;
+			String desc = "";
+			String type = "task";
+			String icon = "";
+			if (adv.display().isPresent()) {
+				DisplayInfo d = adv.display().get();
+				title = TextSerializer.toPlainText(d.getTitle());
+				desc = TextSerializer.toPlainText(d.getDescription());
+				type = d.getType().name().toLowerCase();
+				icon = BuiltInRegistries.ITEM.getKey(d.getIcon().getItem()).toString();
+			}
+
+			String parent = adv.parent().map(ResourceLocation::toString).orElse(null);
+			boolean isDone = progress.isDone();
+			float percent = progress.getPercent();
+
+			List<String> completedCriteria = new ArrayList<>();
+			for (String c : progress.getCompletedCriteria()) {
+				completedCriteria.add(c);
+			}
+			List<String> remainingCriteria = new ArrayList<>();
+			for (String c : progress.getRemainingCriteria()) {
+				remainingCriteria.add(c);
+			}
+
+			if (done != null && isDone != done) {
+				continue;
+			}
+			if (search != null && !search.isBlank()) {
+				String term = search.toLowerCase();
+				if (!id.toLowerCase().contains(term) && !title.toLowerCase().contains(term)) {
+					continue;
+				}
+			}
+
+			list.add(new AdvancementsDto.AdvancementInfo(
+					id, title, desc, type, icon, parent, isDone, percent, completedCriteria, remainingCriteria
+			));
+		}
+
+		int completed = (int) list.stream().filter(AdvancementsDto.AdvancementInfo::done).count();
+		return new AdvancementsDto.Response(list.size(), completed, list);
+	}
+
+	@Override
+	public RecipesDto.Response getRecipes(Boolean craftable, String category, String search) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+		ClientRecipeBook recipeBook = client.player.getRecipeBook();
+		ContextMap context = client.level != null ? SlotDisplayContext.fromLevel(client.level) : null;
+
+		List<RecipesDto.RecipeInfo> list = new ArrayList<>();
+		for (RecipeCollection collection : recipeBook.getCollections()) {
+			for (RecipeDisplayEntry entry : collection.getRecipes()) {
+				int id = entry.id().index();
+				String cat = BuiltInRegistries.RECIPE_BOOK_CATEGORY.getKey(entry.category()).toString();
+				RecipeDisplay display = entry.display();
+				ItemStack resultStack = context != null ? display.result().resolveForFirstStack(context) : ItemStack.EMPTY;
+				String resultId = resultStack.isEmpty() ? "" : BuiltInRegistries.ITEM.getKey(resultStack.getItem()).toString();
+				int resultCount = resultStack.getCount();
+				boolean isCraftable = collection.isCraftable(entry.id());
+
+				List<String> ingredients = extractRecipeIngredients(display, context);
+
+				if (craftable != null && isCraftable != craftable) {
+					continue;
+				}
+				if (category != null && !category.isBlank()) {
+					if (!cat.equalsIgnoreCase(category.trim()) && !cat.endsWith(":" + category.trim())) {
+						continue;
+					}
+				}
+				if (search != null && !search.isBlank()) {
+					String term = search.toLowerCase();
+					if (!resultId.toLowerCase().contains(term)) {
+						continue;
+					}
+				}
+
+				list.add(new RecipesDto.RecipeInfo(
+						id,
+						cat,
+						new RecipesDto.ResultItem(resultId, resultCount),
+						isCraftable,
+						ingredients
+				));
+			}
+		}
+
+		return new RecipesDto.Response(list.size(), list);
+	}
+
+	private List<String> extractRecipeIngredients(RecipeDisplay display, ContextMap context) {
+		if (context == null) return List.of();
+		List<String> ingredients = new ArrayList<>();
+		if (display instanceof ShapedCraftingRecipeDisplay shaped) {
+			for (SlotDisplay sd : shaped.ingredients()) {
+				ItemStack is = sd.resolveForFirstStack(context);
+				if (!is.isEmpty()) {
+					ingredients.add(BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
+				}
+			}
+		} else if (display instanceof ShapelessCraftingRecipeDisplay shapeless) {
+			for (SlotDisplay sd : shapeless.ingredients()) {
+				ItemStack is = sd.resolveForFirstStack(context);
+				if (!is.isEmpty()) {
+					ingredients.add(BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
+				}
+			}
+		} else if (display instanceof FurnaceRecipeDisplay furnace) {
+			ItemStack is = furnace.ingredient().resolveForFirstStack(context);
+			if (!is.isEmpty()) {
+				ingredients.add(BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
+			}
+		} else if (display instanceof StonecutterRecipeDisplay stonecutter) {
+			ItemStack is = stonecutter.input().resolveForFirstStack(context);
+			if (!is.isEmpty()) {
+				ingredients.add(BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
+			}
+		} else if (display instanceof SmithingRecipeDisplay smithing) {
+			ItemStack b = smithing.base().resolveForFirstStack(context);
+			if (!b.isEmpty()) {
+				ingredients.add(BuiltInRegistries.ITEM.getKey(b.getItem()).toString());
+			}
+			ItemStack a = smithing.addition().resolveForFirstStack(context);
+			if (!a.isEmpty()) {
+				ingredients.add(BuiltInRegistries.ITEM.getKey(a.getItem()).toString());
+			}
+		}
+		return ingredients;
+	}
+
+	@Override
+	public RecipesDto.PlaceResponse placeRecipe(RecipesDto.PlaceRequest request) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			throw Problems.noPlayer();
+		}
+		if (!(client.screen instanceof AbstractContainerScreen<?> containerScreen)) {
+			throw Problems.noContainer();
+		}
+		int containerId = containerScreen.getMenu().containerId;
+		boolean max = Boolean.TRUE.equals(request.useMaxItems());
+		if (client.gameMode != null) {
+			client.gameMode.handlePlaceRecipe(containerId, new RecipeDisplayId(request.recipeId()), max);
+		}
+		return new RecipesDto.PlaceResponse(true, request.recipeId(), containerId);
+	}
+
+	// --- Phase 4: Session, Worlds, Servers ---
+
+	@Override
+	public SessionDto.Response getSession() {
+		Minecraft client = Minecraft.getInstance();
+		String state = "menu";
+		if (client.level != null) {
+			state = client.isLocalServer() ? "singleplayer" : "multiplayer";
+		}
+		boolean paused = client.isPaused();
+		boolean lan = client.hasSingleplayerServer() && client.getSingleplayerServer().isPublished();
+		Integer lanPort = lan ? client.getSingleplayerServer().getPort() : null;
+		String serverAddr = client.getCurrentServer() != null ? client.getCurrentServer().ip : null;
+		String serverName = client.getCurrentServer() != null ? client.getCurrentServer().name : null;
+		String worldName = client.hasSingleplayerServer() ? client.getSingleplayerServer().getWorldData().getLevelName() : null;
+
+		return new SessionDto.Response(state, paused, lan, lanPort, serverAddr, serverName, worldName);
+	}
+
+	@Override
+	public SessionDto.Response setSessionPaused(Boolean paused) {
+		Minecraft client = Minecraft.getInstance();
+		if (Boolean.TRUE.equals(paused)) {
+			client.pauseGame(false);
+		} else if (Boolean.FALSE.equals(paused)) {
+			if (client.screen instanceof PauseScreen) {
+				client.setScreen(null);
+			}
+		}
+		return getSession();
+	}
+
+	@Override
+	public SessionDto.DisconnectResponse disconnectSession() {
+		Minecraft client = Minecraft.getInstance();
+		if (client.level != null) {
+			CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS).execute(() -> {
+				client.execute(() -> {
+					if (client.level != null) {
+						boolean isLocal = client.isLocalServer();
+						client.level.disconnect();
+						if (isLocal) {
+							client.disconnect(new GenericMessageScreen(net.minecraft.network.chat.Component.translatable("menu.savingLevel")));
+							client.setScreen(new TitleScreen());
+						} else {
+							client.disconnect();
+							client.setScreen(new TitleScreen());
+						}
+					}
+				});
+			});
+		}
+		return new SessionDto.DisconnectResponse(true);
+	}
+
+	@Override
+	public SessionDto.LanResponse openSessionToLan(SessionDto.LanRequest request) {
+		Minecraft client = Minecraft.getInstance();
+		if (!client.hasSingleplayerServer()) {
+			throw Problems.noWorld();
+		}
+		int port = (request != null && request.port() != null && request.port() > 0) ? request.port() : HttpUtil.getAvailablePort();
+		GameType mode = GameType.SURVIVAL;
+		if (request != null && request.gameMode() != null) {
+			String m = request.gameMode().trim().toLowerCase();
+			mode = switch (m) {
+				case "creative" -> GameType.CREATIVE;
+				case "spectator" -> GameType.SPECTATOR;
+				case "adventure" -> GameType.ADVENTURE;
+				default -> GameType.SURVIVAL;
+			};
+		}
+		boolean commands = request != null && Boolean.TRUE.equals(request.allowCommands());
+		boolean published = client.getSingleplayerServer().publishServer(mode, commands, port);
+		return new SessionDto.LanResponse(published, port);
+	}
+
+	@Override
+	public WorldsDto.ListResponse getWorlds() {
+		Minecraft client = Minecraft.getInstance();
+		LevelStorageSource levelSource = client.getLevelSource();
+		List<WorldsDto.WorldSummaryInfo> list = new ArrayList<>();
+		try {
+			LevelStorageSource.LevelCandidates candidates = levelSource.findLevelCandidates();
+			List<LevelSummary> summaries = levelSource.loadLevelSummaries(candidates).join();
+			for (LevelSummary s : summaries) {
+				list.add(new WorldsDto.WorldSummaryInfo(
+						s.getLevelId(),
+						s.getLevelName(),
+						s.getLastPlayed(),
+						s.getGameMode().getName(),
+						s.isHardcore(),
+						s.hasCommands(),
+						s.getWorldVersionName().getString(),
+						s.isLocked()
+				));
+			}
+		} catch (Exception e) {
+			// Return whatever was collected
+		}
+		return new WorldsDto.ListResponse(list.size(), list);
+	}
+
+	@Override
+	public WorldsDto.LoadResponse loadWorld(String levelId) {
+		Minecraft client = Minecraft.getInstance();
+		CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS).execute(() -> {
+			client.execute(() -> client.createWorldOpenFlows().openWorld(levelId, () -> {}));
+		});
+		return new WorldsDto.LoadResponse(true, levelId);
+	}
+
+	@Override
+	public WorldsDto.DeleteResponse deleteWorld(String levelId) {
+		Minecraft client = Minecraft.getInstance();
+		try (LevelStorageSource.LevelStorageAccess access = client.getLevelSource().createAccess(levelId)) {
+			access.deleteLevel();
+		} catch (Exception e) {
+			throw Problems.internal("Failed to delete world: " + e.getMessage());
+		}
+		return new WorldsDto.DeleteResponse(true, levelId);
+	}
+
+	@Override
+	public ServersDto.ListResponse getServers() {
+		Minecraft client = Minecraft.getInstance();
+		ServerList serverList = new ServerList(client);
+		serverList.load();
+		List<ServersDto.ServerEntryInfo> list = new ArrayList<>();
+		for (int i = 0; i < serverList.size(); i++) {
+			ServerData sd = serverList.get(i);
+			String motd = sd.motd != null ? sd.motd.getString() : "";
+			String count = sd.players != null ? sd.players.online() + "/" + sd.players.max() : "0/0";
+			list.add(new ServersDto.ServerEntryInfo(i, sd.name, sd.ip, sd.ping, motd, count));
+		}
+		return new ServersDto.ListResponse(list.size(), list);
+	}
+
+	@Override
+	public ServersDto.ListResponse addServer(ServersDto.AddRequest request) {
+		Minecraft client = Minecraft.getInstance();
+		if (request.name() == null || request.address() == null) {
+			throw Problems.invalidParameter("name/address", "Server name and address are required");
+		}
+		ServerList serverList = new ServerList(client);
+		serverList.load();
+		ServerData sd = new ServerData(request.name(), request.address(), ServerData.Type.OTHER);
+		serverList.add(sd, false);
+		serverList.save();
+		return getServers();
+	}
+
+	@Override
+	public ServersDto.ListResponse updateServer(int index, ServersDto.UpdateRequest request) {
+		Minecraft client = Minecraft.getInstance();
+		ServerList serverList = new ServerList(client);
+		serverList.load();
+		if (index < 0 || index >= serverList.size()) {
+			throw Problems.notFound("Server not found at index " + index);
+		}
+		ServerData sd = serverList.get(index);
+		if (request.name() != null) sd.name = request.name();
+		if (request.address() != null) sd.ip = request.address();
+		serverList.save();
+		return getServers();
+	}
+
+	@Override
+	public ServersDto.DeleteResponse deleteServer(int index) {
+		Minecraft client = Minecraft.getInstance();
+		ServerList serverList = new ServerList(client);
+		serverList.load();
+		if (index < 0 || index >= serverList.size()) {
+			throw Problems.notFound("Server not found at index " + index);
+		}
+		ServerData sd = serverList.get(index);
+		serverList.remove(sd);
+		serverList.save();
+		return new ServersDto.DeleteResponse(true, index);
+	}
+
+	@Override
+	public ServersDto.ConnectResponse connectServer(String address) {
+		Minecraft client = Minecraft.getInstance();
+		if (address == null || address.isBlank()) {
+			throw Problems.invalidParameter("address", "Server address must not be empty");
+		}
+		ServerAddress sa = ServerAddress.parseString(address);
+		ServerData sd = new ServerData("Server", address, ServerData.Type.OTHER);
+		CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS).execute(() -> {
+			client.execute(() -> ConnectScreen.startConnecting(new TitleScreen(), client, sa, sd, false, null));
+		});
+		return new ServersDto.ConnectResponse(true, address);
 	}
 }
 

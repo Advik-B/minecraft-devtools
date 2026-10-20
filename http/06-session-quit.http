@@ -16,3 +16,101 @@ Content-Type: application/json
 {
   "confirmToken": "PASTE_CONFIRM_TOKEN_HERE"
 }
+
+### 3. Read current session state
+GET {{baseUrl}}/v1/session
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 4. Pause session
+POST {{baseUrl}}/v1/session/pause
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "paused": true
+}
+
+### 5. Disconnect from world or server
+POST {{baseUrl}}/v1/session/disconnect
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 6. Open singleplayer to LAN
+POST {{baseUrl}}/v1/session/lan
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "port": 25565,
+  "gameMode": "survival",
+  "allowCommands": false
+}
+
+### 7. List saved singleplayer worlds
+GET {{baseUrl}}/v1/worlds
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 8. Load singleplayer world
+POST {{baseUrl}}/v1/worlds/New%20World/load
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 9. Delete world: Step 1 (request confirm token)
+DELETE {{baseUrl}}/v1/worlds/WorldToDelete
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 10. Delete world: Step 2 (confirm deletion)
+POST {{baseUrl}}/v1/worlds/WorldToDelete/delete/confirm
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "confirmToken": "PASTE_TOKEN_HERE"
+}
+
+### 11. List saved multiplayer servers
+GET {{baseUrl}}/v1/servers
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 12. Add multiplayer server
+POST {{baseUrl}}/v1/servers
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "name": "Hypixel",
+  "address": "mc.hypixel.net"
+}
+
+### 13. Connect to multiplayer server
+POST {{baseUrl}}/v1/servers/connect
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "address": "127.0.0.1:25565"
+}
+
+### 14. Delete server: Step 1 (request confirm token)
+DELETE {{baseUrl}}/v1/servers/0
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 15. Delete server: Step 2 (confirm removal)
+POST {{baseUrl}}/v1/servers/0/delete/confirm
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "confirmToken": "PASTE_TOKEN_HERE"
+}

@@ -80,15 +80,7 @@ public final class McpResourceRegistry {
 				case URI_SCREEN -> payload = gameClient.getScreen();
 				case URI_WORLD -> payload = gameClient.getWorld();
 				case URI_PLAYER_SKIN -> payload = gameClient.getPlayerSkinInfo(null, false);
-				case URI_HUD -> {
-					ClientDto client = gameClient.getClient();
-					ChatDto.HistoryResponse chat = gameClient.getChatHistory(0, 10);
-					Map<String, Object> hud = new LinkedHashMap<>();
-					hud.put("screen", client.screen());
-					hud.put("connectionState", client.connectionState());
-					hud.put("recentChat", chat.messages());
-					payload = hud;
-				}
+				case URI_HUD -> payload = gameClient.getHud(null);
 				default -> throw new IllegalArgumentException("Unknown resource URI: " + uri);
 			}
 			return Json.MAPPER.valueToTree(payload);

@@ -101,6 +101,12 @@ public final class McpToolRegistry {
 			));
 
 			list.add(new ToolDefinition(
+					"view_blocks",
+					"Cast a grid of rays through the camera view frustum to compute visible blocks, their distance, faces, and screen coverage percentage. With 'summaryOnly': true, returns a lightweight summary of visible block counts and nearest blocks. Essential for non-vision agents to understand the surroundings.",
+					viewBlocksSchema()
+			));
+
+			list.add(new ToolDefinition(
 					"job_status",
 					"Query the status and execution state of a background job (such as a Baritone task or timed movement) by job_id.",
 					jobStatusSchema()
@@ -223,6 +229,7 @@ public final class McpToolRegistry {
 				case "get_player_skin" -> executeGetPlayerSkin(args, timeoutMs);
 				case "get_game_textures" -> executeGetGameTextures(args, timeoutMs);
 				case "job_status" -> executeJobStatus(args);
+				case "view_blocks" -> executeViewBlocks(args, timeoutMs);
 				case "inspect" -> executeInspect(args, timeoutMs);
 				case "rest_call" -> executeRestCall(args);
 				case "look" -> executeLook(args, timeoutMs);
@@ -244,7 +251,7 @@ public final class McpToolRegistry {
 
 	private Permission requiredPermissionForTool(String name) {
 		return switch (name) {
-			case "get_state", "screenshot", "raycast", "job_status", "inspect", "get_player_skin", "get_game_textures" -> Permission.READ;
+			case "get_state", "screenshot", "raycast", "job_status", "inspect", "get_player_skin", "get_game_textures", "view_blocks" -> Permission.READ;
 			case "rest_call" -> Permission.READ; // Target method checked in handler
 			case "look", "move", "interact", "inventory_click", "screen_action", "chat",
 					"baritone_goto", "baritone_mine", "baritone_follow", "baritone_cancel" -> Permission.ACT;
@@ -321,6 +328,32 @@ public final class McpToolRegistry {
 			return Json.MAPPER.valueToTree(response);
 		}, timeoutMs).thenApply(r -> ToolCallResult.text(r.body().toPrettyString()))
 				.exceptionally(ex -> ToolCallResult.error("Raycast failed: " + ex.getMessage()));
+	}
+
+	private CompletableFuture<ToolCallResult> executeViewBlocks(JsonNode args, long timeoutMs) {
+		boolean summaryOnly = args.has("summaryOnly") && args.get("summaryOnly").asBoolean(false);
+		Double maxDist = args.has("maxDistance") ? args.get("maxDistance").asDouble() : null;
+
+		if (summaryOnly) {
+			return queue.submit(() -> {
+				ViewBlocksDto.SummaryResponse response = gameClient.getViewBlocksSummary(maxDist);
+				return Json.MAPPER.valueToTree(response);
+			}, timeoutMs).thenApply(r -> ToolCallResult.text(r.body().toPrettyString()))
+					.exceptionally(ex -> ToolCallResult.error("View blocks summary failed: " + ex.getMessage()));
+		}
+
+		String res = args.has("res") ? args.get("res").asText("128x72") : "128x72";
+		Boolean fluids = !args.has("fluids") || args.get("fluids").asBoolean(true);
+		Boolean passThrough = !args.has("passThrough") || args.get("passThrough").asBoolean(true);
+		Boolean entities = args.has("entities") && args.get("entities").asBoolean(false);
+		Boolean grid = args.has("grid") && args.get("grid").asBoolean(false);
+		Double minCoverage = args.has("minCoverage") ? args.get("minCoverage").asDouble(0.0) : 0.0;
+
+		return queue.submit(() -> {
+			ViewBlocksDto.Response response = gameClient.getViewBlocks(res, maxDist, fluids, passThrough, entities, grid, minCoverage);
+			return Json.MAPPER.valueToTree(response);
+		}, timeoutMs).thenApply(r -> ToolCallResult.text(r.body().toPrettyString()))
+				.exceptionally(ex -> ToolCallResult.error("View blocks failed: " + ex.getMessage()));
 	}
 
 	private CompletableFuture<ToolCallResult> executeGetPlayerSkin(JsonNode args, long timeoutMs) {
@@ -781,6 +814,21 @@ public final class McpToolRegistry {
 		ObjectNode props = schema.putObject("properties");
 		props.putObject("id").put("type", "string").put("description", "Atlas identifier or alias ('blocks', 'particles', 'gui'). Defaults to 'blocks'");
 		props.putObject("embed_image").put("type", "boolean").put("description", "Whether to return the stitched atlas PNG image block");
+		return schema;
+	}
+
+	private static JsonNode viewBlocksSchema() {
+		ObjectNode schema = Json.MAPPER.createObjectNode();
+		schema.put("type", "object");
+		ObjectNode props = schema.putObject("properties");
+		props.putObject("res").put("type", "string").put("description", "Ray grid size (e.g. '128x72', up to '512x288'). Defaults to '128x72'.");
+		props.putObject("maxDistance").put("type", "number").put("description", "Maximum distance in blocks to trace rays (default 64).");
+		props.putObject("fluids").put("type", "boolean").put("description", "Whether to detect fluid surfaces (default true).");
+		props.putObject("passThrough").put("type", "boolean").put("description", "Whether rays pass through transparent/non-occluding blocks (default true).");
+		props.putObject("entities").put("type", "boolean").put("description", "Whether to detect entities (default false).");
+		props.putObject("grid").put("type", "boolean").put("description", "Whether to include 2D labels and depth array grids (default false).");
+		props.putObject("minCoverage").put("type", "number").put("description", "Minimum screen coverage fraction (e.g. 0.01) to include a block type (default 0.0).");
+		props.putObject("summaryOnly").put("type", "boolean").put("description", "If true, returns a lightweight summary of visible block counts and nearest blocks instead of full raycast grid (default false).");
 		return schema;
 	}
 }

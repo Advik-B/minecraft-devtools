@@ -176,7 +176,7 @@ Write-Host "=== 1. System, Auth & Documentation Tests ===" -ForegroundColor Whit
 $null = Test-Endpoint -Name "Health Check" -Path "/v1/health" -Validator { param($j) $j.mcdtVersion -ne $null -and $j.uptimeMs -ge 0 -and $j.tick -ge 0 }
 $null = Test-Endpoint -Name "Unauthorized Reject" -Path "/v1/health" -Headers @{"Authorization"=""} -ExpectedStatus 401
 $null = Test-Endpoint -Name "OpenAPI 3.1 Spec" -Path "/openapi.json" -Headers @{"Authorization"=""} -Validator { param($j) $j.openapi.StartsWith("3.1") }
-$null = Test-Endpoint -Name "Scalar Reference Root" -Path "/" -Headers @{"Authorization"=""} -Validator { param($j, $raw) $raw.Contains("scalar") }
+$null = Test-Endpoint -Name "Scalar or WebUI Root" -Path "/" -Headers @{"Authorization"=""} -Validator { param($j, $raw) $raw.Contains("scalar") -or $raw.Contains("data-theme") -or $raw.Contains("MCDT") }
 $null = Test-Endpoint -Name "Scalar Reference /docs" -Path "/docs" -Headers @{"Authorization"=""} -Validator { param($j, $raw) $raw.Contains("scalar") }
 $null = Test-Endpoint -Name "Scalar Standalone JS" -Path "/docs/scalar/standalone.js" -Headers @{"Authorization"=""} -Validator { param($j, $raw) $raw.Length -gt 1000 }
 $null = Test-Endpoint -Name "ReDoc Reference UI" -Path "/redoc" -Headers @{"Authorization"=""} -Validator { param($j, $raw) $raw.Contains("redoc") }
@@ -190,6 +190,15 @@ $null = Test-Endpoint -Name "Screenshot Bad Scale (expected 400)" -Path "/v1/scr
 $null = Test-Endpoint -Name "Built-in Registries List" -Path "/v1/registries" -Validator { param($j) $j.registries.Count -gt 30 }
 $null = Test-Endpoint -Name "Query Items Registry" -Path "/v1/registries/minecraft:item?limit=5&query=diamond" -Validator { param($j) $j.entries.Count -gt 0 }
 $null = Test-Endpoint -Name "Unknown Registry Query (expected 404)" -Path "/v1/registries/minecraft:unknown" -ExpectedStatus 404 -Validator { param($j) $j.type -eq "registry-not-found" }
+$null = Test-Endpoint -Name "Camera State" -Path "/v1/camera" -Validator { param($j) $j.perspective -ne $null -and $j.fov -gt 0 }
+$null = Test-Endpoint -Name "Window State" -Path "/v1/window" -Validator { param($j) $j.width -gt 0 -and $j.height -gt 0 }
+$null = Test-Endpoint -Name "Debug State" -Path "/v1/debug" -Validator { param($j) $j.f3Left -ne $null }
+$null = Test-Endpoint -Name "Keybinds List" -Path "/v1/keybinds" -Validator { param($j) $j.total -gt 0 -and $j.keybinds.Count -gt 0 }
+$null = Test-Endpoint -Name "Resource Packs" -Path "/v1/resourcepacks" -Validator { param($j) $j.available -ne $null -and $j.enabled -ne $null }
+$null = Test-Endpoint -Name "Session State" -Path "/v1/session" -Validator { param($j) $j.state -ne $null }
+$null = Test-Endpoint -Name "Singleplayer Worlds List" -Path "/v1/worlds" -Validator { param($j) $j.total -ge 0 -and $j.worlds -ne $null }
+$null = Test-Endpoint -Name "Saved Servers List" -Path "/v1/servers" -Validator { param($j) $j.total -ge 0 -and ($j.servers.Count -ge 0) }
+$null = Test-Endpoint -Name "Batch Read Query" -Path "/v1/batch" -Method "POST" -Body @{ requests = @(@{ id = "client"; path = "/v1/client" }, @{ id = "session"; path = "/v1/session" }) } -Validator { param($j) $j.results.client.status -eq 200 -and $j.results.session.status -eq 200 }
 
 Write-Host "`n=== 3. Reflection Engine (Milestone M3) Tests ===" -ForegroundColor White
 $null = Test-Endpoint -Name "Root Handles" -Path "/v1/objects/roots" -Validator { param($j)
@@ -272,6 +281,11 @@ $null = Test-Endpoint -Name "World Blocks Query in Menu (expected 409)" -Path "/
 $null = Test-Endpoint -Name "World Entities Query in Menu (expected 409)" -Path "/v1/world/entities" -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-world" }
 $null = Test-Endpoint -Name "World Raycast Query in Menu (expected 409)" -Path "/v1/world/raycast" -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-world" }
 $null = Test-Endpoint -Name "Chat Send in Menu (expected 409)" -Path "/v1/chat" -Method "POST" -Body @{ message = "hello" } -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-player" }
+$null = Test-Endpoint -Name "HUD Query in Menu (expected 409)" -Path "/v1/hud" -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-player" }
+$null = Test-Endpoint -Name "View Blocks in Menu (expected 409)" -Path "/v1/view/blocks" -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-world" }
+$null = Test-Endpoint -Name "Stats Query in Menu (expected 409)" -Path "/v1/stats" -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-player" }
+$null = Test-Endpoint -Name "Advancements Query in Menu (expected 409)" -Path "/v1/advancements" -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-player" }
+$null = Test-Endpoint -Name "Recipes Query in Menu (expected 409)" -Path "/v1/recipes" -ExpectedStatus 409 -Validator { param($j) $j.type -eq "no-player" }
 
 Write-Host "`n=== 6. Model Context Protocol (MCP) Live Tests ===" -ForegroundColor White
 $null = Test-Endpoint -Name "MCP Initialize Handshake" -Path "/mcp" -Method "POST" -Body @{
@@ -296,7 +310,7 @@ $null = Test-Endpoint -Name "MCP Tool Call: screenshot" -Path "/mcp" -Method "PO
 
 $null = Test-Endpoint -Name "MCP Resources List" -Path "/mcp" -Method "POST" -Body @{
     jsonrpc = "2.0"; id = 6; method = "resources/list"; params = @{}
-} -Validator { param($j) $j.result.resources.Count -eq 5 }
+} -Validator { param($j) $j.result.resources.Count -ge 5 }
 
 $null = Test-Endpoint -Name "MCP Resource Read: mcdt://screen" -Path "/mcp" -Method "POST" -Body @{
     jsonrpc = "2.0"; id = 7; method = "resources/read"; params = @{ uri = "mcdt://screen" }

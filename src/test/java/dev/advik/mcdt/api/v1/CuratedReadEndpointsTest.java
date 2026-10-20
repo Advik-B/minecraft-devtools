@@ -509,4 +509,270 @@ class CuratedReadEndpointsTest {
 		assertEquals(409, rayRes.statusCode());
 		assertTrue(rayRes.body().contains("no-world"));
 	}
+
+	@Test
+	void getViewBlocksSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/view/blocks?res=128x72&grid=true");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("palette"));
+		assertTrue(res.body().contains("minecraft:stone"));
+		assertTrue(res.body().contains("labels"));
+		assertTrue(res.body().contains("depth"));
+		assertNotNull(res.headers().firstValue("X-MCDT-Tick").orElse(null));
+	}
+
+	@Test
+	void getViewBlocksSummarySuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/view/blocks/summary");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("counts"));
+		assertTrue(res.body().contains("nearest"));
+		assertTrue(res.body().contains("crosshair"));
+	}
+
+	@Test
+	void getViewBlocksFailsWhenDisabled() throws Exception {
+		config.enableViewBlocks = false;
+		clock.advance();
+		HttpResponse<String> res = get("/v1/view/blocks");
+		assertEquals(403, res.statusCode());
+		assertTrue(res.body().contains("view-blocks-disabled"));
+	}
+
+	@Test
+	void getHudSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/hud");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("Action bar test text"));
+		assertTrue(res.body().contains("bossBars"));
+		assertTrue(res.body().contains("scoreboard"));
+		assertTrue(res.body().contains("tabList"));
+	}
+
+	@Test
+	void postBatchSuccess() throws Exception {
+		clock.advance();
+		String batchReq = """
+				{
+				  "requests": [
+				    { "id": "p", "path": "/v1/player" },
+				    { "id": "w", "path": "/v1/world" },
+				    { "id": "h", "path": "/v1/hud" }
+				  ]
+				}
+				""";
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/v1/batch"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.header("Authorization", "Bearer " + token.value())
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(batchReq))
+				.build();
+
+		var asyncRes = httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString());
+		long deadline = System.currentTimeMillis() + 5000;
+		while (!asyncRes.isDone() && System.currentTimeMillis() < deadline) {
+			queue.drain(TimeUnit.MILLISECONDS.toNanos(100));
+			if (!asyncRes.isDone()) Thread.sleep(10);
+		}
+
+		assertTrue(asyncRes.isDone());
+		HttpResponse<String> res = asyncRes.get();
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("\"p\":{\"status\":200"));
+		assertTrue(res.body().contains("\"w\":{\"status\":200"));
+		assertTrue(res.body().contains("\"h\":{\"status\":200"));
+	}
+
+	@Test
+	void postBatchRejectsWrites() throws Exception {
+		clock.advance();
+		String batchReq = """
+				{
+				  "requests": [
+				    { "id": "p", "path": "/v1/player" },
+				    { "id": "act", "path": "/v1/input/keys" }
+				  ]
+				}
+				""";
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/v1/batch"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.header("Authorization", "Bearer " + token.value())
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(batchReq))
+				.build();
+
+		HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(400, res.statusCode());
+		assertTrue(res.body().contains("only permits read operations"));
+	}
+
+	@Test
+	void postBatchEnforcesSizeLimit() throws Exception {
+		clock.advance();
+		StringBuilder sb = new StringBuilder("{\"requests\":[");
+		for (int i = 0; i < 33; i++) {
+			if (i > 0) sb.append(",");
+			sb.append("{\"id\":\"req").append(i).append("\",\"path\":\"/v1/player\"}");
+		}
+		sb.append("]}");
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/v1/batch"))
+				.header("Host", "127.0.0.1:" + server.port())
+				.header("Authorization", "Bearer " + token.value())
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(sb.toString()))
+				.build();
+
+		HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(400, res.statusCode());
+		assertTrue(res.body().contains("batch-limit-exceeded"));
+	}
+
+	@Test
+	void getCameraSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/camera");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("first_person"));
+		assertTrue(res.body().contains("fov"));
+		assertTrue(res.body().contains("eyePosition"));
+	}
+
+	@Test
+	void getWindowSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/window");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("width"));
+		assertTrue(res.body().contains("height"));
+		assertTrue(res.body().contains("guiScale"));
+	}
+
+	@Test
+	void getDebugSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/debug");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("f3Left"));
+		assertTrue(res.body().contains("f3Right"));
+		assertTrue(res.body().contains("hitboxes"));
+		assertTrue(res.body().contains("chunkBorders"));
+	}
+
+	@Test
+	void getKeybindsSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/keybinds");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("key.forward"));
+		assertTrue(res.body().contains("boundKey"));
+	}
+
+	@Test
+	void getResourcePacksSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/resourcepacks");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("available"));
+		assertTrue(res.body().contains("enabled"));
+		assertTrue(res.body().contains("vanilla"));
+	}
+
+	@Test
+	void getStatsSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/stats");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("minecraft:jump"));
+		assertTrue(res.body().contains("mined"));
+		assertTrue(res.body().contains("minecraft:iron_ore"));
+	}
+
+	@Test
+	void getStatsWithCategory() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/stats?category=mined");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("minecraft:iron_ore"));
+	}
+
+	@Test
+	void getStatsInvalidCategory() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/stats?category=invalid_category");
+		assertEquals(400, res.statusCode());
+		assertTrue(res.body().contains("invalid-parameter"));
+	}
+
+	@Test
+	void getAdvancementsSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/advancements");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("minecraft:story/root"));
+		assertTrue(res.body().contains("total"));
+		assertTrue(res.body().contains("completed"));
+	}
+
+	@Test
+	void getAdvancementsFilter() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/advancements?done=true");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("minecraft:story/root"));
+		assertFalse(res.body().contains("minecraft:story/mine_stone"));
+	}
+
+	@Test
+	void getRecipesSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/recipes");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("minecraft:iron_pickaxe"));
+		assertTrue(res.body().contains("crafting"));
+	}
+
+	@Test
+	void getRecipesFilter() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/recipes?category=crafting");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("minecraft:iron_pickaxe"));
+		assertFalse(res.body().contains("minecraft:raw_iron"));
+	}
+
+	@Test
+	void getSessionSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/session");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("state"));
+		assertTrue(res.body().contains("paused"));
+	}
+
+	@Test
+	void getWorldsSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/worlds");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("New World"));
+		assertTrue(res.body().contains("survival"));
+	}
+
+	@Test
+	void getServersSuccess() throws Exception {
+		clock.advance();
+		HttpResponse<String> res = get("/v1/servers");
+		assertEquals(200, res.statusCode());
+		assertTrue(res.body().contains("Local Server"));
+		assertTrue(res.body().contains("127.0.0.1:25565"));
+	}
 }

@@ -142,11 +142,15 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/player/inventory", new InventoryHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/player/skin", new PlayerSkinHandlers.ImageHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/player/skin/info", new PlayerSkinHandlers.InfoHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/hud", new HudHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world", new WorldHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/blocks", new BlocksHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/entities", new EntitiesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/entities/categories", new EntityCategoriesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/raycast", new RaycastHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/view/blocks", new ViewBlocksHandlers.ViewHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/view/blocks/summary", new ViewBlocksHandlers.SummaryHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.post("/v1/batch", new BatchHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/screen", new ScreenHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/registries", new RegistriesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/registries/{registry}", new RegistryEntriesHandler(config, queue, gameClient), McdtRole.READ);
@@ -155,12 +159,66 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/options", optionsHandler, McdtRole.READ);
 			cfg.routes.patch("/v1/options", optionsHandler, McdtRole.ACT);
 
+			CameraHandler cameraHandler = new CameraHandler(config, queue, gameClient);
+			cfg.routes.get("/v1/camera", cameraHandler::get, McdtRole.READ);
+			cfg.routes.post("/v1/camera", cameraHandler::update, McdtRole.ACT);
+			cfg.routes.patch("/v1/camera", cameraHandler::update, McdtRole.ACT);
+
+			WindowHandler windowHandler = new WindowHandler(config, queue, gameClient);
+			cfg.routes.get("/v1/window", windowHandler::get, McdtRole.READ);
+			cfg.routes.post("/v1/window", windowHandler::update, McdtRole.ACT);
+			cfg.routes.patch("/v1/window", windowHandler::update, McdtRole.ACT);
+
+			DebugHandler debugHandler = new DebugHandler(config, queue, gameClient);
+			cfg.routes.get("/v1/debug", debugHandler::get, McdtRole.READ);
+			cfg.routes.post("/v1/debug", debugHandler::update, McdtRole.ACT);
+			cfg.routes.patch("/v1/debug", debugHandler::update, McdtRole.ACT);
+
+			KeybindsHandler keybindsHandler = new KeybindsHandler(config, queue, gameClient);
+			cfg.routes.get("/v1/keybinds", keybindsHandler::get, McdtRole.READ);
+			cfg.routes.post("/v1/keybinds", keybindsHandler::update, McdtRole.ACT);
+			cfg.routes.patch("/v1/keybinds", keybindsHandler::update, McdtRole.ACT);
+
+			ResourcePacksHandler resourcePacksHandler = new ResourcePacksHandler(config, queue, gameClient);
+			cfg.routes.get("/v1/resourcepacks", resourcePacksHandler::get, McdtRole.READ);
+			cfg.routes.post("/v1/resourcepacks", resourcePacksHandler::update, McdtRole.ACT);
+			cfg.routes.patch("/v1/resourcepacks", resourcePacksHandler::update, McdtRole.ACT);
+
+			// --- Phase 3: Stats, Advancements, Recipes ---
+			cfg.routes.get("/v1/stats", new StatsHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/advancements", new AdvancementsHandler(config, queue, gameClient), McdtRole.READ);
+			RecipesHandler recipesHandler = new RecipesHandler(config, queue, gameClient);
+			cfg.routes.get("/v1/recipes", recipesHandler::get, McdtRole.READ);
+			cfg.routes.post("/v1/recipes/place", recipesHandler::place, McdtRole.ACT);
+
 			cfg.routes.get("/v1/screenshot", new ScreenshotHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/textures/atlases", new TexturesAtlasHandlers.AtlasesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/textures/atlas", new TexturesAtlasHandlers.AtlasHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/textures/atlas/image", new TexturesAtlasHandlers.ImageHandler(config, queue, gameClient), McdtRole.READ);
 
 			ConfirmManager confirmManager = new ConfirmManager();
+
+			// --- Phase 4: Session, Worlds, Servers ---
+			SessionHandler sessionHandler = new SessionHandler(config, queue, gameClient);
+			cfg.routes.get("/v1/session", sessionHandler::get, McdtRole.READ);
+			cfg.routes.post("/v1/session/pause", sessionHandler::pause, McdtRole.ACT);
+			cfg.routes.post("/v1/session/disconnect", sessionHandler::disconnect, McdtRole.ACT);
+			cfg.routes.post("/v1/session/lan", sessionHandler::lan, McdtRole.ACT);
+
+			WorldsHandler worldsHandler = new WorldsHandler(config, queue, gameClient, confirmManager);
+			cfg.routes.get("/v1/worlds", worldsHandler::list, McdtRole.READ);
+			cfg.routes.post("/v1/worlds/{levelId}/load", worldsHandler::load, McdtRole.ACT);
+			cfg.routes.delete("/v1/worlds/{levelId}", worldsHandler::deleteRequest, McdtRole.ACT);
+			cfg.routes.post("/v1/worlds/{levelId}/delete/confirm", worldsHandler::deleteConfirm, McdtRole.ACT);
+
+			ServersHandler serversHandler = new ServersHandler(config, queue, gameClient, confirmManager);
+			cfg.routes.get("/v1/servers", serversHandler::list, McdtRole.READ);
+			cfg.routes.post("/v1/servers", serversHandler::add, McdtRole.ACT);
+			cfg.routes.patch("/v1/servers/{index}", serversHandler::update, McdtRole.ACT);
+			cfg.routes.post("/v1/servers/connect", serversHandler::connect, McdtRole.ACT);
+			cfg.routes.delete("/v1/servers/{index}", serversHandler::deleteRequest, McdtRole.ACT);
+			cfg.routes.post("/v1/servers/{index}/delete/confirm", serversHandler::deleteConfirm, McdtRole.ACT);
+
 			cfg.routes.post("/v1/input/keys", new InputKeysHandler(config, queue, gameClient), McdtRole.ACT);
 			cfg.routes.post("/v1/input/mouse", new InputMouseHandler(config, queue, gameClient), McdtRole.ACT);
 

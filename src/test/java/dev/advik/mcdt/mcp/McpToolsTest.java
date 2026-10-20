@@ -135,6 +135,7 @@ class McpToolsTest {
 		boolean hasBaritoneGoto = false;
 		boolean hasGetPlayerSkin = false;
 		boolean hasGetGameTextures = false;
+		boolean hasViewBlocks = false;
 
 		for (JsonNode t : tools) {
 			String name = t.get("name").asText();
@@ -145,6 +146,7 @@ class McpToolsTest {
 			if ("baritone_goto".equals(name)) hasBaritoneGoto = true;
 			if ("get_player_skin".equals(name)) hasGetPlayerSkin = true;
 			if ("get_game_textures".equals(name)) hasGetGameTextures = true;
+			if ("view_blocks".equals(name)) hasViewBlocks = true;
 		}
 
 		assertTrue(hasGetState);
@@ -154,6 +156,7 @@ class McpToolsTest {
 		assertTrue(hasBaritoneGoto);
 		assertTrue(hasGetPlayerSkin);
 		assertTrue(hasGetGameTextures);
+		assertTrue(hasViewBlocks);
 	}
 
 	@Test
@@ -296,5 +299,21 @@ class McpToolsTest {
 		assertFalse(callResult.get("isError").asBoolean());
 		assertEquals(2, callResult.get("content").size());
 		assertEquals("image", callResult.get("content").get(1).get("type").asText());
+	}
+
+	@Test
+	void testCallViewBlocks() throws Exception {
+		JsonNode res = callMcp("tools/call", Map.of("name", "view_blocks", "arguments", Map.of("res", "128x72")));
+		JsonNode callResult = res.get("result");
+		assertFalse(callResult.get("isError").asBoolean());
+		assertTrue(callResult.get("content").get(0).get("text").asText().contains("minecraft:stone"));
+	}
+
+	@Test
+	void testCallViewBlocksSummary() throws Exception {
+		JsonNode res = callMcp("tools/call", Map.of("name", "view_blocks", "arguments", Map.of("summaryOnly", true)));
+		JsonNode callResult = res.get("result");
+		assertFalse(callResult.get("isError").asBoolean());
+		assertTrue(callResult.get("content").get(0).get("text").asText().contains("counts"));
 	}
 }

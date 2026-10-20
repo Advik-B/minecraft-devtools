@@ -23,6 +23,8 @@ class ConfigUpdaterTest {
 		draft.eventSubscriberQueueCapacity = 512;
 		draft.originAllowlist = new ArrayList<>(List.of("http://localhost:5173"));
 		draft.allowedMultiplayerServers = new ArrayList<>(List.of("play.example.com"));
+		draft.enableViewBlocks = false;
+		draft.maxViewBlocksRays = 50_000;
 		// startup-only values must not leak into the running config
 		draft.preferredPort = 31_000;
 		draft.bindAddress = "0.0.0.0";
@@ -40,6 +42,8 @@ class ConfigUpdaterTest {
 		assertEquals(512, live.eventSubscriberQueueCapacity);
 		assertEquals(List.of("http://localhost:5173"), live.originAllowlist);
 		assertEquals(List.of("play.example.com"), live.allowedMultiplayerServers);
+		assertFalse(live.enableViewBlocks);
+		assertEquals(50_000, live.maxViewBlocksRays);
 		assertEquals(McdtConfig.DEFAULT_PORT, live.preferredPort);
 		assertEquals("127.0.0.1", live.bindAddress);
 		assertEquals(256, live.queueCapacity);

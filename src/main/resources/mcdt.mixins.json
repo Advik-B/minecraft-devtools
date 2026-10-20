@@ -13,7 +13,16 @@
     "ConnectionMixin",
     "LocalPlayerMixin",
     "TextureManagerAccessor",
-    "TextureAtlasAccessor"
+    "TextureAtlasAccessor",
+    "GuiAccessor",
+    "BossHealthOverlayAccessor",
+    "PlayerTabOverlayAccessor",
+    "SubtitleOverlayAccessor",
+    "ToastManagerAccessor",
+    "DebugScreenOverlayAccessor",
+    "DebugRendererAccessor",
+    "StatsCounterAccessor",
+    "ClientAdvancementsAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

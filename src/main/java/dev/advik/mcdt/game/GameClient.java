@@ -39,6 +39,72 @@ public interface GameClient {
 
 	byte[] getAtlasImage(String atlasId);
 
+	// --- Structured View & HUD ---
+
+	ViewBlocksDto.Response getViewBlocks(String res, Double maxDistance, Boolean fluids, Boolean passThrough, Boolean entities, Boolean grid, Double minCoverage);
+
+	ViewBlocksDto.SummaryResponse getViewBlocksSummary(Double maxDistance);
+
+	HudDto.Response getHud(java.util.Set<String> include);
+
+	// --- Phase 2: Camera, Window, Debug, Keybinds, Resource Packs ---
+
+	CameraDto.Response getCamera();
+
+	CameraDto.Response updateCamera(CameraDto.Request request);
+
+	WindowDto.Response getWindow();
+
+	WindowDto.Response updateWindow(WindowDto.Request request);
+
+	DebugDto.Response getDebug();
+
+	DebugDto.Response updateDebug(DebugDto.Request request);
+
+	KeybindsDto.Response getKeybinds();
+
+	KeybindsDto.Response updateKeybinds(KeybindsDto.Request request);
+
+	ResourcePacksDto.Response getResourcePacks();
+
+	ResourcePacksDto.Response updateResourcePacks(ResourcePacksDto.Request request);
+
+	// --- Phase 3: Stats, Advancements, Recipes ---
+
+	StatsDto.Response getStats(String category);
+
+	AdvancementsDto.Response getAdvancements(Boolean done, String search);
+
+	RecipesDto.Response getRecipes(Boolean craftable, String category, String search);
+
+	RecipesDto.PlaceResponse placeRecipe(RecipesDto.PlaceRequest request);
+
+	// --- Phase 4: Session, Worlds, Servers ---
+
+	SessionDto.Response getSession();
+
+	SessionDto.Response setSessionPaused(Boolean paused);
+
+	SessionDto.DisconnectResponse disconnectSession();
+
+	SessionDto.LanResponse openSessionToLan(SessionDto.LanRequest request);
+
+	WorldsDto.ListResponse getWorlds();
+
+	WorldsDto.LoadResponse loadWorld(String levelId);
+
+	WorldsDto.DeleteResponse deleteWorld(String levelId);
+
+	ServersDto.ListResponse getServers();
+
+	ServersDto.ListResponse addServer(ServersDto.AddRequest request);
+
+	ServersDto.ListResponse updateServer(int index, ServersDto.UpdateRequest request);
+
+	ServersDto.DeleteResponse deleteServer(int index);
+
+	ServersDto.ConnectResponse connectServer(String address);
+
 	// --- Milestone M2 Actions ---
 
 	InputKeyDto.Response pressKey(InputKeyDto.Request request);

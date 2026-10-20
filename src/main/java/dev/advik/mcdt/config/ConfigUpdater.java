@@ -22,6 +22,8 @@ public final class ConfigUpdater {
 		live.mcpLogCalls = draft.mcpLogCalls;
 		live.enableBaritone = draft.enableBaritone;
 		live.eventSubscriberQueueCapacity = draft.eventSubscriberQueueCapacity;
+		live.enableViewBlocks = draft.enableViewBlocks;
+		live.maxViewBlocksRays = draft.maxViewBlocksRays;
 		live.originAllowlist = new ArrayList<>(draft.originAllowlist);
 		live.allowedMultiplayerServers = new ArrayList<>(draft.allowedMultiplayerServers);
 	}

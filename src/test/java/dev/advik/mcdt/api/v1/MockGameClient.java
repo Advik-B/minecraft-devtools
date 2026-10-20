@@ -340,6 +340,431 @@ public class MockGameClient implements GameClient {
 		return baos.toByteArray();
 	}
 
+	@Override
+	public ViewBlocksDto.Response getViewBlocks(String res, Double maxDistance, Boolean fluids, Boolean passThrough, Boolean entities, Boolean grid, Double minCoverage) {
+		if (!hasWorld) {
+			throw Problems.noWorld();
+		}
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		int[] resArray = new int[]{128, 72};
+		if (res != null && res.contains("x")) {
+			String[] parts = res.split("x");
+			try {
+				resArray = new int[]{Integer.parseInt(parts[0]), Integer.parseInt(parts[1])};
+			} catch (Exception ignored) {}
+		}
+		List<String> palette = List.of("minecraft:stone", "minecraft:grass_block");
+		List<ViewBlocksDto.BlockHit> blocks = List.of(
+				new ViewBlocksDto.BlockHit(new int[]{10, 63, -20}, 0, List.of("up"), 5.0, 0.4),
+				new ViewBlocksDto.BlockHit(new int[]{11, 63, -20}, 1, List.of("up", "north"), 6.2, 0.3)
+		);
+		List<Integer> labels = Boolean.TRUE.equals(grid) ? List.of(0, 1, -1) : null;
+		List<Double> depth = Boolean.TRUE.equals(grid) ? List.of(5.0, 6.2, 64.0) : null;
+
+		return new ViewBlocksDto.Response(
+				1000L,
+				new ViewBlocksDto.CameraInfo(new double[]{10.5, 65.6, -20.5}, 90.0f, 0.0f, 70.0f),
+				resArray,
+				palette,
+				blocks,
+				List.of(),
+				0.3,
+				labels,
+				depth
+		);
+	}
+
+	@Override
+	public ViewBlocksDto.SummaryResponse getViewBlocksSummary(Double maxDistance) {
+		if (!hasWorld) {
+			throw Problems.noWorld();
+		}
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		return new ViewBlocksDto.SummaryResponse(
+				1000L,
+				new ViewBlocksDto.CameraInfo(new double[]{10.5, 65.6, -20.5}, 90.0f, 0.0f, 70.0f),
+				Map.of("minecraft:stone", 50, "minecraft:grass_block", 30),
+				Map.of(
+						"minecraft:stone", new ViewBlocksDto.NearestBlock(new int[]{10, 63, -20}, 5.0),
+						"minecraft:grass_block", new ViewBlocksDto.NearestBlock(new int[]{11, 63, -20}, 6.2)
+				),
+				new RaycastDto("block", new double[]{10.5, 63.0, -20.5}, 5.0, new RaycastDto.BlockHit(new int[]{10, 63, -20}, "up", "minecraft:stone", false), null)
+		);
+	}
+
+	@Override
+	public HudDto.Response getHud(java.util.Set<String> include) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		HudDto.TitleInfo title = (include == null || include.contains("title"))
+				? new HudDto.TitleInfo("Welcome", "to Minecraft", 10, 70, 20)
+				: null;
+		List<HudDto.BossBarInfo> bossBars = (include == null || include.contains("bossbars"))
+				? List.of(new HudDto.BossBarInfo("uuid-1234", "Ender Dragon", 1.0f, "pink", "progress", false, true, false))
+				: null;
+		HudDto.ScoreboardSidebar scoreboard = (include == null || include.contains("scoreboard"))
+				? new HudDto.ScoreboardSidebar("obj_sidebar", "Sidebar Objective", List.of(new HudDto.ScoreboardSidebar.ScoreEntry("Player1", 42, "42")))
+				: null;
+		HudDto.TabList tabList = (include == null || include.contains("tablist"))
+				? new HudDto.TabList("Header", "Footer", List.of(new HudDto.TabList.PlayerEntry("DevPlayer", "uuid-player", 15, "survival", "DevPlayer")))
+				: null;
+		List<HudDto.SubtitleEntry> subtitles = (include == null || include.contains("subtitles"))
+				? List.of(new HudDto.SubtitleEntry("Footsteps", 0.8, new double[]{10.0, 64.0, -20.0}))
+				: null;
+		HudDto.HeldItemInfo heldItem = (include == null || include.contains("helditem"))
+				? new HudDto.HeldItemInfo(
+						new InventoryDto.SlotInfo(0, false, "minecraft:diamond_sword", 1, "Diamond Sword", 0, 1561, Map.of()),
+						null,
+						0
+				)
+				: null;
+		List<HudDto.ToastInfo> toasts = (include == null || include.contains("toasts"))
+				? List.of(new HudDto.ToastInfo("recipe", "New Recipe Unlocked!", "Stone Pickaxe"))
+				: null;
+
+		return new HudDto.Response(
+				1000L,
+				"Action bar test text",
+				title,
+				bossBars,
+				scoreboard,
+				tabList,
+				subtitles,
+				heldItem,
+				toasts
+		);
+	}
+
+	// --- Phase 2 Mock Implementations ---
+
+	public String mockPerspective = "first_person";
+	public double mockFov = 70.0;
+	public boolean mockFullscreen = false;
+	public boolean mockHitboxes = false;
+	public boolean mockChunkBorders = false;
+	public final List<String> mockEnabledPacks = new ArrayList<>(List.of("vanilla", "fabric"));
+
+	@Override
+	public CameraDto.Response getCamera() {
+		return new CameraDto.Response(
+				mockPerspective,
+				mockFov,
+				new double[]{10.5, 65.6, -20.5},
+				new CameraDto.Rotation(90.0f, 0.0f)
+		);
+	}
+
+	@Override
+	public CameraDto.Response updateCamera(CameraDto.Request request) {
+		if (request.perspective() != null) {
+			String p = request.perspective().trim().toLowerCase();
+			if (!p.equals("first_person") && !p.equals("third_person_back") && !p.equals("third_person_front")) {
+				throw Problems.invalidParameter("perspective", "Must be one of: first_person, third_person_back, third_person_front");
+			}
+			mockPerspective = p;
+		}
+		if (request.fov() != null) mockFov = request.fov();
+		return getCamera();
+	}
+
+	@Override
+	public WindowDto.Response getWindow() {
+		return new WindowDto.Response(
+				1920, 1080, 960, 540, 2.0, mockFullscreen, true
+		);
+	}
+
+	@Override
+	public WindowDto.Response updateWindow(WindowDto.Request request) {
+		if (request.fullscreen() != null) mockFullscreen = request.fullscreen();
+		return getWindow();
+	}
+
+	@Override
+	public DebugDto.Response getDebug() {
+		return new DebugDto.Response(
+				List.of("Minecraft 1.21.4", "144 fps"),
+				List.of("Java 21", "Display: 1920x1080"),
+				mockHitboxes,
+				mockChunkBorders
+		);
+	}
+
+	@Override
+	public DebugDto.Response updateDebug(DebugDto.Request request) {
+		if (request.hitboxes() != null) mockHitboxes = request.hitboxes();
+		if (request.chunkBorders() != null) mockChunkBorders = request.chunkBorders();
+		return getDebug();
+	}
+
+	@Override
+	public KeybindsDto.Response getKeybinds() {
+		return new KeybindsDto.Response(2, List.of(
+				new KeybindsDto.KeyMappingDetail("key.forward", "key.categories.movement", "W", "key.keyboard.w", true, false),
+				new KeybindsDto.KeyMappingDetail("key.back", "key.categories.movement", "S", "key.keyboard.s", true, false)
+		));
+	}
+
+	@Override
+	public KeybindsDto.Response updateKeybinds(KeybindsDto.Request request) {
+		return getKeybinds();
+	}
+
+	@Override
+	public ResourcePacksDto.Response getResourcePacks() {
+		return new ResourcePacksDto.Response(
+				List.of(
+						new ResourcePacksDto.PackInfo("vanilla", "Default", "The default data pack of Minecraft", true, true, "COMPATIBLE"),
+						new ResourcePacksDto.PackInfo("fabric", "Fabric Mods", "Fabric resource pack", false, false, "COMPATIBLE")
+				),
+				new ArrayList<>(mockEnabledPacks)
+		);
+	}
+
+	@Override
+	public ResourcePacksDto.Response updateResourcePacks(ResourcePacksDto.Request request) {
+		if (request.enabled() != null) {
+			mockEnabledPacks.clear();
+			mockEnabledPacks.addAll(request.enabled());
+		}
+		return getResourcePacks();
+	}
+
+	// --- Phase 3 Mock Implementations ---
+
+	@Override
+	public StatsDto.Response getStats(String category) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		Map<String, Integer> custom = Map.of("minecraft:jump", 142, "minecraft:walk_one_cm", 35240);
+		Map<String, Integer> mined = Map.of("minecraft:stone", 54, "minecraft:iron_ore", 12);
+		Map<String, Integer> crafted = Map.of("minecraft:iron_pickaxe", 1, "minecraft:torch", 16);
+		Map<String, Integer> used = Map.of("minecraft:iron_pickaxe", 66);
+		Map<String, Integer> broken = Map.of();
+		Map<String, Integer> killed = Map.of("minecraft:zombie", 5);
+		Map<String, Integer> killedBy = Map.of("minecraft:creeper", 1);
+
+		if (category != null && !category.isBlank()) {
+			String cat = category.toLowerCase().trim();
+			return switch (cat) {
+				case "custom" -> new StatsDto.Response(custom, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+				case "mined" -> new StatsDto.Response(Map.of(), mined, Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+				case "crafted" -> new StatsDto.Response(Map.of(), Map.of(), crafted, Map.of(), Map.of(), Map.of(), Map.of());
+				case "used" -> new StatsDto.Response(Map.of(), Map.of(), Map.of(), used, Map.of(), Map.of(), Map.of());
+				case "broken" -> new StatsDto.Response(Map.of(), Map.of(), Map.of(), Map.of(), broken, Map.of(), Map.of());
+				case "killed" -> new StatsDto.Response(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), killed, Map.of());
+				case "killed_by" -> new StatsDto.Response(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), killedBy);
+				default -> throw Problems.invalidParameter("category", "Must be one of: custom, mined, crafted, used, broken, killed, killed_by");
+			};
+		}
+
+		return new StatsDto.Response(custom, mined, crafted, used, broken, killed, killedBy);
+	}
+
+	@Override
+	public AdvancementsDto.Response getAdvancements(Boolean done, String search) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		List<AdvancementsDto.AdvancementInfo> list = new ArrayList<>();
+		list.add(new AdvancementsDto.AdvancementInfo(
+				"minecraft:story/root",
+				"Minecraft",
+				"The heart and story of the game",
+				"task",
+				"minecraft:grass_block",
+				null,
+				true,
+				1.0f,
+				List.of("crafting_table"),
+				List.of()
+		));
+		list.add(new AdvancementsDto.AdvancementInfo(
+				"minecraft:story/mine_stone",
+				"Stone Age",
+				"Mine stone with your new pickaxe",
+				"task",
+				"minecraft:wooden_pickaxe",
+				"minecraft:story/root",
+				false,
+				0.0f,
+				List.of(),
+				List.of("has_cobblestone")
+		));
+
+		if (done != null) {
+			list.removeIf(a -> a.done() != done);
+		}
+		if (search != null && !search.isBlank()) {
+			String term = search.toLowerCase();
+			list.removeIf(a -> !a.id().toLowerCase().contains(term) && !a.title().toLowerCase().contains(term));
+		}
+
+		int completed = (int) list.stream().filter(AdvancementsDto.AdvancementInfo::done).count();
+		return new AdvancementsDto.Response(list.size(), completed, list);
+	}
+
+	@Override
+	public RecipesDto.Response getRecipes(Boolean craftable, String category, String search) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		List<RecipesDto.RecipeInfo> list = new ArrayList<>();
+		list.add(new RecipesDto.RecipeInfo(
+				1,
+				"crafting",
+				new RecipesDto.ResultItem("minecraft:iron_pickaxe", 1),
+				true,
+				List.of("minecraft:iron_ingot", "minecraft:stick")
+		));
+		list.add(new RecipesDto.RecipeInfo(
+				2,
+				"furnace",
+				new RecipesDto.ResultItem("minecraft:iron_ingot", 1),
+				false,
+				List.of("minecraft:raw_iron")
+		));
+
+		if (craftable != null) {
+			list.removeIf(r -> r.craftable() != craftable);
+		}
+		if (category != null && !category.isBlank()) {
+			list.removeIf(r -> !r.category().equalsIgnoreCase(category.trim()));
+		}
+		if (search != null && !search.isBlank()) {
+			String term = search.toLowerCase();
+			list.removeIf(r -> !r.result().id().toLowerCase().contains(term));
+		}
+
+		return new RecipesDto.Response(list.size(), list);
+	}
+
+	@Override
+	public RecipesDto.PlaceResponse placeRecipe(RecipesDto.PlaceRequest request) {
+		if (!hasPlayer) {
+			throw Problems.noPlayer();
+		}
+		if (!isScreenOpen) {
+			throw Problems.noContainer();
+		}
+		return new RecipesDto.PlaceResponse(true, request.recipeId(), 1);
+	}
+
+	// --- Phase 4 Mock Implementations ---
+
+	public boolean mockPaused = false;
+	public boolean mockLan = false;
+	public Integer mockLanPort = null;
+	public final List<WorldsDto.WorldSummaryInfo> mockWorldsList = new ArrayList<>(List.of(
+			new WorldsDto.WorldSummaryInfo("New World", "New World", 1700000000000L, "survival", false, true, "1.21.4", false),
+			new WorldsDto.WorldSummaryInfo("Creative Test", "Creative Test", 1699000000000L, "creative", false, true, "1.21.4", false)
+	));
+	public final List<ServersDto.ServerEntryInfo> mockServersList = new ArrayList<>(List.of(
+			new ServersDto.ServerEntryInfo(0, "Local Server", "127.0.0.1:25565", 15L, "A Minecraft Server", "1/20")
+	));
+
+	@Override
+	public SessionDto.Response getSession() {
+		String state = hasWorld ? (hasPlayer ? "singleplayer" : "multiplayer") : "menu";
+		return new SessionDto.Response(state, mockPaused, mockLan, mockLanPort, null, null, hasWorld ? "New World" : null);
+	}
+
+	@Override
+	public SessionDto.Response setSessionPaused(Boolean paused) {
+		if (paused != null) mockPaused = paused;
+		return getSession();
+	}
+
+	@Override
+	public SessionDto.DisconnectResponse disconnectSession() {
+		hasWorld = false;
+		hasPlayer = false;
+		return new SessionDto.DisconnectResponse(true);
+	}
+
+	@Override
+	public SessionDto.LanResponse openSessionToLan(SessionDto.LanRequest request) {
+		if (!hasWorld) {
+			throw Problems.noWorld();
+		}
+		mockLan = true;
+		mockLanPort = (request != null && request.port() != null && request.port() > 0) ? request.port() : 25565;
+		return new SessionDto.LanResponse(true, mockLanPort);
+	}
+
+	@Override
+	public WorldsDto.ListResponse getWorlds() {
+		return new WorldsDto.ListResponse(mockWorldsList.size(), new ArrayList<>(mockWorldsList));
+	}
+
+	@Override
+	public WorldsDto.LoadResponse loadWorld(String levelId) {
+		hasWorld = true;
+		hasPlayer = true;
+		return new WorldsDto.LoadResponse(true, levelId);
+	}
+
+	@Override
+	public WorldsDto.DeleteResponse deleteWorld(String levelId) {
+		boolean removed = mockWorldsList.removeIf(w -> w.levelId().equalsIgnoreCase(levelId));
+		if (!removed) {
+			throw Problems.notFound("World not found: " + levelId);
+		}
+		return new WorldsDto.DeleteResponse(true, levelId);
+	}
+
+	@Override
+	public ServersDto.ListResponse getServers() {
+		return new ServersDto.ListResponse(mockServersList.size(), new ArrayList<>(mockServersList));
+	}
+
+	@Override
+	public ServersDto.ListResponse addServer(ServersDto.AddRequest request) {
+		if (request.name() == null || request.address() == null) {
+			throw Problems.invalidParameter("name/address", "Server name and address are required");
+		}
+		int nextIndex = mockServersList.size();
+		mockServersList.add(new ServersDto.ServerEntryInfo(nextIndex, request.name(), request.address(), -1L, "", "0/0"));
+		return getServers();
+	}
+
+	@Override
+	public ServersDto.ListResponse updateServer(int index, ServersDto.UpdateRequest request) {
+		if (index < 0 || index >= mockServersList.size()) {
+			throw Problems.notFound("Server index out of bounds: " + index);
+		}
+		ServersDto.ServerEntryInfo existing = mockServersList.get(index);
+		String newName = request.name() != null ? request.name() : existing.name();
+		String newAddr = request.address() != null ? request.address() : existing.address();
+		mockServersList.set(index, new ServersDto.ServerEntryInfo(index, newName, newAddr, existing.ping(), existing.status(), existing.playerCount()));
+		return getServers();
+	}
+
+	@Override
+	public ServersDto.DeleteResponse deleteServer(int index) {
+		if (index < 0 || index >= mockServersList.size()) {
+			throw Problems.notFound("Server index out of bounds: " + index);
+		}
+		mockServersList.remove(index);
+		return new ServersDto.DeleteResponse(true, index);
+	}
+
+	@Override
+	public ServersDto.ConnectResponse connectServer(String address) {
+		if (address == null || address.isBlank()) {
+			throw Problems.invalidParameter("address", "Server address must not be empty");
+		}
+		hasWorld = true;
+		hasPlayer = true;
+		return new ServersDto.ConnectResponse(true, address);
+	}
+
 	// --- Milestone M2 Mock Implementation ---
 
 	public InputKeyDto.Request lastPressedKey;

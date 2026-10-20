@@ -36,3 +36,68 @@ Host: 127.0.0.1:25580
 GET {{baseUrl}}/v1/screen
 Authorization: Bearer {{token}}
 Host: 127.0.0.1:25580
+
+### 8. HUD & overlay telemetry (action bar, title, boss bars, scoreboard, tablist)
+GET {{baseUrl}}/v1/hud
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 9. Structured view (visible blocks from camera frustum)
+GET {{baseUrl}}/v1/view/blocks?res=128x72&grid=true
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 10. Structured view summary
+GET {{baseUrl}}/v1/view/blocks/summary
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 11. Batch read operations in one client tick
+POST {{baseUrl}}/v1/batch
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "requests": [
+    { "id": "player", "path": "/v1/player" },
+    { "id": "world", "path": "/v1/world" },
+    { "id": "hud", "path": "/v1/hud" }
+  ]
+}
+
+### 12. Player statistics
+GET {{baseUrl}}/v1/stats
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 13. Player statistics filtered by category
+GET {{baseUrl}}/v1/stats?category=mined
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 14. Player advancements
+GET {{baseUrl}}/v1/advancements
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 15. Player advancements filtered by completed status
+GET {{baseUrl}}/v1/advancements?done=true
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 16. Recipes unlocked in recipe book
+GET {{baseUrl}}/v1/recipes?craftable=true
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 17. Place recipe into active crafting container
+POST {{baseUrl}}/v1/recipes/place
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "recipeId": 1,
+  "useMaxItems": false
+}
