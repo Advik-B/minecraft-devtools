@@ -31,7 +31,10 @@ public final class McdtConfig {
 	public volatile List<String> originAllowlist = new ArrayList<>();
 	/** Extra Host header names accepted besides loopback and the bind address, e.g. a reverse proxy's domain. */
 	public volatile List<String> allowedHosts = new ArrayList<>();
-	/** Allowed multiplayer server addresses for act and reflect-write actions. */
+	/**
+	 * Allowed multiplayer server addresses for act and reflect-write actions. {@code *} is a wildcard (e.g.
+	 * {@code *.example.com}), and {@code *} alone allows every server. See {@link ServerAllowlist}.
+	 */
 	public volatile List<String> allowedMultiplayerServers = new ArrayList<>();
 	/** Enable or disable Baritone endpoints. */
 	public volatile boolean enableBaritone = true;

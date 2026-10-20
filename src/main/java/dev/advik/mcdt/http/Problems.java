@@ -212,7 +212,7 @@ public final class Problems {
 
 	public static ProblemException multiplayerWriteDisabled(String server) {
 		return of(403, MULTIPLAYER_WRITE_DISABLED, "Multiplayer write disabled",
-				"Write operations are disabled on multiplayer server '" + (server != null ? server : "unknown") + "'. Add it to allowedMultiplayerServers in config/mcdt/config.json to allow automation.");
+				"Write operations are disabled on multiplayer server '" + (server != null ? server : "unknown") + "'. Add it (or a * wildcard pattern) to allowedMultiplayerServers in config/mcdt/config.json to allow automation.");
 	}
 
 	public static ProblemException methodNotFound(String methodName, String className) {

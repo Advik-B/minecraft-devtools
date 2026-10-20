@@ -170,7 +170,7 @@ Settings live in `<gameDir>/config/mcdt/config.json`. You can also edit them in-
 | Setting | Default | Description |
 | --- | --- | --- |
 | `permission` | `"read"` | Highest level granted to clients: `read`, `act`, or `reflect-write` |
-| `allowedMultiplayerServers` | `[]` | Servers where `act` and `reflect-write` are allowed |
+| `allowedMultiplayerServers` | `[]` | Servers where `act` and `reflect-write` are allowed. `*` is a wildcard (`*.example.com`), and `*` alone allows every server |
 | `originAllowlist` | `[]` | Extra browser origins, e.g. `http://localhost:5173` |
 | `allowedHosts` | `[]` | Extra `Host` header names, e.g. a reverse proxy's domain |
 | `preferredPort` / `bindAddress` | `25580` / `127.0.0.1` | Falls back to a random port if `25580` is taken |
@@ -178,6 +178,10 @@ Settings live in `<gameDir>/config/mcdt/config.json`. You can also edit them in-
 | `tickBudgetMicros` | `2000` | Time the queue may use per client tick |
 | `enableMcp`, `enableBaritone`, `allowQuit` | `true` | Feature switches |
 | `rateLimitPerSecond` | `200` | Per-client request rate limit |
+
+> [!CAUTION]
+> A wildcard in `allowedMultiplayerServers` lets API clients automate every matching server, and `*` lets them automate **any** server you join. Most servers ban automated clients, so this is a **huge ban risk** for your account. MCDT logs a loud warning at startup, when the list changes, and when you join a server that only a wildcard allows.
+> Entries are matched against the address as it appears in your server list, port included if you typed one. So `*.example.com` does not match `play.example.com:25566`. Use `*.example.com*` to cover ports too.
 
 The file also holds `enabled`, `queueCapacity`, `maxRequestBytes`, `eventRingBufferSize`, `eventSubscriberQueueCapacity`, `mcpLogCalls`, and `mcpNotificationThrottleMs`.
 

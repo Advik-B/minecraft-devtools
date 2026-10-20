@@ -2,6 +2,7 @@ package dev.advik.mcdt;
 
 import dev.advik.mcdt.config.ConfigStore;
 import dev.advik.mcdt.config.McdtConfig;
+import dev.advik.mcdt.config.ServerAllowlist;
 import dev.advik.mcdt.discovery.DiscoveryFile;
 import dev.advik.mcdt.exec.TaskQueue;
 import dev.advik.mcdt.exec.TickClock;
@@ -51,6 +52,7 @@ public final class McdtCore implements AutoCloseable {
 
 		ConfigStore configStore = new ConfigStore(env.configDir().resolve("config.json"));
 		McdtConfig config = ConfigStore.applyEnv(configStore.load(), envOverrides);
+		ServerAllowlist.warnIfWildcard(config.allowedMultiplayerServers);
 
 		BearerToken token = tokenFrom(envOverrides);
 		token.writeTo(env.configDir().resolve("token"));

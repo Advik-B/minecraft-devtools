@@ -30,6 +30,11 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
 			String dimension = client.level != null ? client.level.dimension().location().toString() : "unknown";
 			boolean isSingleplayer = client.isSingleplayer();
+			McdtCore instance = core;
+			if (!isSingleplayer && instance != null) {
+				dev.advik.mcdt.config.ServerAllowlist.warnOnJoin(instance.config().allowedMultiplayerServers,
+						client.getCurrentServer() != null ? client.getCurrentServer().ip : null);
+			}
 			dev.advik.mcdt.events.EventHub.getInstance().publish("world.join", java.util.Map.of(
 					"dimension", dimension,
 					"singleplayer", isSingleplayer

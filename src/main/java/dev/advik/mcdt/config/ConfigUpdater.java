@@ -26,6 +26,9 @@ public final class ConfigUpdater {
 		live.maxViewBlocksRays = draft.maxViewBlocksRays;
 		live.originAllowlist = new ArrayList<>(draft.originAllowlist);
 		live.allowedHosts = new ArrayList<>(draft.allowedHosts);
+		if (!live.allowedMultiplayerServers.equals(draft.allowedMultiplayerServers)) {
+			ServerAllowlist.warnIfWildcard(draft.allowedMultiplayerServers);
+		}
 		live.allowedMultiplayerServers = new ArrayList<>(draft.allowedMultiplayerServers);
 	}
 

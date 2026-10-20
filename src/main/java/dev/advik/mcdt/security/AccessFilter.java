@@ -2,6 +2,7 @@ package dev.advik.mcdt.security;
 
 import dev.advik.mcdt.config.McdtConfig;
 import dev.advik.mcdt.config.Permission;
+import dev.advik.mcdt.config.ServerAllowlist;
 import dev.advik.mcdt.http.Problems;
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
@@ -148,9 +149,7 @@ public final class AccessFilter implements Handler {
 				if (gameClient != null && (required == Permission.ACT || required == Permission.REFLECT_WRITE)) {
 					if (gameClient.isMultiplayer()) {
 						String serverAddress = gameClient.getCurrentServerAddress();
-						boolean allowed = serverAddress != null && config.allowedMultiplayerServers.stream()
-								.anyMatch(serverAddress::equalsIgnoreCase);
-						if (!allowed) {
+						if (!ServerAllowlist.allows(config.allowedMultiplayerServers, serverAddress)) {
 							throw Problems.multiplayerWriteDisabled(serverAddress);
 						}
 					}
