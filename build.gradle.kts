@@ -266,6 +266,7 @@ tasks.processResources {
 
 tasks.matching { it.name == "sourcesJar" }.configureEach {
 	dependsOn(syncWebAssets)
+	dependsOn(packageIsolatedRenamer)
 }
 
 tasks.register<JavaExec>("runTestServer") {
