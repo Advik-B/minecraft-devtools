@@ -5,10 +5,12 @@
     getObjectRoots,
     inspectObject,
     inspectClass,
-    sendPacket
+    sendPacket,
+    decompileClass
   } from '../api'
+  import { highlightJava } from '../highlight'
   import { toastStore } from '../toast.svelte'
-  import type { RootsResponse, ObjectInspectResponse, RootDescriptor } from '../types'
+  import type { RootsResponse, ObjectInspectResponse, RootDescriptor, ClassSourceResponse } from '../types'
   import {
     Cpu,
     Terminal,
@@ -22,7 +24,10 @@
     Check,
     Layers,
     Key,
-    ExternalLink
+    ExternalLink,
+    Code,
+    FileCode,
+    X
   } from 'lucide-svelte'
 
   let rootsData = $state<RootsResponse | null>(null)
@@ -46,6 +51,48 @@
   let activeSubTab = $state<'inspector' | 'repl' | 'packets'>('inspector')
   let fieldSearch = $state('')
   let methodSearch = $state('')
+
+  // Decompiler modal state
+  let decompileModalOpen = $state(false)
+  let decompileClassName = $state('')
+  let decompileRemap = $state(true)
+  let isDecompiling = $state(false)
+  let decompileData = $state<ClassSourceResponse | null>(null)
+  let decompileCopied = $state(false)
+
+  const highlightedLines = $derived(
+    decompileData?.source ? highlightJava(decompileData.source) : []
+  )
+
+  async function openDecompileModal(className: string) {
+    decompileClassName = className
+    decompileModalOpen = true
+    await runDecompile()
+  }
+
+  async function runDecompile() {
+    if (!decompileClassName.trim()) return
+    isDecompiling = true
+    decompileData = null
+    try {
+      const res = await decompileClass(decompileClassName.trim(), decompileRemap)
+      if (res) {
+        decompileData = res
+      }
+    } catch (err: unknown) {
+      toastStore.show(err instanceof Error ? err.message : 'Decompilation failed', 'error')
+    } finally {
+      isDecompiling = false
+    }
+  }
+
+  function copySource() {
+    if (!decompileData?.source) return
+    navigator.clipboard.writeText(decompileData.source)
+    decompileCopied = true
+    setTimeout(() => decompileCopied = false, 2000)
+    toastStore.show('Source code copied to clipboard', 'success')
+  }
 
   async function loadRoots() {
     if (!appState.token) return
@@ -268,9 +315,20 @@
                 {activeObject?.$class || 'Loading class metadata...'}
               </h3>
             </div>
-            <button class="btn btn-xs btn-ghost gap-1 font-mono" onclick={() => loadObject(activeHandle)}>
-              <span>Reload Handle</span>
-            </button>
+            <div class="flex items-center gap-2">
+              {#if activeObject?.$class}
+                <button
+                  class="btn btn-xs btn-outline btn-primary gap-1 font-mono"
+                  onclick={() => activeObject?.$class && openDecompileModal(activeObject.$class)}
+                >
+                  <Code class="w-3.5 h-3.5" />
+                  <span>Decompile</span>
+                </button>
+              {/if}
+              <button class="btn btn-xs btn-ghost gap-1 font-mono" onclick={() => loadObject(activeHandle)}>
+                <span>Reload Handle</span>
+              </button>
+            </div>
           </div>
 
           <!-- Fields and Methods Tabs -->
@@ -478,5 +536,116 @@
         </div>
       </div>
     {/if}
+  {/if}
+
+  {#if decompileModalOpen}
+    <dialog class="modal modal-open" open>
+      <div class="modal-box bg-base-200 border border-base-300 shadow-2xl relative max-w-4xl p-6 rounded-box flex flex-col max-h-[90vh]">
+        <button
+          class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3 text-base-content/60 hover:text-base-content"
+          aria-label="Close modal"
+          onclick={() => decompileModalOpen = false}
+        >
+          <X class="w-4 h-4" />
+        </button>
+
+        <!-- Modal Header -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 pr-8">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 rounded-xl bg-primary/10 text-primary">
+              <Code class="w-5 h-5" />
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <input
+                  type="text"
+                  bind:value={decompileClassName}
+                  placeholder="Enter full class name..."
+                  class="input input-xs input-bordered font-mono font-bold text-sm w-80 bg-base-100"
+                  onkeydown={(e) => e.key === 'Enter' && runDecompile()}
+                />
+                <button
+                  class="btn btn-xs btn-primary font-mono"
+                  disabled={isDecompiling}
+                  onclick={runDecompile}
+                >
+                  Load
+                </button>
+              </div>
+              <div class="flex items-center gap-2 mt-1.5">
+                {#if decompileData}
+                  <span class="badge badge-xs {decompileData.remapped ? 'badge-info' : 'badge-neutral'}">
+                    {decompileData.remapped ? 'Remapped (Mojang)' : 'Raw Bytecode'}
+                  </span>
+                  <span class="badge badge-xs badge-ghost font-mono">
+                    {decompileData.durationMs}ms
+                  </span>
+                  {#if decompileData.cached}
+                    <span class="badge badge-xs badge-success">Cached</span>
+                  {/if}
+                {/if}
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <label class="label cursor-pointer gap-2 py-0">
+              <span class="label-text text-xs">Remap (Mojang)</span>
+              <input
+                type="checkbox"
+                class="toggle toggle-primary toggle-sm"
+                bind:checked={decompileRemap}
+                onchange={() => runDecompile()}
+              />
+            </label>
+            <button
+              class="btn btn-sm btn-outline gap-1.5 font-mono"
+              disabled={!decompileData?.source}
+              onclick={copySource}
+            >
+              {#if decompileCopied}
+                <Check class="w-4 h-4 text-success" />
+                <span>Copied</span>
+              {:else}
+                <Copy class="w-4 h-4" />
+                <span>Copy</span>
+              {/if}
+            </button>
+          </div>
+        </div>
+
+        <!-- Modal Body (Code View) -->
+        <div class="flex-1 overflow-y-auto bg-base-300/80 rounded-xl border border-base-content/10 font-mono text-xs select-text relative">
+          {#if isDecompiling}
+            <div class="flex flex-col items-center justify-center py-20 gap-3 text-base-content/60">
+              <span class="loading loading-spinner loading-md text-primary"></span>
+              <span>Decompiling {decompileClassName} on-the-fly...</span>
+            </div>
+          {:else if decompileData}
+            <div class="flex min-w-full overflow-x-auto">
+              <!-- Line numbers column -->
+              <div class="select-none py-3 px-3 text-right text-base-content/30 border-r border-base-content/10 bg-base-300/60 shrink-0 font-mono text-[11px] leading-relaxed">
+                {#each highlightedLines as _, idx}
+                  <div>{idx + 1}</div>
+                {/each}
+              </div>
+              <!-- Syntax-highlighted code column -->
+              <div class="py-3 px-4 font-mono whitespace-pre leading-relaxed flex-1 overflow-x-visible">
+                {#each highlightedLines as line}
+                  <div>{@html line}</div>
+                {/each}
+              </div>
+            </div>
+          {:else}
+            <div class="text-center py-12 text-base-content/50 italic">
+              No source available.
+            </div>
+          {/if}
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button onclick={() => decompileModalOpen = false}>close</button>
+      </form>
+    </dialog>
   {/if}
 </div>

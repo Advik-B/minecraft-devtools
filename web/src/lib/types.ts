@@ -284,6 +284,15 @@ export interface ClassInspectResponse {
   }>
 }
 
+export interface ClassSourceResponse {
+  $class: string
+  runtimeName?: string
+  source: string
+  remapped: boolean
+  cached: boolean
+  durationMs: number
+}
+
 export interface RegistryEntryResponse {
   total: number
   offset: number

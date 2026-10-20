@@ -16,6 +16,7 @@ import type {
   RootsResponse,
   ObjectInspectResponse,
   ClassInspectResponse,
+  ClassSourceResponse,
   RegistryEntryResponse,
   PlayerSkinResponse,
   TextureAtlasesResponse,
@@ -343,6 +344,10 @@ export async function inspectObject(handle: string, path?: string): Promise<Obje
 
 export async function inspectClass(className: string): Promise<ClassInspectResponse | null> {
   return await fetchApi<ClassInspectResponse>(`/v1/classes/${encodeURIComponent(className)}`)
+}
+
+export async function decompileClass(className: string, remap: boolean = true): Promise<ClassSourceResponse | null> {
+  return await fetchApi<ClassSourceResponse>(`/v1/classes/${encodeURIComponent(className)}/source?remap=${remap}`)
 }
 
 export async function sendPacket(payload: Record<string, unknown>): Promise<boolean> {
