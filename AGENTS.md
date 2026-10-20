@@ -48,7 +48,7 @@ libs/                       pinned Baritone API jar (committed via a .gitignore 
 - `runClient` serves the dashboard straight from `web/dist` (Gradle passes `-Dmcdt.webDist`), so `cd web && bun run build` followed by a browser reload picks up UI changes without restarting the game.
 - WebUI dev: run `cd web && bun run dev` (Vite on :5173). It proxies `/v1`, `/mcp`, `/docs`, and `/openapi.json` to :25580. Add `http://localhost:5173` to `originAllowlist` in the config, or the API rejects the Origin. Type-check with `bun run check`.
 - Versions of Minecraft, Loader, Fabric API, Javalin, Jackson, YACL, Mod Menu, and Baritone all live in `gradle.properties`.
-- Docker: `Dockerfile` builds the jar (JDK 25 + Bun) and runs a headless client with Xvfb, Mesa, and portablemc. `docker/entrypoint.sh` launches it. If you bump Minecraft, Loader, or Fabric API in `gradle.properties`, update the matching `ARG`s and the Fabric API SHA-512 in the `Dockerfile` too. `MCDT_*` environment overrides are applied in `ConfigStore.applyEnv`. `MCDT_TOKEN` is handled in `McdtCore`.
+- Docker: `Dockerfile` builds the jar (JDK 25 + Bun) and runs a headless client with Xvfb, Mesa, and portablemc. `docker/entrypoint.sh` launches it. If you bump Minecraft, Loader, or Fabric API in `gradle.properties`, update the matching `ARG`s and the Fabric API SHA-512 in the `Dockerfile` too. The image ships the pinned `libs/` Baritone jar, so a `baritone_version` bump reaches it automatically. `MCDT_*` environment overrides are applied in `ConfigStore.applyEnv`. `MCDT_TOKEN` is handled in `McdtCore`.
 
 ## Core invariants: do not break these
 

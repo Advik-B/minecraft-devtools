@@ -194,7 +194,7 @@ Environment variables override the file at startup. They are not written back to
 
 ## Run it in Docker
 
-The image runs a headless Minecraft 1.21.4 client with Fabric, Fabric API and MCDT. The client draws to a virtual display (Xvfb) with software OpenGL (Mesa llvmpipe), so screenshots and texture endpoints still work. The image needs no GPU and is tested on `linux/amd64`. The client starts on the title screen. Join a world or server through the API.
+The image runs a headless Minecraft 1.21.4 client with Fabric, Fabric API, MCDT and [Baritone](https://github.com/cabaletta/baritone) 1.13.1. The client draws to a virtual display (Xvfb) with software OpenGL (Mesa llvmpipe), so screenshots and texture endpoints still work. The image needs no GPU and is tested on `linux/amd64`. The client starts on the title screen. Join a world or server through the API.
 
 ```sh
 docker build -t mcdt .
@@ -214,6 +214,7 @@ curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 | Variable | Default | Description |
 | --- | --- | --- |
 | `MC_AUTH` | `offline` | `offline`, or `microsoft` for a real account |
+| `MC_BARITONE` | `true` | Load the bundled Baritone. `false` leaves it out, and `/v1/baritone/*` then returns `501` |
 | `MC_USERNAME` | `McdtBot` | Offline player name. With `microsoft`, picks a stored account by name |
 | `MC_MAX_MEMORY` | `2G` | Game heap (`-Xmx`) |
 | `MC_JVM_ARGS` | | Extra JVM arguments, space-separated |
@@ -223,7 +224,9 @@ curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 
 **Offline accounts** only work in singleplayer and on servers with `online-mode=false`. For a **Microsoft account**, set `MC_AUTH=microsoft` and watch `docker logs -f mcdt` on the first start. It prints a link and a code to sign in with. The login is saved in the `/data` volume and reused on later starts.
 
-`/data` is the game directory. It holds `config/mcdt/`, `logs/`, `saves/`, `options.txt`, and `mods/`. Add extra mods such as Baritone to `/data/mods`.
+`/data` is the game directory. It holds `config/mcdt/`, `logs/`, `saves/`, `options.txt`, and `mods/`. You can add extra mods to `/data/mods`.
+
+The Baritone routes that start jobs (`goto`, `mine`, `follow` and so on) need `MCDT_PERMISSION=act` or higher. On a multiplayer server they also need that server in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`. Baritone is LGPL-3.0 and ships unmodified: it is the `libs/` jar pinned in `gradle.properties`.
 
 > [!CAUTION]
 > Inside the container the API binds to `0.0.0.0`, but the examples above publish it only on the host's loopback. To reach it from other machines, put a TLS reverse proxy in front of it and set `MCDT_ALLOWED_HOSTS` to the proxy's host name, plus `MCDT_ORIGIN_ALLOWLIST` if you use the dashboard. Always set a strong `MCDT_TOKEN`. Anyone with the token and `act` permission controls the client. `act` and `reflect-write` stay blocked on multiplayer servers that are not in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`.
