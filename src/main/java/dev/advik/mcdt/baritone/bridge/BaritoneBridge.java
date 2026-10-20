@@ -108,7 +108,10 @@ public final class BaritoneBridge implements BaritoneService {
 			goalInfo = new GoalInfo(goal.getClass().getSimpleName(), params);
 		}
 
-		Double ticksRemaining = pathing.estimatedTicksToGoal().orElse(null);
+		// Baritone's estimate dereferences the player, which is null outside a world (e.g. on the title screen).
+		Double ticksRemaining = baritone.getPlayerContext().player() != null
+				? pathing.estimatedTicksToGoal().orElse(null)
+				: null;
 		PathingInfo pathingInfo = new PathingInfo(
 				pathing.hasPath(),
 				pathing.isPathing(),
