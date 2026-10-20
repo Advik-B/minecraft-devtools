@@ -58,6 +58,10 @@ public final class McdtConfig {
 	public volatile boolean enableViewBlocks = true;
 	/** Maximum resolution (width * height rays) allowed for /v1/view/blocks (default 512x288 = 147456). */
 	public volatile int maxViewBlocksRays = 147_456;
+	/** Enable or disable on-the-fly class decompiler. */
+	public volatile boolean enableDecompiler = true;
+	/** Maximum number of decompiled class sources cached in memory. */
+	public volatile int decompilerCacheSize = 50;
 
 	/** Clamps out-of-range values to safe ones. Returns {@code this}. */
 	public McdtConfig normalize() {
@@ -76,6 +80,7 @@ public final class McdtConfig {
 		eventSubscriberQueueCapacity = (int) clamp(eventSubscriberQueueCapacity, 16, 4_096);
 		mcpNotificationThrottleMs = clamp(mcpNotificationThrottleMs, 50, 10_000);
 		maxViewBlocksRays = (int) clamp(maxViewBlocksRays, 100, 1_000_000);
+		decompilerCacheSize = (int) clamp(decompilerCacheSize, 0, 500);
 		if (permission == null) {
 			permission = Permission.READ;
 		}

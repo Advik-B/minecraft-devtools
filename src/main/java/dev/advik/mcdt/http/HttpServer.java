@@ -42,6 +42,7 @@ public final class HttpServer implements AutoCloseable {
 	private final GameClient gameClient;
 	private final BaritoneService baritoneService;
 	private final dev.advik.mcdt.mcp.McpSessionManager mcpSessionManager;
+	private final dev.advik.mcdt.decompiler.DecompilerService decompilerService;
 	private final Javalin app;
 	private final AtomicInteger boundPort = new AtomicInteger();
 	private volatile Runnable onQuitCallback = () -> {};
@@ -87,6 +88,18 @@ public final class HttpServer implements AutoCloseable {
 		this.gameClient = gameClient;
 		this.baritoneService = baritoneService != null ? baritoneService : new UnavailableBaritoneService();
 		this.mcpSessionManager = new dev.advik.mcdt.mcp.McpSessionManager(config.mcpNotificationThrottleMs);
+
+		NameService nameService = NameService.getInstance();
+		nameService.initialize(env.configDir(), env.gameVersion());
+
+		dev.advik.mcdt.decompiler.DecompilerService decompiler = null;
+		try {
+			dev.advik.mcdt.decompiler.VineflowerHost vineflowerHost = new dev.advik.mcdt.decompiler.VineflowerHost(env.configDir());
+			decompiler = new dev.advik.mcdt.decompiler.DecompilerService(config, vineflowerHost, nameService);
+		} catch (Throwable t) {
+			Mcdt.LOGGER.warn("Vineflower decompiler not available: {}", t.getMessage());
+		}
+		this.decompilerService = decompiler;
 
 		int targetPort = ConfigStore.effectivePort(config, envOverrides);
 		RateLimiter rateLimiter = new RateLimiter(config.rateLimitPerSecond);
@@ -241,8 +254,6 @@ public final class HttpServer implements AutoCloseable {
 
 			// --- Milestone M3 Reflection Routes ---
 			HandleTable handleTable = HandleTable.getInstance();
-			NameService nameService = NameService.getInstance();
-			nameService.initialize(env.configDir(), env.gameVersion());
 			ReflectionCache reflectionCache = new ReflectionCache(nameService);
 			PathEvaluator pathEvaluator = new PathEvaluator(reflectionCache);
 			ReflectionSerializer reflectionSerializer = new ReflectionSerializer(handleTable, nameService, reflectionCache);
@@ -254,6 +265,10 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.post("/v1/objects/{handle}/invoke", new ObjectInvokeHandler(config, queue, gameClient, handleTable, reflectionCache, reflectionSerializer), McdtRole.REFLECT_WRITE);
 			cfg.routes.get("/v1/classes/{name}", new ClassInspectHandler(config, queue, nameService, reflectionSerializer), McdtRole.READ);
 			cfg.routes.delete("/v1/objects/{handle}", new ObjectDeleteHandler(handleTable), McdtRole.READ);
+
+			if (decompilerService != null) {
+				cfg.routes.get("/v1/classes/{name}/source", new ClassSourceHandler(config, decompilerService), McdtRole.READ);
+			}
 
 			// --- Milestone M5 Raw Packet Send ---
 			cfg.routes.post("/v1/packets", new PacketsHandler(config, queue, gameClient, handleTable), McdtRole.REFLECT_WRITE);
@@ -295,7 +310,8 @@ public final class HttpServer implements AutoCloseable {
 					handleTable,
 					nameService,
 					pathEvaluator,
-					reflectionSerializer
+					reflectionSerializer,
+					decompilerService
 			);
 			dev.advik.mcdt.mcp.McpResourceRegistry resourceRegistry = new dev.advik.mcdt.mcp.McpResourceRegistry(gameClient);
 			dev.advik.mcdt.mcp.McpHandler mcpHandler = new dev.advik.mcdt.mcp.McpHandler(
@@ -435,6 +451,12 @@ public final class HttpServer implements AutoCloseable {
 	@Override
 	public void close() {
 		try {
+			if (decompilerService != null) {
+				try {
+					decompilerService.close();
+				} catch (Exception ignored) {
+				}
+			}
 			if (mcpSessionManager != null) {
 				mcpSessionManager.close();
 			}

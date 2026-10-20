@@ -61,3 +61,19 @@ Host: 127.0.0.1:25580
 DELETE {{baseUrl}}/v1/objects/h_12345678
 Authorization: Bearer {{token}}
 Host: 127.0.0.1:25580
+
+### 13. Decompile class source: net.minecraft.client.Minecraft (remapped)
+GET {{baseUrl}}/v1/classes/net.minecraft.client.Minecraft/source
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 14. Decompile class source (raw runtime bytecode, no remap)
+GET {{baseUrl}}/v1/classes/net.minecraft.client.Minecraft/source?remap=false
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+
+### 15. Decompile class source (plain text output)
+GET {{baseUrl}}/v1/classes/net.minecraft.client.Minecraft/source?format=text
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Accept: text/plain

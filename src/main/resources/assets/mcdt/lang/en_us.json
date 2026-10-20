@@ -56,6 +56,10 @@
 	"mcdt.config.mcpLogCalls.desc": "Keep recent MCP tool calls in an in-memory log.",
 	"mcdt.config.enableBaritone": "Enable Baritone endpoints",
 	"mcdt.config.enableBaritone.desc": "Expose Baritone pathing endpoints and tools when Baritone is installed.",
+	"mcdt.config.enableDecompiler": "Enable decompiler",
+	"mcdt.config.enableDecompiler.desc": "Decompile Minecraft and installed mod classes on-the-fly using an isolated Vineflower engine.",
+	"mcdt.config.decompilerCacheSize": "Decompiler cache size",
+	"mcdt.config.decompilerCacheSize.desc": "Maximum number of decompiled class sources cached in memory.",
 	"mcdt.config.mcpNotificationThrottleMs": "MCP notification throttle (ms)",
 	"mcdt.config.mcpNotificationThrottleMs.desc": "Minimum time between resource update notifications per URI per session."
 }

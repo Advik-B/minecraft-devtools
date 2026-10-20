@@ -286,4 +286,39 @@ class ReflectionEndpointsTest {
 		assertEquals(409, fieldResp.statusCode());
 		assertTrue(fieldResp.body().contains("no-player"));
 	}
+
+	@Test
+	void testDecompileClassEndpoint() throws Exception {
+		HttpResponse<String> resp = get("/v1/classes/dev.advik.mcdt.config.McdtConfig/source");
+		assertEquals(200, resp.statusCode());
+		JsonNode root = Json.MAPPER.readTree(resp.body());
+		assertEquals("dev.advik.mcdt.config.McdtConfig", root.path("$class").asText());
+		assertTrue(root.path("source").asText().contains("public final class McdtConfig"));
+	}
+
+	@Test
+	void testDecompileClassTextFormat() throws Exception {
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(server.baseUrl() + "/v1/classes/dev.advik.mcdt.config.McdtConfig/source?format=text"))
+				.header("Authorization", "Bearer " + token.value())
+				.header("Host", "127.0.0.1")
+				.GET()
+				.build();
+		HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, resp.statusCode());
+		assertTrue(resp.headers().firstValue("content-type").orElse("").contains("text/plain"));
+		assertTrue(resp.body().contains("public final class McdtConfig"));
+	}
+
+	@Test
+	void testDecompileSecurityBlockedReturns403() throws Exception {
+		HttpResponse<String> resp = get("/v1/classes/java.lang.Runtime/source");
+		assertEquals(403, resp.statusCode());
+	}
+
+	@Test
+	void testDecompileNotFoundReturns404() throws Exception {
+		HttpResponse<String> resp = get("/v1/classes/com.nonexistent.NoSuchClass/source");
+		assertEquals(404, resp.statusCode());
+	}
 }

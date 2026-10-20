@@ -158,6 +158,12 @@ public final class McdtConfigScreen {
 				.option(liveOption("enableBaritone", DEFAULTS.enableBaritone,
 						() -> draft.enableBaritone, v -> draft.enableBaritone = v,
 						TickBoxControllerBuilder::create))
+				.option(liveOption("enableDecompiler", DEFAULTS.enableDecompiler,
+						() -> draft.enableDecompiler, v -> draft.enableDecompiler = v,
+						TickBoxControllerBuilder::create))
+				.option(liveOption("decompilerCacheSize", DEFAULTS.decompilerCacheSize,
+						() -> draft.decompilerCacheSize, v -> draft.decompilerCacheSize = v,
+						o -> IntegerFieldControllerBuilder.create(o).range(0, 500)))
 				.option(restartOption("mcpNotificationThrottleMs", DEFAULTS.mcpNotificationThrottleMs,
 						() -> draft.mcpNotificationThrottleMs, v -> draft.mcpNotificationThrottleMs = v,
 						o -> LongFieldControllerBuilder.create(o).range(50L, 10_000L)))

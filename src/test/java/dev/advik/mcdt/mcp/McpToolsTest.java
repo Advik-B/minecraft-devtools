@@ -99,10 +99,10 @@ class McpToolsTest {
 		String body = Json.MAPPER.writeValueAsString(req);
 
 		Thread drainer = new Thread(() -> {
-			for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < 50; i++) {
 				drainQueue();
 				try {
-					Thread.sleep(10);
+					Thread.sleep(20);
 				} catch (InterruptedException ignored) {}
 			}
 		});
@@ -315,5 +315,16 @@ class McpToolsTest {
 		JsonNode callResult = res.get("result");
 		assertFalse(callResult.get("isError").asBoolean());
 		assertTrue(callResult.get("content").get(0).get("text").asText().contains("counts"));
+	}
+
+	@Test
+	void testCallDecompileClass() throws Exception {
+		JsonNode res = callMcp("tools/call", Map.of(
+				"name", "decompile_class",
+				"arguments", Map.of("class_name", "dev.advik.mcdt.config.McdtConfig")
+		));
+		JsonNode callResult = res.get("result");
+		assertFalse(callResult.get("isError").asBoolean());
+		assertTrue(callResult.get("content").get(0).get("text").asText().contains("public final class McdtConfig"));
 	}
 }

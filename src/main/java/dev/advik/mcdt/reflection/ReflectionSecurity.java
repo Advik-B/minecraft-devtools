@@ -18,6 +18,7 @@ public final class ReflectionSecurity {
 			"java.lang.System",
 			"java.lang.Thread",
 			"java.lang.ThreadGroup",
+			"java.lang.ClassLoader",
 			"sun.misc.Unsafe",
 			"jdk.internal.misc.Unsafe",
 			"java.io.File",

@@ -159,6 +159,39 @@ val downloadScalar = tasks.register<DownloadVerified>("downloadScalar") {
 	outputDir = layout.buildDirectory.dir("generated/scalar")
 }
 
+val downloadVineflower = tasks.register<DownloadVerified>("downloadVineflower") {
+	group = "build setup"
+	description = "Downloads the pinned Vineflower decompiler jar for isolated runtime loading."
+	val version = prop("vineflower_version")
+	url = "https://repo1.maven.org/maven2/org/vineflower/vineflower/$version/vineflower-$version.jar"
+	sha256 = prop("vineflower_sha256")
+	relativePath = "mcdt-internal/vineflower.jar"
+	outputDir = layout.buildDirectory.dir("generated/vineflower")
+}
+
+val compileIsolatedRenamer = tasks.register<JavaCompile>("compileIsolatedRenamer") {
+	group = "build setup"
+	description = "Compiles the isolated identifier renamer against the pinned Vineflower jar."
+	dependsOn(downloadVineflower)
+
+	source = fileTree("src/main/isolated")
+	destinationDirectory = layout.buildDirectory.dir("generated/vineflower-classes")
+	classpath = files(layout.buildDirectory.file("generated/vineflower/mcdt-internal/vineflower.jar"))
+
+	options.release = 21
+	options.encoding = "UTF-8"
+}
+
+val packageIsolatedRenamer = tasks.register<Copy>("packageIsolatedRenamer") {
+	group = "build setup"
+	description = "Copies the compiled renamer class as .classBytes into the vineflower resources directory."
+	dependsOn(compileIsolatedRenamer)
+
+	from(layout.buildDirectory.file("generated/vineflower-classes/dev/advik/mcdt/decompiler/isolated/VineflowerRenamer.class"))
+	into(layout.buildDirectory.dir("generated/vineflower/mcdt-internal"))
+	rename { "VineflowerRenamer.classBytes" }
+}
+
 val downloadBaritoneApi = tasks.register<DownloadVerified>("downloadBaritoneApi") {
 	group = "build setup"
 	description = "Downloads the pinned Baritone API Fabric jar."
@@ -212,6 +245,7 @@ val syncWebAssets = tasks.register<Sync>("syncWebAssets") {
 
 sourceSets.main {
 	resources.srcDir(downloadScalar)
+	resources.srcDir(downloadVineflower)
 	resources.srcDir(layout.buildDirectory.dir("generated/web"))
 }
 
@@ -221,6 +255,7 @@ tasks.compileJava {
 
 tasks.processResources {
 	dependsOn(syncWebAssets)
+	dependsOn(packageIsolatedRenamer)
 	val version = version
 	inputs.property("version", version)
 
@@ -231,6 +266,13 @@ tasks.processResources {
 
 tasks.matching { it.name == "sourcesJar" }.configureEach {
 	dependsOn(syncWebAssets)
+}
+
+tasks.register<JavaExec>("runTestServer") {
+	group = "verification"
+	description = "Runs the standalone MCDT test server with WebUI and Baritone for manual and automated verification."
+	classpath = sourceSets["test"].runtimeClasspath
+	mainClass.set("dev.advik.mcdt.TestServerRunner")
 }
 
 tasks.withType<JavaCompile>().configureEach {

@@ -38,6 +38,7 @@ public final class McpToolRegistry {
 	private final NameService nameService;
 	private final PathEvaluator pathEvaluator;
 	private final ReflectionSerializer reflectionSerializer;
+	private final dev.advik.mcdt.decompiler.DecompilerService decompilerService;
 	private final HttpClient internalHttpClient;
 
 	public McpToolRegistry(
@@ -52,6 +53,22 @@ public final class McpToolRegistry {
 			PathEvaluator pathEvaluator,
 			ReflectionSerializer reflectionSerializer
 	) {
+		this(config, token, portSupplier, queue, gameClient, baritoneService, handleTable, nameService, pathEvaluator, reflectionSerializer, null);
+	}
+
+	public McpToolRegistry(
+			McdtConfig config,
+			BearerToken token,
+			IntSupplier portSupplier,
+			TaskQueue queue,
+			GameClient gameClient,
+			BaritoneService baritoneService,
+			HandleTable handleTable,
+			NameService nameService,
+			PathEvaluator pathEvaluator,
+			ReflectionSerializer reflectionSerializer,
+			dev.advik.mcdt.decompiler.DecompilerService decompilerService
+	) {
 		this.config = config;
 		this.token = token;
 		this.portSupplier = portSupplier;
@@ -62,6 +79,7 @@ public final class McpToolRegistry {
 		this.nameService = nameService;
 		this.pathEvaluator = pathEvaluator;
 		this.reflectionSerializer = reflectionSerializer;
+		this.decompilerService = decompilerService;
 		this.internalHttpClient = HttpClient.newHttpClient();
 	}
 
@@ -124,6 +142,14 @@ public final class McpToolRegistry {
 					"Escape hatch to call any REST endpoint on the MCDT server (e.g. GET /v1/options, POST /v1/chat, GET /v1/registries). Automatically enforces current permissions on the target method/route.",
 					restCallSchema()
 			));
+
+			if (decompilerService != null && config.enableDecompiler) {
+				list.add(new ToolDefinition(
+						"decompile_class",
+						"Decompile any Minecraft or installed mod class to Java source code on-the-fly. Optional parameter 'remap' (boolean, default true) translates obfuscated/intermediary names to Mojang human-readable names when mappings exist.",
+						decompileClassSchema()
+				));
+			}
 		}
 
 		// 2. ACT Tools
@@ -241,6 +267,7 @@ public final class McpToolRegistry {
 				case "baritone_mine" -> executeBaritoneMine(args);
 				case "baritone_follow" -> executeBaritoneFollow(args);
 				case "baritone_cancel" -> executeBaritoneCancel();
+				case "decompile_class" -> executeDecompileClass(args);
 				default -> CompletableFuture.completedFuture(ToolCallResult.error("Unknown tool: " + name));
 			};
 		} catch (Exception e) {
@@ -250,7 +277,7 @@ public final class McpToolRegistry {
 
 	private Permission requiredPermissionForTool(String name) {
 		return switch (name) {
-			case "get_state", "screenshot", "raycast", "job_status", "inspect", "get_player_skin", "get_game_textures", "view_blocks" -> Permission.READ;
+			case "get_state", "screenshot", "raycast", "job_status", "inspect", "get_player_skin", "get_game_textures", "view_blocks", "decompile_class" -> Permission.READ;
 			case "rest_call" -> Permission.READ; // Target method checked in handler
 			case "look", "move", "interact", "inventory_click", "screen_action", "chat",
 					"baritone_goto", "baritone_mine", "baritone_follow", "baritone_cancel" -> Permission.ACT;
@@ -828,6 +855,43 @@ public final class McpToolRegistry {
 		props.putObject("grid").put("type", "boolean").put("description", "Whether to include 2D labels and depth array grids (default false).");
 		props.putObject("minCoverage").put("type", "number").put("description", "Minimum screen coverage fraction (e.g. 0.01) to include a block type (default 0.0).");
 		props.putObject("summaryOnly").put("type", "boolean").put("description", "If true, returns a lightweight summary of visible block counts and nearest blocks instead of full raycast grid (default false).");
+		return schema;
+	}
+
+	private CompletableFuture<ToolCallResult> executeDecompileClass(JsonNode args) {
+		if (decompilerService == null) {
+			return CompletableFuture.completedFuture(ToolCallResult.error("Decompiler service is not initialized or unavailable."));
+		}
+		String className = args.path("class_name").asText("");
+		if (className.isBlank()) {
+			return CompletableFuture.completedFuture(ToolCallResult.error("Missing required argument: 'class_name'"));
+		}
+		boolean remap = !args.has("remap") || args.path("remap").asBoolean(true);
+
+		return decompilerService.decompileAsync(className, remap)
+				.thenApply(res -> ToolCallResult.text(res.source()))
+				.exceptionally(err -> {
+					Throwable cause = err.getCause() != null ? err.getCause() : err;
+					return ToolCallResult.error("Decompilation failed for '" + className + "': " + cause.getMessage());
+				});
+	}
+
+	private static JsonNode decompileClassSchema() {
+		ObjectNode schema = Json.MAPPER.createObjectNode();
+		schema.put("type", "object");
+		ObjectNode props = schema.putObject("properties");
+
+		ObjectNode className = props.putObject("class_name");
+		className.put("type", "string");
+		className.put("description", "Fully qualified class name to decompile (e.g. 'net.minecraft.client.Minecraft', 'me.author.mod.SomeClass')");
+
+		ObjectNode remap = props.putObject("remap");
+		remap.put("type", "boolean");
+		remap.put("description", "Whether to remap names to Mojang mappings if available (default true)");
+
+		ArrayNode required = schema.putArray("required");
+		required.add("class_name");
+
 		return schema;
 	}
 }

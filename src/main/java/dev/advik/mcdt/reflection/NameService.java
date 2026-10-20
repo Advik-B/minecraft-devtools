@@ -428,20 +428,24 @@ public final class NameService {
 		return classMojangToIntermediary.getOrDefault(mojangClassName, mojangClassName);
 	}
 
-	public String resolveFieldName(Class<?> owner, String runtimeFieldName) {
+	public String resolveFieldByName(String ownerName, String runtimeFieldName) {
 		if (runtimeFieldName == null) {
 			return null;
 		}
 		if (isDevEnvironment) {
 			return runtimeFieldName;
 		}
-		if (owner != null) {
-			String mapped = fieldIntermediaryToMojang.get(owner.getName() + "#" + runtimeFieldName);
+		if (ownerName != null) {
+			String mapped = fieldIntermediaryToMojang.get(ownerName + "#" + runtimeFieldName);
 			if (mapped != null) {
 				return mapped;
 			}
 		}
 		return runtimeFieldName;
+	}
+
+	public String resolveFieldName(Class<?> owner, String runtimeFieldName) {
+		return resolveFieldByName(owner != null ? owner.getName() : null, runtimeFieldName);
 	}
 
 	public String toRuntimeFieldName(Class<?> owner, String mojangFieldName) {
@@ -460,20 +464,24 @@ public final class NameService {
 		return mojangFieldName;
 	}
 
-	public String resolveMethodName(Class<?> owner, String runtimeMethodName) {
+	public String resolveMethodByName(String ownerName, String runtimeMethodName) {
 		if (runtimeMethodName == null) {
 			return null;
 		}
 		if (isDevEnvironment) {
 			return runtimeMethodName;
 		}
-		if (owner != null) {
-			String mapped = methodIntermediaryToMojang.get(owner.getName() + "#" + runtimeMethodName);
+		if (ownerName != null) {
+			String mapped = methodIntermediaryToMojang.get(ownerName + "#" + runtimeMethodName);
 			if (mapped != null) {
 				return mapped;
 			}
 		}
 		return runtimeMethodName;
+	}
+
+	public String resolveMethodName(Class<?> owner, String runtimeMethodName) {
+		return resolveMethodByName(owner != null ? owner.getName() : null, runtimeMethodName);
 	}
 
 	public String toRuntimeMethodName(Class<?> owner, String mojangMethodName) {

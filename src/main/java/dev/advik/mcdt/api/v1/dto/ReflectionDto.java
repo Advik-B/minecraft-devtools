@@ -68,4 +68,15 @@ public final class ReflectionDto {
 			boolean released
 	) {
 	}
+
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	public record ClassSourceResponse(
+			@JsonProperty("$class") String className,
+			String runtimeName,
+			String source,
+			boolean remapped,
+			boolean cached,
+			long durationMs
+	) {
+	}
 }

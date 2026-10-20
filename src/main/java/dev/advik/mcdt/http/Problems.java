@@ -48,8 +48,13 @@ public final class Problems {
 	public static final String TEXTURE_FAILED = "texture-failed";
 	public static final String VIEW_BLOCKS_DISABLED = "view-blocks-disabled";
 	public static final String BATCH_LIMIT_EXCEEDED = "batch-limit-exceeded";
+	public static final String DECOMPILER_DISABLED = "decompiler-disabled";
 
 	private Problems() {
+	}
+
+	public static ProblemException decompilerDisabled() {
+		return of(503, DECOMPILER_DISABLED, "Decompiler disabled", "The class decompiler is disabled in configuration.");
 	}
 
 	public static ProblemException unauthorized(String detail) {

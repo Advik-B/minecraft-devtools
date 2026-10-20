@@ -24,6 +24,8 @@ public final class ConfigUpdater {
 		live.eventSubscriberQueueCapacity = draft.eventSubscriberQueueCapacity;
 		live.enableViewBlocks = draft.enableViewBlocks;
 		live.maxViewBlocksRays = draft.maxViewBlocksRays;
+		live.enableDecompiler = draft.enableDecompiler;
+		live.decompilerCacheSize = draft.decompilerCacheSize;
 		live.originAllowlist = new ArrayList<>(draft.originAllowlist);
 		live.allowedHosts = new ArrayList<>(draft.allowedHosts);
 		if (!live.allowedMultiplayerServers.equals(draft.allowedMultiplayerServers)) {
