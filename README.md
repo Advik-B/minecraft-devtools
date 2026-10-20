@@ -14,7 +14,7 @@ Read game state, send input, stream events and poke around the live object graph
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 [![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
-[Features](#features) | [Getting started](#getting-started) | [AI agents (MCP)](#use-it-from-an-ai-agent-mcp) | [API](#api-at-a-glance) | [Configuration](#configuration) | [Development](#development)
+[Features](#features) | [Getting started](#getting-started) | [AI agents (MCP)](#use-it-from-an-ai-agent-mcp) | [API](#api-at-a-glance) | [Configuration](#configuration) | [Docker](#run-it-in-docker) | [Development](#development)
 
 <img src="docs/images/hero.jpg" alt="The MCDT dashboard inspecting the live LocalPlayer object, floating over a Minecraft scene" width="900">
 
@@ -172,6 +172,7 @@ Settings live in `<gameDir>/config/mcdt/config.json`. You can also edit them in-
 | `permission` | `"read"` | Highest level granted to clients: `read`, `act`, or `reflect-write` |
 | `allowedMultiplayerServers` | `[]` | Servers where `act` and `reflect-write` are allowed |
 | `originAllowlist` | `[]` | Extra browser origins, e.g. `http://localhost:5173` |
+| `allowedHosts` | `[]` | Extra `Host` header names, e.g. a reverse proxy's domain |
 | `preferredPort` / `bindAddress` | `25580` / `127.0.0.1` | Falls back to a random port if `25580` is taken |
 | `requestTimeoutMs` | `5000` | How long a request waits for the client thread |
 | `tickBudgetMicros` | `2000` | Time the queue may use per client tick |
@@ -179,6 +180,53 @@ Settings live in `<gameDir>/config/mcdt/config.json`. You can also edit them in-
 | `rateLimitPerSecond` | `200` | Per-client request rate limit |
 
 The file also holds `enabled`, `queueCapacity`, `maxRequestBytes`, `eventRingBufferSize`, `eventSubscriberQueueCapacity`, `mcpLogCalls`, and `mcpNotificationThrottleMs`.
+
+Environment variables override the file at startup. They are not written back to it, and an empty variable counts as unset.
+
+| Variable | Overrides |
+| --- | --- |
+| `MCDT_PORT` | `preferredPort` |
+| `MCDT_BIND_ADDRESS` | `bindAddress` |
+| `MCDT_PERMISSION` | `permission` |
+| `MCDT_ALLOW_QUIT` | `allowQuit` (`true` or `false`) |
+| `MCDT_ALLOWED_HOSTS`, `MCDT_ORIGIN_ALLOWLIST`, `MCDT_ALLOWED_MULTIPLAYER_SERVERS` | The matching list, comma-separated |
+| `MCDT_TOKEN` | A fixed bearer token of at least 32 characters, used instead of a random one per launch |
+
+## Run it in Docker
+
+The image runs a headless Minecraft 1.21.4 client with Fabric, Fabric API and MCDT. The client draws to a virtual display (Xvfb) with software OpenGL (Mesa llvmpipe), so screenshots and texture endpoints still work. The image needs no GPU and is tested on `linux/amd64`. The client starts on the title screen. Join a world or server through the API.
+
+```sh
+docker build -t mcdt .
+docker run -d --name mcdt -p 127.0.0.1:25580:25580 -v mcdt-data:/data \
+  -e MCDT_TOKEN="$(openssl rand -hex 32)" -e MCDT_PERMISSION=act mcdt
+```
+
+You can also use `docker compose up -d --build`. Put your settings in a `.env` file next to `docker-compose.yml`. The first start takes a minute or two, and the container shows as `healthy` when the API is up. If you don't set `MCDT_TOKEN`, read the random token with `docker exec mcdt cat /data/config/mcdt/token`.
+
+```sh
+TOKEN=...   # your MCDT_TOKEN
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:25580/v1/client
+curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"address":"mc.example.com:25565"}' http://127.0.0.1:25580/v1/servers/connect
+```
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MC_AUTH` | `offline` | `offline`, or `microsoft` for a real account |
+| `MC_USERNAME` | `McdtBot` | Offline player name. With `microsoft`, picks a stored account by name |
+| `MC_MAX_MEMORY` | `2G` | Game heap (`-Xmx`) |
+| `MC_JVM_ARGS` | | Extra JVM arguments, space-separated |
+| `MC_WIDTH` / `MC_HEIGHT` | `1280` / `720` | Virtual screen and window size |
+| `MC_JOIN_SERVER` (+ `MC_JOIN_SERVER_PORT`) / `MC_JOIN_WORLD` | | Optional: join a server or saved world at startup |
+| `MCDT_*` | see above | MCDT settings. The image sets `MCDT_BIND_ADDRESS=0.0.0.0` |
+
+**Offline accounts** only work in singleplayer and on servers with `online-mode=false`. For a **Microsoft account**, set `MC_AUTH=microsoft` and watch `docker logs -f mcdt` on the first start. It prints a link and a code to sign in with. The login is saved in the `/data` volume and reused on later starts.
+
+`/data` is the game directory. It holds `config/mcdt/`, `logs/`, `saves/`, `options.txt`, and `mods/`. Add extra mods such as Baritone to `/data/mods`.
+
+> [!CAUTION]
+> Inside the container the API binds to `0.0.0.0`, but the examples above publish it only on the host's loopback. To reach it from other machines, put a TLS reverse proxy in front of it and set `MCDT_ALLOWED_HOSTS` to the proxy's host name, plus `MCDT_ORIGIN_ALLOWLIST` if you use the dashboard. Always set a strong `MCDT_TOKEN`. Anyone with the token and `act` permission controls the client. `act` and `reflect-write` stay blocked on multiplayer servers that are not in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`.
 
 ## Development
 
