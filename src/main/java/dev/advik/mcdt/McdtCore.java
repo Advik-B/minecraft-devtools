@@ -50,9 +50,9 @@ public final class McdtCore implements AutoCloseable {
 		Files.createDirectories(env.logDir());
 
 		ConfigStore configStore = new ConfigStore(env.configDir().resolve("config.json"));
-		McdtConfig config = configStore.load();
+		McdtConfig config = ConfigStore.applyEnv(configStore.load(), envOverrides);
 
-		BearerToken token = BearerToken.generate();
+		BearerToken token = tokenFrom(envOverrides);
 		token.writeTo(env.configDir().resolve("token"));
 
 		TickClock clock = new TickClock();
@@ -79,6 +79,20 @@ public final class McdtCore implements AutoCloseable {
 		McdtCore core = new McdtCore(env, configStore, config, token, queue, logWriter, server, discovery);
 		Runtime.getRuntime().addShutdownHook(core.shutdownHook);
 		return core;
+	}
+
+	private static BearerToken tokenFrom(Map<String, String> envOverrides) {
+		String fixed = envOverrides.get(ConfigStore.TOKEN_ENV);
+		if (fixed == null || fixed.isBlank()) {
+			return BearerToken.generate();
+		}
+		fixed = fixed.trim();
+		if (fixed.length() < ConfigStore.MIN_TOKEN_LENGTH) {
+			Mcdt.LOGGER.warn("Ignoring {}: it must be at least {} characters; using a random token instead",
+					ConfigStore.TOKEN_ENV, ConfigStore.MIN_TOKEN_LENGTH);
+			return BearerToken.generate();
+		}
+		return BearerToken.of(fixed);
 	}
 
 	private McdtCore(

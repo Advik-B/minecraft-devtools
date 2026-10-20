@@ -25,6 +25,7 @@ public final class ConfigUpdater {
 		live.enableViewBlocks = draft.enableViewBlocks;
 		live.maxViewBlocksRays = draft.maxViewBlocksRays;
 		live.originAllowlist = new ArrayList<>(draft.originAllowlist);
+		live.allowedHosts = new ArrayList<>(draft.allowedHosts);
 		live.allowedMultiplayerServers = new ArrayList<>(draft.allowedMultiplayerServers);
 	}
 

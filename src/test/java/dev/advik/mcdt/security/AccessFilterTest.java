@@ -76,6 +76,18 @@ class AccessFilterTest {
 	}
 
 	@Test
+	void allowsConfiguredHost() {
+		config.allowedHosts = List.of("mcdt.example.com");
+		JavalinTest.test(app, (server, client) -> {
+			Response res = client.get("/public", req -> req.header("Host", "MCDT.example.com:443"));
+			assertEquals(200, res.code());
+
+			Response other = client.get("/public", req -> req.header("Host", "evil.attacker.com"));
+			assertEquals(403, other.code());
+		});
+	}
+
+	@Test
 	void rejectsDisallowedOrigin() {
 		JavalinTest.test(app, (server, client) -> {
 			Response res = client.get("/public", req -> {

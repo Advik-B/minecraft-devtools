@@ -6,6 +6,7 @@ import dev.advik.mcdt.events.EventHub;
 import dev.advik.mcdt.events.EventSubscriber;
 import dev.advik.mcdt.events.SubscriptionRequest;
 import dev.advik.mcdt.json.Json;
+import dev.advik.mcdt.security.AccessFilter;
 import dev.advik.mcdt.security.BearerToken;
 import io.javalin.websocket.WsConfig;
 import io.javalin.websocket.WsConnectContext;
@@ -116,40 +117,15 @@ public final class EventsWsHandler implements Consumer<WsConfig> {
 			ctx.closeSession(1008, "Missing Host header");
 			return false;
 		}
-
-		String hostName = hostHeader.trim();
-		if (hostName.startsWith("[")) {
-			int closeBracket = hostName.indexOf(']');
-			if (closeBracket != -1) {
-				hostName = hostName.substring(1, closeBracket);
-			}
-		} else {
-			int colon = hostName.indexOf(':');
-			if (colon != -1) {
-				hostName = hostName.substring(0, colon);
-			}
-		}
-
-		boolean isLoopback = "127.0.0.1".equalsIgnoreCase(hostName) || "localhost".equalsIgnoreCase(hostName)
-				|| "::1".equalsIgnoreCase(hostName);
-		boolean matchesBind = config.bindAddress != null && config.bindAddress.equalsIgnoreCase(hostName);
-
-		if (!isLoopback && !matchesBind) {
+		if (!AccessFilter.isHostAllowed(config, hostHeader)) {
 			ctx.closeSession(1008, "Host not allowed");
 			return false;
 		}
 
 		String origin = ctx.header("Origin");
-		if (origin != null && !origin.isBlank()) {
-			int port = portSupplier.getAsInt();
-			boolean isSelf = origin.equalsIgnoreCase("http://127.0.0.1:" + port)
-					|| origin.equalsIgnoreCase("http://localhost:" + port);
-			boolean isAllowed = isSelf || config.originAllowlist.stream().anyMatch(origin::equalsIgnoreCase);
-
-			if (!isAllowed) {
-				ctx.closeSession(1008, "Origin not allowed");
-				return false;
-			}
+		if (origin != null && !origin.isBlank() && !AccessFilter.isOriginAllowed(config, portSupplier.getAsInt(), origin)) {
+			ctx.closeSession(1008, "Origin not allowed");
+			return false;
 		}
 
 		String presented = null;

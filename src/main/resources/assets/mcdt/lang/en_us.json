@@ -34,6 +34,8 @@
 	"mcdt.config.maxRequestBytes.desc": "Largest accepted request body.",
 	"mcdt.config.originAllowlist": "Allowed browser origins",
 	"mcdt.config.originAllowlist.desc": "Extra browser origins allowed to call the API, e.g. http://localhost:5173.",
+	"mcdt.config.allowedHosts": "Allowed host names",
+	"mcdt.config.allowedHosts.desc": "Extra Host header names accepted besides loopback and the bind address, e.g. a reverse proxy's domain.",
 	"mcdt.config.allowedMultiplayerServers": "Allowed multiplayer servers",
 	"mcdt.config.allowedMultiplayerServers.desc": "Server addresses where act and reflect-write actions are permitted.",
 

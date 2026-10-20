@@ -421,7 +421,11 @@ public final class HttpServer implements AutoCloseable {
 	}
 
 	public String baseUrl() {
-		return "http://" + config.bindAddress + ":" + port();
+		String host = config.bindAddress;
+		if ("0.0.0.0".equals(host) || "::".equals(host)) {
+			host = "127.0.0.1";
+		}
+		return "http://" + host + ":" + port();
 	}
 
 	public void setOnQuitCallback(Runnable callback) {
