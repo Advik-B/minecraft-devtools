@@ -92,7 +92,9 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 					.map(m -> m.getVersion().getFriendlyString())
 					.orElse("0.1.0-SNAPSHOT");
 
-			String gameVersion = client.getLaunchedVersion();
+			// The game's own version id (e.g. "1.21.4"). getLaunchedVersion() is the launcher profile name, which for
+			// Fabric is something like "fabric-loader-0.19.5-1.21.4" and is not in Mojang's version manifest.
+			String gameVersion = net.minecraft.SharedConstants.getCurrentVersion().getName();
 			if (gameVersion == null || gameVersion.isBlank()) {
 				gameVersion = "1.21.4";
 			}
