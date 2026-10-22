@@ -252,6 +252,32 @@ $null = Test-Endpoint -Name "Security Denylist: java.lang.Runtime (expected 403)
 $null = Test-Endpoint -Name "Security Denylist: ClassLoader (expected 403)" -Path "/v1/classes/java.lang.ClassLoader" -ExpectedStatus 403 -Validator { param($j)
     $j.type -eq "reflection-denied"
 }
+
+Write-Host "`n=== 3b. On-the-Fly (OTF) Decompiler Tests ===" -ForegroundColor White
+$null = Test-Endpoint -Name "Decompile Minecraft (Remapped)" -Path "/v1/classes/net.minecraft.client.Minecraft/source?remap=true" -Validator { param($j)
+    $j.'$class' -eq "net.minecraft.client.Minecraft" -and
+    $j.source.Contains("class Minecraft") -and
+    $j.remapped -eq $true
+}
+$null = Test-Endpoint -Name "Decompile Minecraft (Cached)" -Path "/v1/classes/net.minecraft.client.Minecraft/source?remap=true" -Validator { param($j)
+    $j.'$class' -eq "net.minecraft.client.Minecraft" -and
+    $j.cached -eq $true -and
+    $j.durationMs -eq 0
+}
+$null = Test-Endpoint -Name "Decompile Mod Class (dev.advik.mcdt.Mcdt)" -Path "/v1/classes/dev.advik.mcdt.Mcdt/source" -Validator { param($j)
+    $j.'$class' -eq "dev.advik.mcdt.Mcdt" -and
+    $j.source.Contains("class Mcdt")
+}
+$null = Test-Endpoint -Name "Decompile Minecraft (Raw Bytecode)" -Path "/v1/classes/net.minecraft.client.Minecraft/source?remap=false" -Validator { param($j)
+    $j.'$class' -eq "net.minecraft.client.Minecraft" -and
+    $j.remapped -eq $false
+}
+$null = Test-Endpoint -Name "Decompile Plain Text Output" -Path "/v1/classes/dev.advik.mcdt.Mcdt/source?format=text" -Headers @{ "Accept" = "text/plain" } -Validator { param($j, $raw)
+    $raw.Contains("class Mcdt")
+}
+$null = Test-Endpoint -Name "Decompile Security Denylist: java.lang.Runtime (expected 403)" -Path "/v1/classes/java.lang.Runtime/source" -ExpectedStatus 403 -Validator { param($j)
+    $j.type -eq "reflection-denied"
+}
 $null = Test-Endpoint -Name "Cannot Release Root Handle (expected 400)" -Path "/v1/objects/minecraft" -Method "DELETE" -ExpectedStatus 400
 
 # Test handle deletion using the handle returned from field expansion

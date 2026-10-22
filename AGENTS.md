@@ -86,12 +86,13 @@ libs/                       pinned Baritone API jar (committed via a .gitignore 
 
 ## Testing
 
+- **Mock tests are often false signals that something has gone right.** They verify HTTP route protocol shape and DTO serialization, but cannot verify real game rendering, texture extraction, OpenGL/WebGPU pipelines, block model geometry, or client thread safety. Never rely solely on mock unit tests. **Always do live testing against a running Minecraft client before declaring any feature or bug fix done.**
 - Unit and integration tests run **without Minecraft**. They construct a real `HttpServer` with `MockGameClient` (and `MockBaritoneService` for Baritone tests), `config.preferredPort = 0`, `BearerToken.of("test-secret-token")`, and a `McdtEnvironment` rooted in a JUnit `@TempDir`, then call it with `java.net.http.HttpClient`. Use `api/v1/CuratedActionEndpointsTest` as the template.
 - Close the server, queue, and log writer in `@AfterEach`.
 - Game-specific code in `MinecraftGameClient`, mixins, and `bridge/` is not unit-tested. Check it live:
   1. `./gradlew runClient`, then open a world.
   2. `pwsh scripts/test-live-client.ps1`. It finds the instance via `~/.mcdt/instances/<pid>.json` or `run/config/mcdt/instance.json`. `-ShutdownClient` also exercises the quit flow.
-- Before you call a change done, run `./gradlew test`, plus `bun run check` in `web/` if you touched the WebUI.
+- Before you call a change done, run `./gradlew test`, plus `bun run check` in `web/` if you touched the WebUI, followed by live verification on the running client.
 
 ## Conventions
 
