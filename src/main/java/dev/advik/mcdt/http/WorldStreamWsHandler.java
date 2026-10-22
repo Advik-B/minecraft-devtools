@@ -1,142 +1,105 @@
 package dev.advik.mcdt.http;
 
-import dev.advik.mcdt.Mcdt;
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.advik.mcdt.config.McdtConfig;
-import dev.advik.mcdt.exec.TaskQueue;
-import dev.advik.mcdt.game.GameClient;
+import dev.advik.mcdt.json.Json;
 import dev.advik.mcdt.security.AccessFilter;
 import dev.advik.mcdt.security.BearerToken;
-import dev.advik.mcdt.world.stream.BinaryChunkSerializer;
-import dev.advik.mcdt.world.stream.ChunkOrderGenerator;
+import dev.advik.mcdt.world.stream.WorldStreamService;
 import io.javalin.websocket.WsConfig;
 import io.javalin.websocket.WsConnectContext;
 import io.javalin.websocket.WsContext;
 import io.javalin.websocket.WsMessageContext;
+import org.eclipse.jetty.websocket.api.Callback;
 
 import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 
 /**
- * Dedicated WebSocket endpoint on {@code /v1/world/stream} for 3D viewers and mapping tools.
- * Streams palette-indexed chunk sections in requested ordering (spiral, radial, scan)
- * and broadcasts live binary block diffs.
+ * WebSocket endpoint on {@code /v1/world/stream} for the 3D viewer. Frames are produced by {@link WorldStreamService} on
+ * the client tick; this handler only authenticates, registers sessions and applies {@code view} messages:
+ * {@code {"type":"view","cx":0,"cz":0,"radius":8,"follow":false,"entities":true}}.
  */
 public final class WorldStreamWsHandler implements Consumer<WsConfig> {
-	private static final List<WsContext> ACTIVE_SESSIONS = new CopyOnWriteArrayList<>();
+	private static final String SESSION_ATTR = "mcdt.worldStream";
 
 	private final McdtConfig config;
 	private final BearerToken token;
 	private final IntSupplier portSupplier;
-	private final TaskQueue queue;
-	private final GameClient gameClient;
+	private final WorldStreamService service;
 
-	public WorldStreamWsHandler(
-			McdtConfig config,
-			BearerToken token,
-			IntSupplier portSupplier,
-			TaskQueue queue,
-			GameClient gameClient
-	) {
+	public WorldStreamWsHandler(McdtConfig config, BearerToken token, IntSupplier portSupplier, WorldStreamService service) {
 		this.config = config;
 		this.token = token;
 		this.portSupplier = portSupplier;
-		this.queue = queue;
-		this.gameClient = gameClient;
-	}
-
-	public static void broadcastBlockDiff(int x, int y, int z, String blockState, int flags) {
-		if (ACTIVE_SESSIONS.isEmpty()) return;
-		ByteBuffer buf = BinaryChunkSerializer.encodeBlockDiff(x, y, z, blockState, flags);
-		for (WsContext ctx : ACTIVE_SESSIONS) {
-			try {
-				ctx.send(buf.duplicate());
-			} catch (Exception e) {
-				ACTIVE_SESSIONS.remove(ctx);
-			}
-		}
-	}
-
-	public static void broadcastPlayerPose(double x, double y, double z, float yaw, float pitch) {
-		if (ACTIVE_SESSIONS.isEmpty()) return;
-		ByteBuffer buf = BinaryChunkSerializer.encodePlayerPose(x, y, z, yaw, pitch);
-		for (WsContext ctx : ACTIVE_SESSIONS) {
-			try {
-				ctx.send(buf.duplicate());
-			} catch (Exception e) {
-				ACTIVE_SESSIONS.remove(ctx);
-			}
-		}
+		this.service = service;
 	}
 
 	@Override
 	public void accept(WsConfig ws) {
 		ws.onConnect(this::handleConnect);
 		ws.onMessage(this::handleMessage);
-		ws.onClose(this::handleClose);
-		ws.onError(this::handleError);
+		ws.onClose(ctx -> release(ctx));
+		ws.onError(ctx -> release(ctx));
 	}
 
 	private void handleConnect(WsConnectContext ctx) {
 		if (!validateHandshake(ctx)) {
 			return;
 		}
-
-		ACTIVE_SESSIONS.add(ctx);
-
-		int radius = 4;
-		String radiusStr = ctx.queryParam("radius");
-		if (radiusStr != null) {
+		int radius = WorldStreamService.DEFAULT_RADIUS;
+		String radiusParam = ctx.queryParam("radius");
+		if (radiusParam != null) {
 			try {
-				radius = Integer.parseInt(radiusStr);
+				radius = Integer.parseInt(radiusParam.trim());
 			} catch (NumberFormatException ignored) {
 			}
 		}
-
-		String orderStr = ctx.queryParam("order");
-		ChunkOrderGenerator.Order order = ChunkOrderGenerator.parseOrder(orderStr);
-
-		List<ChunkOrderGenerator.ChunkOffset> offsets = ChunkOrderGenerator.generate(radius, order);
-
-		// Asynchronously stream chunk sections
-		Thread streamer = new Thread(() -> streamInitialChunks(ctx, offsets), "MCDT-ViewerStreamer-" + ctx.sessionId());
-		streamer.setDaemon(true);
-		streamer.start();
-	}
-
-	private void streamInitialChunks(WsContext ctx, List<ChunkOrderGenerator.ChunkOffset> offsets) {
-		for (ChunkOrderGenerator.ChunkOffset offset : offsets) {
-			if (!ACTIVE_SESSIONS.contains(ctx)) break;
-
-			// In test or live game, generate/read chunk section binary frame
-			List<BinaryChunkSerializer.SectionData> sections = List.of(
-					new BinaryChunkSerializer.SectionData(4, List.of("minecraft:stone", "minecraft:dirt"), new byte[4096])
-			);
-			ByteBuffer buf = BinaryChunkSerializer.encodeChunkData(offset.dx(), offset.dz(), 0, sections);
-
-			try {
-				ctx.send(buf);
-				Thread.sleep(5); // Throttle slightly to pace chunk streaming
-			} catch (Exception e) {
-				ACTIVE_SESSIONS.remove(ctx);
-				break;
+		WorldStreamService.Session session = service.open(new WorldStreamService.Sink() {
+			@Override
+			public void send(ByteBuffer frame, Runnable done) {
+				if (!ctx.session.isOpen()) {
+					done.run();
+					throw new IllegalStateException("session closed");
+				}
+				ctx.session.sendBinary(frame, Callback.from(done, error -> done.run()));
 			}
-		}
+
+			@Override
+			public void close(int code, String reason) {
+				ctx.closeSession(code, reason);
+			}
+		}, radius);
+		ctx.attribute(SESSION_ATTR, session);
+		ctx.enableAutomaticPings();
 	}
 
 	private void handleMessage(WsMessageContext ctx) {
-		// Can handle client view center updates or custom requests
+		WorldStreamService.Session session = ctx.attribute(SESSION_ATTR);
+		if (session == null) return;
+		try {
+			JsonNode node = Json.MAPPER.readTree(ctx.message());
+			if (!"view".equals(node.path("type").asText())) return;
+			session.setView(
+					node.hasNonNull("cx") ? node.get("cx").asInt() : null,
+					node.hasNonNull("cz") ? node.get("cz").asInt() : null,
+					node.hasNonNull("radius") ? node.get("radius").asInt() : null,
+					node.path("follow").asBoolean(false)
+			);
+			if (node.has("entities")) {
+				session.setEntities(node.get("entities").asBoolean(true));
+			}
+		} catch (Exception ignored) {
+			// Malformed view messages are ignored; the stream keeps its current view.
+		}
 	}
 
-	private void handleClose(WsContext ctx) {
-		ACTIVE_SESSIONS.remove(ctx);
-	}
-
-	private void handleError(io.javalin.websocket.WsErrorContext ctx) {
-		ACTIVE_SESSIONS.remove(ctx);
+	private void release(WsContext ctx) {
+		WorldStreamService.Session session = ctx.attribute(SESSION_ATTR);
+		if (session != null) {
+			service.close(session);
+		}
 	}
 
 	private boolean validateHandshake(WsContext ctx) {
@@ -156,13 +119,20 @@ public final class WorldStreamWsHandler implements Consumer<WsConfig> {
 			return false;
 		}
 
+		// Browsers cannot set headers on a WebSocket handshake, so the dashboard passes the token like /v1/events does.
 		String auth = ctx.header("Authorization");
-		if (auth == null || !auth.startsWith("Bearer ")) {
+		String presented = null;
+		if (auth != null && auth.startsWith("Bearer ")) {
+			presented = auth.substring("Bearer ".length()).trim();
+		} else if (ctx.queryParam("token") != null && !ctx.queryParam("token").isBlank()) {
+			presented = ctx.queryParam("token").trim();
+		}
+
+		if (presented == null) {
 			ctx.closeSession(1008, "Missing or invalid Bearer token");
 			return false;
 		}
 
-		String presented = auth.substring("Bearer ".length()).trim();
 		if (!token.matches(presented)) {
 			ctx.closeSession(1008, "Invalid Bearer token");
 			return false;

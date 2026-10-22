@@ -10,13 +10,15 @@
     Radio,
     BookOpen,
     Key,
-    Image
+    Image,
+    Box
   } from 'lucide-svelte'
 
   const tabs = [
     { id: 'telemetry', label: 'Telemetry', icon: Activity },
     { id: 'inventory', label: 'Inventory', icon: Package },
     { id: 'radar', label: 'Radar', icon: Radar },
+    { id: 'viewer', label: '3D Viewer', icon: Box },
     { id: 'textures', label: 'Textures', icon: Image },
     { id: 'baritone', label: 'Baritone', icon: Bot },
     { id: 'actions', label: 'Controls & Actions', icon: Gamepad2 },

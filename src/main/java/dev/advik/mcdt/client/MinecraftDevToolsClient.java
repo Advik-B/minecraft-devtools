@@ -59,6 +59,10 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 					"type", "game"
 			));
 		});
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents.CHUNK_LOAD.register((level, chunk) ->
+				dev.advik.mcdt.world.stream.WorldStreamService.onChunkLoaded(chunk.getPos().x, chunk.getPos().z));
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) ->
+				dev.advik.mcdt.world.stream.WorldStreamService.onChunkUnloaded(chunk.getPos().x, chunk.getPos().z));
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> {
 			String type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
 			dev.advik.mcdt.events.EventHub.getInstance().publish("entity.spawn", java.util.Map.of(
@@ -158,6 +162,7 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 			dev.advik.mcdt.events.EventHub.getInstance().publish("tick", currentTick, java.util.Map.of("tick", currentTick));
 			long budgetNanos = TimeUnit.MICROSECONDS.toNanos(instance.config().tickBudgetMicros);
 			instance.queue().drain(budgetNanos);
+			instance.server().worldStream().tick(budgetNanos);
 		}
 	}
 

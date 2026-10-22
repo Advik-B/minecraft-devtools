@@ -19,6 +19,7 @@ import dev.advik.mcdt.security.BearerToken;
 import dev.advik.mcdt.security.McdtRole;
 import dev.advik.mcdt.security.RateLimiter;
 import dev.advik.mcdt.security.ConfirmManager;
+import dev.advik.mcdt.world.stream.WorldStreamService;
 import io.javalin.Javalin;
 import io.javalin.http.HttpResponseException;
 import io.javalin.openapi.plugin.OpenApiPlugin;
@@ -43,6 +44,7 @@ public final class HttpServer implements AutoCloseable {
 	private final BaritoneService baritoneService;
 	private final dev.advik.mcdt.mcp.McpSessionManager mcpSessionManager;
 	private final dev.advik.mcdt.decompiler.DecompilerService decompilerService;
+	private final WorldStreamService worldStream;
 	private final Javalin app;
 	private final AtomicInteger boundPort = new AtomicInteger();
 	private volatile Runnable onQuitCallback = () -> {};
@@ -88,6 +90,7 @@ public final class HttpServer implements AutoCloseable {
 		this.gameClient = gameClient;
 		this.baritoneService = baritoneService != null ? baritoneService : new UnavailableBaritoneService();
 		this.mcpSessionManager = new dev.advik.mcdt.mcp.McpSessionManager(config.mcpNotificationThrottleMs);
+		this.worldStream = new WorldStreamService(gameClient);
 
 		NameService nameService = NameService.getInstance();
 		nameService.initialize(env.configDir(), env.gameVersion());
@@ -161,6 +164,7 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/world/entities", new EntitiesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/entities/categories", new EntityCategoriesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/raycast", new RaycastHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.post("/v1/world/block-models", new BlockModelsHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/view/blocks", new ViewBlocksHandlers.ViewHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/view/blocks/summary", new ViewBlocksHandlers.SummaryHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.post("/v1/batch", new BatchHandler(config, queue, gameClient), McdtRole.READ);
@@ -296,7 +300,7 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.ws("/v1/input/mouse", new InputMouseWsHandler(config, token, boundPort::get, queue, gameClient));
 			cfg.routes.ws("/v1/player/inventory", new InventoryWsHandler(config, token, boundPort::get, queue, gameClient));
 			cfg.routes.ws("/v1/player/status", new PlayerStatusWsHandler(config, token, boundPort::get, queue, gameClient));
-			cfg.routes.ws("/v1/world/stream", new WorldStreamWsHandler(config, token, boundPort::get, queue, gameClient));
+			cfg.routes.ws("/v1/world/stream", new WorldStreamWsHandler(config, token, boundPort::get, worldStream));
 
 			// --- Milestone M6 MCP Routes ---
 			dev.advik.mcdt.mcp.McpToolLog toolLog = new dev.advik.mcdt.mcp.McpToolLog(100);
@@ -444,6 +448,11 @@ public final class HttpServer implements AutoCloseable {
 		return "http://" + host + ":" + port();
 	}
 
+	/** Viewer stream driven by the client tick hook. */
+	public WorldStreamService worldStream() {
+		return worldStream;
+	}
+
 	public void setOnQuitCallback(Runnable callback) {
 		this.onQuitCallback = callback != null ? callback : () -> {};
 	}
@@ -461,6 +470,7 @@ public final class HttpServer implements AutoCloseable {
 				mcpSessionManager.close();
 			}
 			dev.advik.mcdt.events.EventHub.getInstance().closeAll(1000, "Server stopping");
+			worldStream.shutdown();
 			app.stop();
 		} catch (Exception e) {
 			Mcdt.LOGGER.warn("Error stopping Javalin server: {}", e.getMessage());

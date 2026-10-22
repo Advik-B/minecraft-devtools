@@ -9,6 +9,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -338,6 +339,38 @@ public class MockGameClient implements GameClient {
 			throw Problems.textureFailed(e.getMessage());
 		}
 		return baos.toByteArray();
+	}
+
+	// The 3D viewer stream is verified against a live client only; these are deliberately not simulated.
+
+	@Override
+	public BlockModelsDto.Response getBlockModels(List<Integer> stateIds) {
+		throw new UnsupportedOperationException("3D viewer is live-tested only");
+	}
+
+	@Override
+	public dev.advik.mcdt.world.stream.ViewData.Level getViewLevel() {
+		throw new UnsupportedOperationException("3D viewer is live-tested only");
+	}
+
+	@Override
+	public boolean isChunkLoaded(int chunkX, int chunkZ) {
+		throw new UnsupportedOperationException("3D viewer is live-tested only");
+	}
+
+	@Override
+	public dev.advik.mcdt.world.stream.ViewData.Chunk getViewChunk(int chunkX, int chunkZ, java.util.Set<Integer> sectionYs) {
+		throw new UnsupportedOperationException("3D viewer is live-tested only");
+	}
+
+	@Override
+	public dev.advik.mcdt.world.stream.ViewData.Pose getViewPose() {
+		throw new UnsupportedOperationException("3D viewer is live-tested only");
+	}
+
+	@Override
+	public List<dev.advik.mcdt.world.stream.ViewData.Entity> getViewEntities(double centerX, double centerZ, double radius, int limit) {
+		throw new UnsupportedOperationException("3D viewer is live-tested only");
 	}
 
 	@Override

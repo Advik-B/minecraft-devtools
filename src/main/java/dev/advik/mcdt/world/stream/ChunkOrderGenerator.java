@@ -26,7 +26,7 @@ public final class ChunkOrderGenerator {
 	}
 
 	public static List<ChunkOffset> generate(int radius, Order order) {
-		radius = Math.max(1, Math.min(16, radius));
+		radius = Math.max(1, Math.min(32, radius));
 		return switch (order) {
 			case SPIRAL -> generateSpiral(radius);
 			case RADIAL -> generateRadial(radius);

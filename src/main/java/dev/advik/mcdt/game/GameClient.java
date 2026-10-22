@@ -39,6 +39,26 @@ public interface GameClient {
 
 	byte[] getAtlasImage(String atlasId);
 
+	// --- 3D viewer stream (client thread only) ---
+
+	BlockModelsDto.Response getBlockModels(java.util.List<Integer> stateIds);
+
+	/** The loaded level, or null when no world is loaded. */
+	dev.advik.mcdt.world.stream.ViewData.Level getViewLevel();
+
+	boolean isChunkLoaded(int chunkX, int chunkZ);
+
+	/**
+	 * Snapshot of a loaded chunk column, or null if it is not loaded. With {@code sectionYs} null every non-empty
+	 * section is returned ({@code full}); otherwise exactly the listed sections are, empty or not.
+	 */
+	dev.advik.mcdt.world.stream.ViewData.Chunk getViewChunk(int chunkX, int chunkZ, java.util.Set<Integer> sectionYs);
+
+	/** The local player's pose, or null when no player exists. */
+	dev.advik.mcdt.world.stream.ViewData.Pose getViewPose();
+
+	java.util.List<dev.advik.mcdt.world.stream.ViewData.Entity> getViewEntities(double centerX, double centerZ, double radius, int limit);
+
 	// --- Structured View & HUD ---
 
 	ViewBlocksDto.Response getViewBlocks(String res, Double maxDistance, Boolean fluids, Boolean passThrough, Boolean entities, Boolean grid, Double minCoverage);

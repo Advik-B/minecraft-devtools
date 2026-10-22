@@ -101,3 +101,13 @@ Content-Type: application/json
   "recipeId": 1,
   "useMaxItems": false
 }
+
+### 18. Baked block geometry for the 3D viewer (global block state ids, as in /v1/world/stream palettes)
+POST {{baseUrl}}/v1/world/block-models
+Authorization: Bearer {{token}}
+Host: 127.0.0.1:25580
+Content-Type: application/json
+
+{
+  "ids": [1, 9, 86]
+}

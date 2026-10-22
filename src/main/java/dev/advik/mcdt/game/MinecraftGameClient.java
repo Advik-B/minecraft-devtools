@@ -72,6 +72,8 @@ import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.GenericMessageScreen;
 import net.minecraft.client.multiplayer.ServerList;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import dev.advik.mcdt.game.viewer.ViewerWorld;
+import dev.advik.mcdt.world.stream.ViewData;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.LevelSummary;
 import net.minecraft.world.level.GameType;
@@ -79,6 +81,8 @@ import net.minecraft.util.HttpUtil;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.client.CameraType;
 import net.minecraft.server.packs.repository.Pack;
@@ -857,6 +861,36 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		throw Problems.textureFailed("Unable to retrieve texture data for " + loc);
+	}
+
+	@Override
+	public BlockModelsDto.Response getBlockModels(List<Integer> stateIds) {
+		return ViewerWorld.blockModels(stateIds);
+	}
+
+	@Override
+	public ViewData.Level getViewLevel() {
+		return ViewerWorld.level();
+	}
+
+	@Override
+	public boolean isChunkLoaded(int chunkX, int chunkZ) {
+		return ViewerWorld.isChunkLoaded(chunkX, chunkZ);
+	}
+
+	@Override
+	public ViewData.Chunk getViewChunk(int chunkX, int chunkZ, Set<Integer> sectionYs) {
+		return ViewerWorld.chunk(chunkX, chunkZ, sectionYs);
+	}
+
+	@Override
+	public ViewData.Pose getViewPose() {
+		return ViewerWorld.pose();
+	}
+
+	@Override
+	public List<ViewData.Entity> getViewEntities(double centerX, double centerZ, double radius, int limit) {
+		return ViewerWorld.entities(centerX, centerZ, radius, limit);
 	}
 
 	// --- Milestone M2 Actions ---

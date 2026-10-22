@@ -1,7 +1,7 @@
 package dev.advik.mcdt.mixin;
 
 import dev.advik.mcdt.events.EventHub;
-import dev.advik.mcdt.http.WorldStreamWsHandler;
+import dev.advik.mcdt.world.stream.WorldStreamService;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -24,6 +24,6 @@ public abstract class ClientLevelMixin {
 				"z", pos.getZ(),
 				"block", blockId
 		));
-		WorldStreamWsHandler.broadcastBlockDiff(pos.getX(), pos.getY(), pos.getZ(), blockId, flags);
+		WorldStreamService.onBlockChanged(pos.getX(), pos.getY(), pos.getZ());
 	}
 }

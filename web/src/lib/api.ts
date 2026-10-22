@@ -40,7 +40,8 @@ import type {
   WorldLoadResponse,
   ConfirmTokenResponse,
   ServersListResponse,
-  ServerConnectResponse
+  ServerConnectResponse,
+  BlockModelsResponse
 } from './types'
 
 export async function fetchApi<T>(path: string, options: RequestInit = {}): Promise<T | null> {
@@ -393,6 +394,13 @@ export async function loadAtlasImage(atlasId?: string): Promise<string | null> {
   if (atlasId) params.set('id', atlasId)
   const query = params.toString() ? `?${params.toString()}` : ''
   return fetchBlobUrl(`/v1/textures/atlas/image${query}`)
+}
+
+export async function getBlockModels(ids: number[]): Promise<BlockModelsResponse | null> {
+  return await fetchApi<BlockModelsResponse>('/v1/world/block-models', {
+    method: 'POST',
+    body: JSON.stringify({ ids })
+  })
 }
 
 export async function getViewBlocks(params: Record<string, string | number | boolean> = {}): Promise<ViewBlocksResponse | null> {

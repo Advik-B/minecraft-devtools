@@ -619,5 +619,42 @@ export interface ServerConnectResponse {
   address: string
 }
 
+/** Baked block geometry from POST /v1/world/block-models. Directions: 0 down, 1 up, 2 north, 3 south, 4 west, 5 east. */
+export interface BlockQuad {
+  pos: number[]
+  uv: number[]
+  face?: number
+  cull?: number
+  /** 0 none, 1 grass, 2 foliage, 3 water, 4 constant `color` */
+  tint?: number
+  color?: number
+  shade?: boolean
+}
 
+export interface BlockFluid {
+  type: 'water' | 'lava'
+  height: number
+  falling: boolean
+  layer: string
+  still: number[]
+  flow: number[]
+}
 
+export interface BlockModel {
+  id: number
+  state: string
+  blockId: number
+  air: boolean
+  layer: 'solid' | 'cutout' | 'cutout_mipped' | 'translucent' | 'tripwire'
+  occlusion: number
+  selfCull: boolean
+  aoOccluder: boolean
+  ao: boolean
+  emission: number
+  fluid?: BlockFluid
+  quads: BlockQuad[]
+}
+
+export interface BlockModelsResponse {
+  models: BlockModel[]
+}

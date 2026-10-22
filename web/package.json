@@ -14,6 +14,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.19.2",
+    "@types/three": "^0.186.0",
     "daisyui": "^5.7.50",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.7",
@@ -23,6 +24,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "lucide-svelte": "^1.0.1"
+    "lucide-svelte": "^1.0.1",
+    "three": "^0.186.1"
   }
 }
