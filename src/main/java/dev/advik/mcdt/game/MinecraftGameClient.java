@@ -1470,6 +1470,23 @@ public final class MinecraftGameClient implements GameClient {
 		return Packet.class;
 	}
 
+	private static final java.util.Set<dev.advik.mcdt.api.v1.Capability> CAPABILITIES = platformCapabilities();
+
+	private static java.util.Set<dev.advik.mcdt.api.v1.Capability> platformCapabilities() {
+		java.util.EnumSet<dev.advik.mcdt.api.v1.Capability> set = java.util.EnumSet.allOf(dev.advik.mcdt.api.v1.Capability.class);
+		try {
+			Class.forName("dev.isxander.yacl3.api.YetAnotherConfigLib", false, MinecraftGameClient.class.getClassLoader());
+		} catch (ClassNotFoundException | LinkageError e) {
+			set.remove(dev.advik.mcdt.api.v1.Capability.CONFIG_SCREEN);
+		}
+		return java.util.Collections.unmodifiableSet(set);
+	}
+
+	@Override
+	public java.util.Set<dev.advik.mcdt.api.v1.Capability> capabilities() {
+		return CAPABILITIES;
+	}
+
 	@Override
 	public void sendPacket(Object packet) {
 		if (packet instanceof Packet<?> p) {

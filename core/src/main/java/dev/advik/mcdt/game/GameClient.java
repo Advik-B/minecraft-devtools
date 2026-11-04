@@ -167,5 +167,11 @@ public interface GameClient {
 
 	/** The base type of the packets {@link #sendPacket(Object)} accepts. Metadata only: safe on any thread. */
 	Class<?> packetType();
+
+	/**
+	 * Features this platform supports. Runtime facts (Baritone installed, decompiler up) are applied on top by
+	 * {@link dev.advik.mcdt.api.v1.Capability#effective}. Metadata only: safe on any thread.
+	 */
+	java.util.Set<dev.advik.mcdt.api.v1.Capability> capabilities();
 }
 

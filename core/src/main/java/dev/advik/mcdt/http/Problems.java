@@ -1,5 +1,7 @@
 package dev.advik.mcdt.http;
 
+import dev.advik.mcdt.api.v1.Capability;
+
 import java.util.Map;
 
 /** Factory for every problem type MCDT returns. The {@code type} strings are part of the public API. */
@@ -49,8 +51,14 @@ public final class Problems {
 	public static final String VIEW_BLOCKS_DISABLED = "view-blocks-disabled";
 	public static final String BATCH_LIMIT_EXCEEDED = "batch-limit-exceeded";
 	public static final String DECOMPILER_DISABLED = "decompiler-disabled";
+	public static final String FEATURE_UNAVAILABLE = "feature-unavailable";
 
 	private Problems() {
+	}
+
+	public static ProblemException featureUnavailable(Capability capability, String platform) {
+		return of(501, FEATURE_UNAVAILABLE, "Feature unavailable",
+				"The '" + capability.id() + "' feature is not available on " + platform + ".");
 	}
 
 	public static ProblemException decompilerDisabled() {

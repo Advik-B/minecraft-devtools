@@ -11,7 +11,8 @@ public record HealthResponse(
 		QueueStats queue,
 		String baritone,
 		String permission,
-		long droppedEvents
+		long droppedEvents,
+		java.util.List<String> capabilities
 ) {
 	public record QueueStats(
 			int depth,

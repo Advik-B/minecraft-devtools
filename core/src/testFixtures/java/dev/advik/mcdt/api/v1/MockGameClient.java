@@ -1077,5 +1077,13 @@ public class MockGameClient implements GameClient {
 	public Class<?> packetType() {
 		return packetType;
 	}
+
+	/** What {@link #capabilities()} reports; tests remove entries to simulate a platform without a feature. */
+	public java.util.EnumSet<Capability> capabilities = java.util.EnumSet.allOf(Capability.class);
+
+	@Override
+	public java.util.Set<Capability> capabilities() {
+		return capabilities;
+	}
 }
 

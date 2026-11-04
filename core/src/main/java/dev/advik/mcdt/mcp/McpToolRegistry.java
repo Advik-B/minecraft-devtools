@@ -3,6 +3,7 @@ package dev.advik.mcdt.mcp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.advik.mcdt.api.v1.Capability;
 import dev.advik.mcdt.api.v1.dto.*;
 import dev.advik.mcdt.baritone.BaritoneService;
 import dev.advik.mcdt.config.McdtConfig;
@@ -219,6 +220,11 @@ public final class McpToolRegistry {
 			}
 		}
 
+		Set<Capability> capabilities = capabilities();
+		list.removeIf(tool -> {
+			Capability required = requiredCapabilityForTool(tool.name());
+			return required != null && !capabilities.contains(required);
+		});
 		return list;
 	}
 
@@ -243,6 +249,13 @@ public final class McpToolRegistry {
 								+ "' is not in allowedMultiplayerServers list."
 				));
 			}
+		}
+
+		Capability capability = requiredCapabilityForTool(name);
+		if (capability != null && !capabilities().contains(capability)) {
+			return CompletableFuture.completedFuture(ToolCallResult.error(
+					"Tool '" + name + "' is unavailable: the '" + capability.id() + "' feature is not available on this platform."
+			));
 		}
 
 		long timeoutMs = config.requestTimeoutMs;
@@ -277,6 +290,22 @@ public final class McpToolRegistry {
 		} catch (Exception e) {
 			return CompletableFuture.completedFuture(ToolCallResult.error("Error executing tool " + name + ": " + e.getMessage()));
 		}
+	}
+
+	private Set<Capability> capabilities() {
+		return Capability.effective(gameClient.capabilities(), baritoneService.isInstalled(), decompilerService != null);
+	}
+
+	/** The capability a tool needs, or null; tools whose capability is off are hidden and refuse calls. */
+	private static Capability requiredCapabilityForTool(String name) {
+		return switch (name) {
+			case "screenshot" -> Capability.SCREENSHOT;
+			case "get_game_textures" -> Capability.TEXTURES;
+			case "view_blocks" -> Capability.BLOCK_VIEWER;
+			case "decompile_class" -> Capability.DECOMPILER;
+			case "baritone_goto", "baritone_mine", "baritone_follow", "baritone_cancel" -> Capability.BARITONE;
+			default -> null;
+		};
 	}
 
 	private Permission requiredPermissionForTool(String name) {
