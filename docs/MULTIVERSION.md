@@ -131,6 +131,37 @@ What changes in the plan:
 - New code stays independent of the transport: handler logic gets its inputs as DTOs and returns `TaskResult`. This makes Phase 5 cheaper.
 - Update `AGENTS.md` (layout and recipes) and `build.gradle.kts` (the `bundled` config moves to the server module; keep the ASM/slf4j exclusions).
 
+#### Phase 1 progress (2026-11-04)
+
+**Done:**
+- **Module split.** The projects are `core/` (103 classes, `--release 17`, no Minecraft, loader or Javalin types), `server/` (67 classes: Javalin, handlers, `McdtCore`) and the root Fabric 1.21.4 platform (34 classes). The mod jar merges all three; the only differences from the pre-split jar are the intended ones, the 43 nested library jars are identical, and `openapi.json` is unchanged. Tests split 87 core, 201 server, 22 platform (310, the same as before). `MockGameClient` / `MockBaritoneService` are `core` test fixtures.
+- **Seams.** Each one keeps Minecraft and loader types out of core. Platform implementations are found with `ServiceLoader`, which works regardless of init order:
+  - `MappingProvider`: runtime names. Replaces Fabric's `MappingResolver` in `NameService`.
+  - `GameTypeAdapter`: Minecraft types in the reflection serializer and `TypeConverter`.
+  - `SessionClassProvider`: the session class, for redaction by type.
+  - `ModResourceSource`: mod jars for the decompiler.
+  - `EventSink` plus an injected tick source in `EventHub`.
+  - `GameClient.packetType()` for packet resolution.
+- **Live CI** (`.github/workflows/live.yml`, `scripts/ci/live-client.sh`) runs a real headless Fabric 1.21.4 client with and without Baritone:
+  - the Python suite on the title screen;
+  - a superflat world from the dedicated server, loaded through `POST /v1/worlds/{id}/load`, with the world and Baritone checks;
+  - the two-step quit flow.
+- **Python live suite** (`tests/live/`, uv + pytest + httpx + websockets): a port of `test-live-client.ps1` plus Baritone, world, and events-stream tests.
+
+**Bugs the live suite found and fixed** (all pre-existing on `master`):
+- **Remapped decompile broken in production.** `/v1/classes/{name}/source?remap=true` failed with an NPE inside Vineflower's lambda processor whenever its identifier renamer was on. Fix: class files are now remapped with ASM before decompiling (`MojangRemapper`), and the isolated renamer was removed.
+- **Baritone settings returned 500.** `GET /v1/baritone/settings` failed because some setting values are `Item`/`Block` lists. Fix: values are now converted to registry ids, enum names, and so on.
+- **Baritone off the client thread (MCP tools).** The Baritone MCP tools (`baritone_goto`, `_mine`, `_follow`, `_cancel`) called Baritone and Minecraft registries off the client thread (invariant 1). Fix: they now run through the task queue, with a regression test.
+- **Baritone off the client thread (settings routes).** `GET`/`PATCH /v1/baritone/settings` also ran on Jetty threads. Fix: queued.
+- **Packets built off the client thread.** `/v1/packets` resolved and constructed packet classes on Jetty threads. Fix: that work now runs in the queued task.
+- **Baritone jobs wrongly marked cancelled.** Two causes:
+  - Baritone delivers path events one tick late, so the `CANCELED` from replacing the previous goal ended the new job. Fix: such stale events are ignored.
+  - Baritone reports reaching a coordinate goal as `CANCELED` (the process gives up control) rather than `AT_GOAL`. Fix: such a job now completes when the player is in the goal.
+
+**Left for Phase 1:**
+- `Capability` + `feature-unavailable`, with WebUI and MCP gating. This is only needed once a platform lacks a feature, so it lands with the first such node in Phase 2/3.
+- `PlatformHooks` turned out unnecessary. The platform entrypoint already builds `McdtEnvironment` and drives the tick; the loader-specific lookups went behind the SPIs above.
+
 ### Phase 2: Stonecutter + NeoForge (1.21.4, then 1.21.1)
 - Stonecutter with branches `fabric` and `neoforge`, and nodes 1.21.1 and 1.21.4.
 - NeoForge entrypoint: `ClientTickEvent.Post` drains the queue, `IConfigScreenFactory` + YACL for config, jarJar for the bundled libs, and the identity `MappingProvider`.
