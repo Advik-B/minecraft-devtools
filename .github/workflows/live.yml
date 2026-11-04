@@ -19,6 +19,10 @@ jobs:
           - { name: fabric-1.21.4, node: 1.21.4-fabric, loader: fabric, mc: '1.21.4', target: 'fabric:1.21.4:0.19.5', java: '21',
               fabric_api: 'https://cdn.modrinth.com/data/P7dR8mSH/versions/p96k10UR/fabric-api-0.119.4%2B1.21.4.jar 16b679f6a42549ca3b6bc147de710b2c8ba2d5e4661ed88df22782c05a4a5f6c1163d7b13867687ed91acde0fdfe5a5037d05662431c946865b58396284e7ee7',
               caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
+          # 1.21.1: no recipes (recipe display ids arrived in 1.21.2)
+          - { name: fabric-1.21.1, node: 1.21.1-fabric, loader: fabric, mc: '1.21.1', target: 'fabric:1.21.1:0.19.5', java: '21',
+              fabric_api: 'https://cdn.modrinth.com/data/P7dR8mSH/versions/Mys3P7lK/fabric-api-0.116.17%2B1.21.1.jar 98c478217da19181f0e4df3ea6c2da6bdbda271c7544a4aea048513a49b444f1ff5b71dc0df6303017c48e8ff69b7bb6af6179bdf0d0e09ab3c1ee08411857a8',
+              caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
           - { name: neoforge-1.21.4, node: 1.21.4-neoforge, loader: neoforge, mc: '1.21.4', target: 'neoforge::21.4.161', java: '21',
               fabric_api: '',
               caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
