@@ -98,6 +98,7 @@ web/             Unchanged; reads capabilities and hides unsupported panels.
 
 ### Phase 0: Spikes (throwaway, about 1 week)
 1. Build `core` with `--release 17` and confirm it compiles and the tests pass.
+   **Done (2026-11-04): passed.** I switched every `options.release` in `build.gradle.kts` from 21 to 17 temporarily. Main and test sources compiled with no errors (class major version 61). 308/309 tests passed. The one failure, `McpShimTest.testPythonShimStdioRelay`, happens because `python` isn't on PATH on the dev machine, so it's unrelated to the release level. The build change was reverted; Phase 1 sets `core` to 17 for real.
 2. Launch Legacy Fabric 1.8.9 on Java 17 and on Java 21. The result decides whether 1.8.9 ships in Phase 4 or waits for Phase 6.
 3. Use Unimined to build a hello-world mod for Forge 1.8.9, Forge 1.12.2, and Legacy Fabric 1.8.9 from **one** MCP-named source set, inside Stonecutter.
 4. On NeoForge 1.21.1, jar-in-jar Javalin, Jetty, and Jackson, and confirm they load on the JPMS module layer.
@@ -114,7 +115,11 @@ Record the outcomes in `MCDT.md`. If a spike fails, switch to the fallback tool 
 ### Phase 2: Stonecutter + NeoForge (1.21.4, then 1.21.1)
 - Stonecutter with branches `fabric` and `neoforge`, and nodes 1.21.1 and 1.21.4.
 - NeoForge entrypoint: `ClientTickEvent.Post` drains the queue, `IConfigScreenFactory` + YACL for config, jarJar for the bundled libs, and the identity `MappingProvider`.
-- Baritone: pin the API jar and SHA per node and loader in each node's `gradle.properties`. The bridge stays under `baritone/bridge/`.
+- Baritone: pin the API jar and SHA per node and loader in each node's `gradle.properties`. The bridge stays under `baritone/bridge/`. Where Baritone's API changed between releases, add a Stonecutter conditional or a per-range bridge class. Nodes with no Baritone release (expected: 1.7.10, 1.8.9) ship without the bridge and report the `BARITONE` capability as off.
+- **Baritone live coverage** (added to `scripts/test-live-client.ps1`, which has none today):
+  - **With Baritone:** `GET /v1/baritone/status`; `POST /v1/baritone/goto` a few blocks away, then poll `GET /v1/baritone/jobs/{id}` until it reaches a terminal state; `GET /v1/baritone/path`; `POST /v1/baritone/cancel`; read `GET /v1/baritone/settings` and round-trip a `PATCH`; `POST /v1/baritone/command`; a short `mine` / `follow` / `explore` / `farm` / `build` start followed by cancel; and the `baritone*` MCP tools through `/mcp`.
+  - **Without Baritone:** the same routes return 501 `baritone-not-installed`, and the capability is off.
+  - **Docker:** each node runs twice, `MC_BARITONE=true` and `MC_BARITONE=false`. `docker/entrypoint.sh` and the `Dockerfile` copy the Baritone jar that matches the node's MC version and loader (today they hardcode `baritone-api-fabric-*`).
 - Versioning: `mcdt-<modver>+<mc>-<loader>.jar`, replacing `1.1.0-mc_1.21.4`.
 - **Live-test matrix starts here:**
   - Parameterize `Dockerfile` ARGs as `MC_VERSION` + `LOADER` (portablemc launches fabric, forge, and neoforge).
@@ -186,6 +191,7 @@ Also add **Forge 1.16.5** (modern era, Java 8, downgraded node) and let the **1.
 3. `cd web && bun run check` if the WebUI changed.
 4. **Live, for every node added in the phase:** a Docker headless client with `MC_VERSION`/`LOADER`, then `scripts/test-live-client.ps1` (including `-ShutdownClient`). For Cleanroom, lwjgl3ify, and plain legacy Forge, use a Prism Launcher instance and the manual checklist: open a world, hit `/v1/health` (correct capabilities), read player/world/inventory, send chat, inject input, use reflection to read the session class (it must be redacted), and connect MCP from `scripts/mcdt-mcp.py`.
 5. Security regression on each era: Host/Origin checks, no token in the query string, `ACT` blocked on a non-allowlisted multiplayer server.
+6. **Baritone, on every node that has a Baritone release:** run the live Baritone section with Baritone installed *and* without it (see Phase 2). Also keep `BaritoneIntegrationTest` / `BaritoneNotInstalledTest` (`MockBaritoneService`) green in the unit suite, and run them against both transports from Phase 5 on.
 
 ## Key risks
 
