@@ -164,5 +164,8 @@ public interface GameClient {
 	String getCurrentServerAddress();
 
 	void sendPacket(Object packet);
+
+	/** The base type of the packets {@link #sendPacket(Object)} accepts. Metadata only: safe on any thread. */
+	Class<?> packetType();
 }
 

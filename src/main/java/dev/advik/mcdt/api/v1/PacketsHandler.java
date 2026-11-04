@@ -61,15 +61,16 @@ public final class PacketsHandler implements Handler {
 			throw Problems.badRequest("Missing required 'packet' name");
 		}
 
-		Class<?> packetClass = PacketResolver.resolvePacketClass(request.packet());
-		Object packet = PacketResolver.constructPacket(packetClass, request.data(), handleTable);
-
+		// Loading and building packet classes touches game classes, so all of it runs on the client thread.
+		SendRequest sendRequest = request;
 		long timeoutMs = config.requestTimeoutMs;
 		CompletableFuture<Void> future = queue.submit(() -> {
+			Class<?> packetClass = PacketResolver.resolvePacketClass(sendRequest.packet(), gameClient.packetType());
+			Object packet = PacketResolver.constructPacket(packetClass, sendRequest.data(), handleTable);
 			gameClient.sendPacket(packet);
 			return Json.MAPPER.valueToTree(new SendResponse(true, NameService.getInstance().resolveClassName(packetClass.getName()), 0));
 		}, timeoutMs).thenAccept(res -> {
-			SendResponse resp = new SendResponse(true, NameService.getInstance().resolveClassName(packetClass.getName()), res.tick());
+			SendResponse resp = new SendResponse(true, res.body().get("packet").asText(), res.tick());
 			ctx.header("X-MCDT-Tick", String.valueOf(res.tick()));
 			ctx.contentType("application/json");
 			ctx.result(Json.MAPPER.valueToTree(resp).toString());

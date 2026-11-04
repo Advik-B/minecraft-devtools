@@ -1466,6 +1466,11 @@ public final class MinecraftGameClient implements GameClient {
 	}
 
 	@Override
+	public Class<?> packetType() {
+		return Packet.class;
+	}
+
+	@Override
 	public void sendPacket(Object packet) {
 		if (packet instanceof Packet<?> p) {
 			Minecraft client = Minecraft.getInstance();

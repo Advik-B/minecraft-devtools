@@ -1069,5 +1069,10 @@ public class MockGameClient implements GameClient {
 		}
 		sentPackets.add(packet);
 	}
+
+	@Override
+	public Class<?> packetType() {
+		return net.minecraft.network.protocol.Packet.class;
+	}
 }
 

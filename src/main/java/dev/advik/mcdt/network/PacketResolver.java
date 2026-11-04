@@ -4,7 +4,6 @@ import dev.advik.mcdt.http.Problems;
 import dev.advik.mcdt.reflection.HandleTable;
 import dev.advik.mcdt.reflection.NameService;
 import dev.advik.mcdt.reflection.TypeConverter;
-import net.minecraft.network.protocol.Packet;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -27,7 +26,11 @@ public final class PacketResolver {
 	private PacketResolver() {
 	}
 
-	public static Class<?> resolvePacketClass(String name) {
+	/**
+	 * Finds a packet class by simple or qualified Mojang name. {@code packetType} is the platform's packet base
+	 * type ({@link dev.advik.mcdt.game.GameClient#packetType()}); classes that don't extend it are rejected.
+	 */
+	public static Class<?> resolvePacketClass(String name, Class<?> packetType) {
 		if (name == null || name.isBlank()) {
 			throw Problems.badRequest("Packet name cannot be null or empty");
 		}
@@ -44,14 +47,14 @@ public final class PacketResolver {
 
 		// Try direct load
 		Class<?> clazz = tryLoadClass(normalized);
-		if (clazz != null && Packet.class.isAssignableFrom(clazz)) {
+		if (clazz != null && packetType.isAssignableFrom(clazz)) {
 			return clazz;
 		}
 
 		// Try prefixing packages
 		for (String pkg : PACKET_PACKAGES) {
 			clazz = tryLoadClass(pkg + normalized);
-			if (clazz != null && Packet.class.isAssignableFrom(clazz)) {
+			if (clazz != null && packetType.isAssignableFrom(clazz)) {
 				return clazz;
 			}
 		}
@@ -61,7 +64,7 @@ public final class PacketResolver {
 			String serverbound = "Serverbound" + normalized;
 			for (String pkg : PACKET_PACKAGES) {
 				clazz = tryLoadClass(pkg + serverbound);
-				if (clazz != null && Packet.class.isAssignableFrom(clazz)) {
+				if (clazz != null && packetType.isAssignableFrom(clazz)) {
 					return clazz;
 				}
 			}
