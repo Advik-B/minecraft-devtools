@@ -119,7 +119,7 @@ class BaritoneNotInstalledTest {
 			HttpResponse<String> resp = send(route, "GET", null);
 			assertEquals(501, resp.statusCode(), "Route " + route + " should return 501");
 			assertTrue(resp.body().contains("baritone-not-installed"));
-			assertTrue(resp.body().contains("baritone-api-fabric-1.13.1.jar"));
+			assertTrue(resp.body().contains("baritone-api jar"));
 		}
 
 		String[] postRoutes = {

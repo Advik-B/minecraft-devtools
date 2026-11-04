@@ -220,7 +220,7 @@ public final class Problems {
 
 	public static ProblemException baritoneNotInstalled() {
 		return of(501, BARITONE_NOT_INSTALLED, "Baritone not installed",
-				"Baritone 1.13.1 is not installed. Download baritone-api-fabric-1.13.1.jar from https://github.com/cabaletta/baritone/releases and place it in your mods folder.");
+				"Baritone is not installed. Download the baritone-api jar for your mod loader and Minecraft version from https://github.com/cabaletta/baritone/releases and place it in your mods folder.");
 	}
 
 	public static ProblemException multiplayerWriteDisabled(String server) {
