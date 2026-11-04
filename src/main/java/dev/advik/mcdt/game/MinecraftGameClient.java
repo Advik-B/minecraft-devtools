@@ -61,10 +61,14 @@ import net.minecraft.client.multiplayer.ClientAdvancements;
 import net.minecraft.stats.Stat;
 import net.minecraft.stats.Stats;
 import net.minecraft.stats.StatsCounter;
+//? if >=1.21.2 {
 import net.minecraft.util.context.ContextMap;
+//?}
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
+//? if >=1.21.2 {
 import net.minecraft.world.item.crafting.display.*;
+//?}
 import net.minecraft.world.level.block.Block;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -1479,6 +1483,9 @@ public final class MinecraftGameClient implements GameClient {
 		} catch (ClassNotFoundException | LinkageError e) {
 			set.remove(dev.advik.mcdt.api.v1.Capability.CONFIG_SCREEN);
 		}
+		//? if <1.21.2 {
+		/*set.remove(dev.advik.mcdt.api.v1.Capability.RECIPES);
+		*///?}
 		return java.util.Collections.unmodifiableSet(set);
 	}
 
@@ -1922,7 +1929,12 @@ public final class MinecraftGameClient implements GameClient {
 		List<HudDto.ToastInfo> toasts = null;
 		if (all || include.contains("toasts")) {
 			toasts = new ArrayList<>();
-			if (client.getToastManager() instanceof ToastManagerAccessor toastAccessor) {
+			//? if >=1.21.2 {
+			Object toastManager = client.getToastManager();
+			//?} else {
+			/*Object toastManager = client.getToasts();
+			*///?}
+			if (toastManager instanceof ToastManagerAccessor toastAccessor) {
 				List<?> visible = toastAccessor.getVisibleToasts();
 				if (visible != null) {
 					for (Object toastInst : visible) {
@@ -2271,6 +2283,7 @@ public final class MinecraftGameClient implements GameClient {
 
 	@Override
 	public RecipesDto.Response getRecipes(Boolean craftable, String category, String search) {
+		//? if >=1.21.2 {
 		Minecraft client = Minecraft.getInstance();
 		if (client.player == null) {
 			throw Problems.noPlayer();
@@ -2317,8 +2330,12 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		return new RecipesDto.Response(list.size(), list);
+		//?} else {
+		/*throw recipesUnavailable();
+		*///?}
 	}
 
+	//? if >=1.21.2 {
 	private List<String> extractRecipeIngredients(RecipeDisplay display, ContextMap context) {
 		if (context == null) return List.of();
 		List<String> ingredients = new ArrayList<>();
@@ -2358,9 +2375,16 @@ public final class MinecraftGameClient implements GameClient {
 		}
 		return ingredients;
 	}
+	//?} else {
+	/*// Before 1.21.2 recipes have no numeric display ids, which the recipes API is built on.
+	private static RuntimeException recipesUnavailable() {
+		return Problems.featureUnavailable(dev.advik.mcdt.api.v1.Capability.RECIPES, "Minecraft " + net.minecraft.SharedConstants.getCurrentVersion().getName());
+	}
+	*///?}
 
 	@Override
 	public RecipesDto.PlaceResponse placeRecipe(RecipesDto.PlaceRequest request) {
+		//? if >=1.21.2 {
 		Minecraft client = Minecraft.getInstance();
 		if (client.player == null) {
 			throw Problems.noPlayer();
@@ -2374,6 +2398,9 @@ public final class MinecraftGameClient implements GameClient {
 			client.gameMode.handlePlaceRecipe(containerId, new RecipeDisplayId(request.recipeId()), max);
 		}
 		return new RecipesDto.PlaceResponse(true, request.recipeId(), containerId);
+		//?} else {
+		/*throw recipesUnavailable();
+		*///?}
 	}
 
 	// --- Phase 4: Session, Worlds, Servers ---
