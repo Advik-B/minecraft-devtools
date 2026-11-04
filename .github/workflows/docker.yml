@@ -1,0 +1,124 @@
+# Docker images: one per node (.github/nodes.json), built and live-tested on every PR and master push.
+# A master push publishes ghcr.io/<owner>/mcdt-<node>:edge; a v* tag publishes :<version> and :latest.
+name: docker
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  nodes:
+    runs-on: ubuntu-24.04
+    outputs:
+      nodes: ${{ steps.read.outputs.nodes }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: read
+        run: echo "nodes=$(jq -c . .github/nodes.json)" >> "$GITHUB_OUTPUT"
+
+  image:
+    needs: nodes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ${{ fromJSON(needs.nodes.outputs.nodes) }}
+    name: mcdt-${{ matrix.node.node }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: node facts
+        run: sh scripts/ci/node-env.sh "${{ matrix.node.node }}" | tee -a "$GITHUB_ENV"
+      - name: image name and tags
+        id: meta
+        run: |
+          owner="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/$owner/mcdt-$NODE"
+          version=""
+          tags=""
+          if [ "${{ github.ref_type }}" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+            tags="$image:$version,$image:latest"
+          elif [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/master ]; then
+            tags="$image:edge"
+          fi
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: mcdt-test:${{ matrix.node.node }}
+          build-args: |
+            NODE=${{ env.NODE }}
+            JAVA_VERSION=${{ env.JAVA_VERSION }}
+            MCDT_VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.node.node }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.node.node }}
+      - name: no python, no minecraft files in the image
+        run: |
+          docker run --rm --entrypoint sh "mcdt-test:$NODE" -c \
+            '! command -v python3 && ! command -v python && ! test -d /opt/minecraft && test -x /usr/local/bin/portablemc && ls -la /opt/mcdt /opt/mcdt/mods /opt/mcdt/baritone'
+          docker image ls "mcdt-test:$NODE"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - name: install uv
+        run: pipx install uv
+      # Baritone comes in through a user path, so the test proves user mods load: the /mods mount on 1.21.4,
+      # an MC_MODS URL on 1.21.1. YACL comes from Modrinth and turns on the config-screen capability.
+      - name: live tests
+        env:
+          LAUNCH: docker
+          IMAGE: mcdt-test:${{ matrix.node.node }}
+          BARITONE: installed
+          MC_BARITONE: 'false'
+          MCDT_EXPECT_CAPABILITIES: ${{ matrix.node.caps }},config-screen
+        run: |
+          export MC_MODRINTH="yacl:$YACL_VERSION"
+          if [ "$MC_VERSION" = 1.21.4 ]; then
+            export USER_MODS="$RUNNER_TEMP/user-mods"
+            mkdir -p "$USER_MODS"
+            cp "libs/$BARITONE_JAR" "$USER_MODS/"
+          else
+            export MC_MODS="https://github.com/cabaletta/baritone/releases/download/v$BARITONE_VERSION/$BARITONE_JAR"
+          fi
+          export JAVA_BIN="$(eval echo "\$JAVA_HOME_${JAVA_VERSION}_X64")/bin/java"
+          bash scripts/ci/live-client.sh
+      - name: upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker-${{ matrix.node.node }}
+          path: ${{ env.LIVE_RESULTS }}
+          if-no-files-found: ignore
+      - name: log in to ghcr.io
+        if: steps.meta.outputs.tags != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: publish
+        if: steps.meta.outputs.tags != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            NODE=${{ env.NODE }}
+            JAVA_VERSION=${{ env.JAVA_VERSION }}
+            MCDT_VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.node.node }}
