@@ -112,12 +112,18 @@ def test_goto_walks_to_target(api: Api, baritone: str) -> None:
     require(baritone, "installed")
     x, y, z = (math.floor(v) for v in player_pos(api))
     target = (x + 6, y, z + 3)
-    with record_events(api, ["baritone.path", "baritone.process"]) as events:
-        started = start(api, "goto", {"x": target[0], "y": target[1], "z": target[2]})
-        assert started["type"] == "goto"
-        final = wait_for(lambda: job(api, started["jobId"]), lambda j: j["status"] in TERMINAL, timeout=120)
+    # chatDebug makes Baritone explain cancellations in chat; attached to the failure message below.
+    expect(api.patch("/v1/baritone/settings", {"chatDebug": True}), 200)
+    try:
+        with record_events(api, ["baritone.path", "baritone.process"]) as events:
+            started = start(api, "goto", {"x": target[0], "y": target[1], "z": target[2]})
+            assert started["type"] == "goto"
+            final = wait_for(lambda: job(api, started["jobId"]), lambda j: j["status"] in TERMINAL, timeout=120)
+    finally:
+        expect(api.patch("/v1/baritone/settings", {"chatDebug": False}), 200)
     path_events = [e["data"] for e in events if e.get("topic", "").startswith("baritone.")]
-    assert final["status"] == "completed", f"{final}; Baritone events: {path_events}"
+    chat = [m.get("text") for m in expect(api.get("/v1/chat?limit=40"), 200)["messages"]]
+    assert final["status"] == "completed", f"{final}; Baritone events: {path_events}; chat: {chat}"
 
     px, py, pz = player_pos(api)
     distance = math.dist((px, pz), (target[0] + 0.5, target[2] + 0.5))
