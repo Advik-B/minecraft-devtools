@@ -3,14 +3,6 @@ package dev.advik.mcdt.reflection;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.advik.mcdt.http.Problems;
 import dev.advik.mcdt.json.Json;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Vec3i;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.phys.Vec3;
-
-import java.util.Locale;
 
 /**
  * Converts JSON input values into target Java parameter types for field setting and method invocation.
@@ -107,45 +99,10 @@ public final class TypeConverter {
 			throw Problems.badRequest("Invalid enum value '" + name + "' for " + targetType.getSimpleName());
 		}
 
-		// Minecraft types
-		if (targetType == BlockPos.class || targetType == Vec3i.class) {
-			if (node.isObject() && node.has("x") && node.has("y") && node.has("z")) {
-				return new BlockPos(node.get("x").asInt(), node.get("y").asInt(), node.get("z").asInt());
-			}
-			if (node.isArray() && node.size() >= 3) {
-				return new BlockPos(node.get(0).asInt(), node.get(1).asInt(), node.get(2).asInt());
-			}
-			throw Problems.badRequest("Expected BlockPos as {x, y, z} or [x, y, z]");
-		}
-
-		if (targetType == Vec3.class) {
-			if (node.isObject() && node.has("x") && node.has("y") && node.has("z")) {
-				return new Vec3(node.get("x").asDouble(), node.get("y").asDouble(), node.get("z").asDouble());
-			}
-			if (node.isArray() && node.size() >= 3) {
-				return new Vec3(node.get(0).asDouble(), node.get(1).asDouble(), node.get(2).asDouble());
-			}
-			throw Problems.badRequest("Expected Vec3 as {x, y, z} or [x, y, z]");
-		}
-
-		if (targetType == ResourceLocation.class) {
-			return ResourceLocation.parse(node.asText());
-		}
-
-		if (targetType == InteractionHand.class) {
-			String hand = node.asText();
-			if ("off_hand".equalsIgnoreCase(hand) || "offhand".equalsIgnoreCase(hand)) {
-				return InteractionHand.OFF_HAND;
-			}
-			return InteractionHand.MAIN_HAND;
-		}
-
-		if (targetType == Direction.class) {
-			Direction dir = Direction.byName(node.asText().toLowerCase(Locale.ROOT));
-			if (dir != null) {
-				return dir;
-			}
-			throw Problems.badRequest("Unknown direction: " + node.asText());
+		// Minecraft types, through the platform's adapters
+		Object gameValue = GameTypeAdapters.convert(node, targetType);
+		if (gameValue != GameTypeAdapter.UNHANDLED) {
+			return gameValue;
 		}
 
 		if (targetType == Object.class) {

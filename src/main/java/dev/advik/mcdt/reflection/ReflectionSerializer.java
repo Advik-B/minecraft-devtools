@@ -1,17 +1,5 @@
 package dev.advik.mcdt.reflection;
 
-import dev.advik.mcdt.game.serializers.BlockStateSerializer;
-import dev.advik.mcdt.game.serializers.EntitySerializer;
-import dev.advik.mcdt.game.serializers.ItemSerializer;
-import dev.advik.mcdt.game.serializers.TextSerializer;
-import net.minecraft.core.Vec3i;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
-
 import java.lang.reflect.Array;
 import java.util.*;
 
@@ -191,29 +179,10 @@ public final class ReflectionSerializer {
 			return uuid.toString();
 		}
 
-		// Minecraft type adapters
-		if (obj instanceof Vec3 vec) {
-			return Map.of("x", vec.x, "y", vec.y, "z", vec.z);
-		}
-		if (obj instanceof Vec3i pos) {
-			return Map.of("x", pos.getX(), "y", pos.getY(), "z", pos.getZ());
-		}
-		if (obj instanceof ResourceLocation res) {
-			return res.toString();
-		}
-		if (obj instanceof Component comp) {
-			String plain = TextSerializer.toPlainText(comp);
-			String json = TextSerializer.toJson(comp);
-			return Map.of("text", plain != null ? plain : "", "json", json != null ? json : "");
-		}
-		if (obj instanceof ItemStack stack) {
-			return ItemSerializer.toSlotInfo(0, stack);
-		}
-		if (obj instanceof BlockState bs) {
-			return BlockStateSerializer.toString(bs);
-		}
-		if (obj instanceof Entity ent) {
-			return EntitySerializer.toEntityInfo(ent, null);
+		// Minecraft types, through the platform's adapters
+		Object gameValue = GameTypeAdapters.serialize(obj);
+		if (gameValue != GameTypeAdapter.UNHANDLED) {
+			return gameValue;
 		}
 
 		// Collections & Arrays
