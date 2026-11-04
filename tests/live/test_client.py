@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 import pytest
 
-from conftest import REPO, Api, expect, problem, record_events, wait_for
+from conftest import REPO, Api, expect, problem, record_events, required_capability, skip_without, wait_for
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,8 @@ class Case:
     raw: Callable[[str], Any] | None = None
 
 
-def run(api: Api, case: Case) -> Any:
+def run(api: Api, case: Case, capabilities: set[str]) -> Any:
+    skip_without(capabilities, required_capability(case.path))
     response = api.request(case.method, case.path, json=case.body, auth=case.auth, headers=case.headers)
     data = expect(response, case.status, case.check)
     if case.raw is not None:
@@ -142,34 +143,34 @@ MENU = cases(
 
 
 @pytest.mark.parametrize("case", SYSTEM)
-def test_system(api: Api, case: Case) -> None:
-    run(api, case)
+def test_system(api: Api, case: Case, capabilities: set[str]) -> None:
+    run(api, case, capabilities)
 
 
 @pytest.mark.parametrize("case", CLIENT)
-def test_client(api: Api, case: Case) -> None:
-    run(api, case)
+def test_client(api: Api, case: Case, capabilities: set[str]) -> None:
+    run(api, case, capabilities)
 
 
 @pytest.mark.parametrize("case", REFLECTION)
-def test_reflection(api: Api, case: Case) -> None:
-    run(api, case)
+def test_reflection(api: Api, case: Case, capabilities: set[str]) -> None:
+    run(api, case, capabilities)
 
 
 @pytest.mark.parametrize("case", DECOMPILER)
-def test_decompiler(api: Api, case: Case) -> None:
-    run(api, case)
+def test_decompiler(api: Api, case: Case, capabilities: set[str]) -> None:
+    run(api, case, capabilities)
 
 
 @pytest.mark.parametrize("case", INPUT)
-def test_input(api: Api, case: Case) -> None:
-    run(api, case)
+def test_input(api: Api, case: Case, capabilities: set[str]) -> None:
+    run(api, case, capabilities)
 
 
 @pytest.mark.menu
 @pytest.mark.parametrize("case", MENU)
-def test_menu_state(api: Api, case: Case) -> None:
-    run(api, case)
+def test_menu_state(api: Api, case: Case, capabilities: set[str]) -> None:
+    run(api, case, capabilities)
 
 
 def test_handle_release(api: Api) -> None:
@@ -180,7 +181,7 @@ def test_handle_release(api: Api) -> None:
     expect(api.get(f"/v1/objects/{handle}"), 404)
 
 
-def test_mcp(api: Api) -> None:
+def test_mcp(api: Api, capabilities: set[str]) -> None:
     init = api.mcp("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
                                   "clientInfo": {"name": "LiveTestClient", "version": "1.0.0"}})
     assert init["result"]["protocolVersion"] == "2024-11-05" and init["result"]["serverInfo"]["name"] == "mcdt"
@@ -190,8 +191,9 @@ def test_mcp(api: Api) -> None:
     state = api.mcp("tools/call", {"name": "get_state", "arguments": {}})["result"]
     assert state["isError"] is False and "client" in state["content"][0]["text"]
 
-    shot = api.mcp("tools/call", {"name": "screenshot", "arguments": {"scale": 0.2}})["result"]
-    assert shot["isError"] is False and shot["content"][0]["type"] == "image" and len(shot["content"][0]["data"]) > 100
+    if "screenshot" in capabilities:
+        shot = api.mcp("tools/call", {"name": "screenshot", "arguments": {"scale": 0.2}})["result"]
+        assert shot["isError"] is False and shot["content"][0]["type"] == "image" and len(shot["content"][0]["data"]) > 100
 
     assert len(api.mcp("resources/list", {})["result"]["resources"]) >= 5
     assert api.mcp("resources/read", {"uri": "mcdt://screen"})["result"]["contents"][0]["uri"] == "mcdt://screen"

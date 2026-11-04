@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import re
 import threading
 import time
 from contextlib import contextmanager
@@ -172,7 +173,34 @@ def api(request: pytest.FixtureRequest) -> Api:
     client.http.close()
 
 
+# Routes gated on a capability (HttpServer wraps them in requires(...)): path pattern -> capability id.
+CAPABILITY_ROUTES: list[tuple[str, str]] = [
+    (r"^/v1/textures/", "textures"),
+    (r"^/v1/view/blocks", "block-viewer"),
+    (r"^/v1/world/block-models", "block-viewer"),
+    (r"^/v1/world/stream", "world-stream"),
+    (r"^/v1/screenshot", "screenshot"),
+    (r"^/v1/packets", "packets"),
+    (r"^/v1/input/", "input"),
+    (r"^/v1/advancements", "advancements"),
+    (r"^/v1/recipes", "recipes"),
+    (r"^/v1/stats", "stats"),
+    (r"^/v1/classes/[^/]+/source", "decompiler"),
+]
+
+
+def required_capability(path: str) -> str | None:
+    """The capability a route needs, or None."""
+    return next((cap for pattern, cap in CAPABILITY_ROUTES if re.match(pattern, path)), None)
+
+
 @pytest.fixture(scope="session")
 def capabilities(api: Api) -> set[str]:
     """Capability ids the running client reports in /v1/health."""
     return set(expect(api.get("/v1/health"), 200)["capabilities"])
+
+
+def skip_without(capabilities: set[str], capability: str | None) -> None:
+    """Skips the test when the client lacks the capability (test_capabilities checks the 501 those routes answer)."""
+    if capability is not None and capability not in capabilities:
+        pytest.skip(f"{capability} is off on this client")
