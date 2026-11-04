@@ -5,10 +5,29 @@ on:
   push:
     paths:
       - 'spikes/**'
+      - 'src/main/java/dev/advik/mcdt/json/**'
       - '.github/workflows/spikes.yml'
   workflow_dispatch:
 
 jobs:
+  # Spike 5: real MCDT core classes and tests, downgraded to Java 8 bytecode, run on a Java 8 JVM.
+  downgrade:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: test on modern java, then downgraded on java 8
+        run: |
+          chmod +x ./gradlew
+          ./gradlew -p spikes/downgrade test testOnJava8 --console=plain
+
+
   # Spike 4: do the bundled Javalin/Jetty/Jackson jars load from jar-in-jar on NeoForge 1.21.1?
   neoforge:
     runs-on: ubuntu-24.04
@@ -42,10 +61,10 @@ jobs:
           cp spikes/neoforge/build/libs/mcdt-spike-neoforge1211-0.0.0.jar "$inst/mods/"
           printf 'pauseOnLostFocus:false\nonboardAccessibility:false\nsoundCategory_master:0.0\nrenderDistance:2\n' > "$inst/options.txt"
           echo "INST=$inst" >> "$GITHUB_ENV"
-          portablemc --main-dir "$RUNNER_TEMP/pmc" --mc-dir "$inst" start --dry --jvm "$java21" "neoforge::21.1.265"
+          portablemc --main-dir "$RUNNER_TEMP/pmc" start --mc-dir "$inst" --dry --jvm "$java21" "neoforge::21.1.265"
           set +e
           timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" \
-            portablemc --main-dir "$RUNNER_TEMP/pmc" --mc-dir "$inst" start \
+            portablemc --main-dir "$RUNNER_TEMP/pmc" start --mc-dir "$inst" \
             --jvm "$java21" --jvm-arg=-Xmx2G -u SpikeBot "neoforge::21.1.265" > "$inst/launch.log" 2>&1
           echo "launcher exit code: $?"
           set -e
@@ -134,7 +153,7 @@ jobs:
           echo "INST=$inst" >> "$GITHUB_ENV"
       - name: install game
         run: |
-          portablemc --main-dir "$RUNNER_TEMP/pmc" --mc-dir "$INST" start --dry \
+          portablemc --main-dir "$RUNNER_TEMP/pmc" start --mc-dir "$INST" --dry \
             --jvm "${{ steps.java.outputs.path }}/bin/java" "${{ matrix.version }}"
       - name: launch until the spike reports
         env:
@@ -142,7 +161,7 @@ jobs:
         run: |
           set +e
           timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" \
-            portablemc --main-dir "$RUNNER_TEMP/pmc" --mc-dir "$INST" start \
+            portablemc --main-dir "$RUNNER_TEMP/pmc" start --mc-dir "$INST" \
             --jvm "${{ steps.java.outputs.path }}/bin/java" --jvm-arg=-Xmx1G -u SpikeBot \
             "${{ matrix.version }}" > "$INST/launch.log" 2>&1
           code=$?
