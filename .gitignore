@@ -46,3 +46,8 @@ skills-lock.json
 
 # docker
 .env
+
+# Phase 0 spike builds
+spikes/*/build/
+spikes/*/*/build/
+spikes/*/.gradle/
