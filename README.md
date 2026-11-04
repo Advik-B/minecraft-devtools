@@ -209,15 +209,28 @@ Environment variables override the file at startup. They are not written back to
 
 ## Run it in Docker
 
-The image runs a headless Minecraft 1.21.4 client with Fabric, Fabric API, MCDT and [Baritone](https://github.com/cabaletta/baritone) 1.13.1. The client draws to a virtual display (Xvfb) with software OpenGL (Mesa llvmpipe), so screenshots and texture endpoints still work. The image needs no GPU and is tested on `linux/amd64`. The client starts on the title screen. Join a world or server through the API.
+Each image runs a headless Minecraft client with MCDT and [Baritone](https://github.com/cabaletta/baritone), plus Fabric API on Fabric. There is one image for each Minecraft version and loader:
+
+| Image | Minecraft | Loader |
+| --- | --- | --- |
+| `ghcr.io/advik-b/mcdt-1.21.4-fabric` | 1.21.4 | Fabric |
+| `ghcr.io/advik-b/mcdt-1.21.4-neoforge` | 1.21.4 | NeoForge |
+| `ghcr.io/advik-b/mcdt-1.21.1-fabric` | 1.21.1 | Fabric |
+| `ghcr.io/advik-b/mcdt-1.21.1-neoforge` | 1.21.1 | NeoForge |
+
+Tags: `latest` is the newest release, `1.1.0` and so on are fixed releases, and `edge` is the latest `master` build. CI runs the full live suite against every image before it publishes it.
+
+The client draws to a virtual display (Xvfb) with software OpenGL (Mesa llvmpipe), so screenshots and texture endpoints still work. The image needs no GPU and is tested on `linux/amd64`. The client starts on the title screen. Join a world or server through the API.
 
 ```sh
-docker build -t mcdt .
 docker run -d --name mcdt -p 127.0.0.1:25580:25580 -v mcdt-data:/data \
-  -e MCDT_TOKEN="$(openssl rand -hex 32)" -e MCDT_PERMISSION=act mcdt
+  -e MCDT_TOKEN="$(openssl rand -hex 32)" -e MCDT_PERMISSION=act \
+  ghcr.io/advik-b/mcdt-1.21.4-fabric:latest
 ```
 
-You can also use `docker compose up -d --build`. Put your settings in a `.env` file next to `docker-compose.yml`. The first start takes a minute or two, and the container shows as `healthy` when the API is up. If you don't set `MCDT_TOKEN`, read the random token with `docker exec mcdt cat /data/config/mcdt/token`.
+The images do not contain Minecraft. On the first start the container downloads the game, the loader and the assets into the `/data` volume. That takes a few minutes, and later starts reuse the files. The container shows as `healthy` when the API is up. If you don't set `MCDT_TOKEN`, read the random token with `docker exec mcdt cat /data/config/mcdt/token`.
+
+You can also use `docker compose up -d`. Put your settings in a `.env` file next to `docker-compose.yml`. `MCDT_NODE` picks the image (default `1.21.4-fabric`) and `MCDT_TAG` the tag. To build an image yourself, run `docker build --build-arg NODE=1.21.1-neoforge -t mcdt .`.
 
 ```sh
 TOKEN=...   # your MCDT_TOKEN
@@ -230,6 +243,8 @@ curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 | --- | --- | --- |
 | `MC_AUTH` | `offline` | `offline`, or `microsoft` for a real account |
 | `MC_BARITONE` | `true` | Load the bundled Baritone. `false` leaves it out, and `/v1/baritone/*` then returns `501` |
+| `MC_MODRINTH` | | Modrinth projects to install, comma-separated: `slug` (newest version for the image) or `slug:version` |
+| `MC_MODS` | | Mod jar URLs to download, comma-separated |
 | `MC_USERNAME` | `McdtBot` | Offline player name. With `microsoft`, picks a stored account by name |
 | `MC_MAX_MEMORY` | `2G` | Game heap (`-Xmx`) |
 | `MC_JVM_ARGS` | | Extra JVM arguments, space-separated |
@@ -239,9 +254,20 @@ curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 
 **Offline accounts** only work in singleplayer and on servers with `online-mode=false`. For a **Microsoft account**, set `MC_AUTH=microsoft` and watch `docker logs -f mcdt` on the first start. It prints a link and a code to sign in with. The login is saved in the `/data` volume and reused on later starts.
 
-`/data` is the game directory. It holds `config/mcdt/`, `logs/`, `saves/`, `options.txt`, and `mods/`. You can add extra mods to `/data/mods`.
+`/data` is the game directory. It holds `config/mcdt/`, `logs/`, `saves/`, `options.txt`, and `mods/`.
 
-The Baritone routes that start jobs (`goto`, `mine`, `follow` and so on) need `MCDT_PERMISSION=act` or higher. On a multiplayer server they also need that server in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`. Baritone is LGPL-3.0 and ships unmodified: it is the `libs/` jar pinned in `gradle.properties`.
+### Add mods
+
+Use any mix of these. All of them are applied on each start, so to remove a mod, take it out and restart the container.
+
+- **From Modrinth:** `-e MC_MODRINTH=sodium,lithium,yacl:3.8.1+1.21.4-fabric`. The container picks the file for the image's Minecraft version and loader, checks its SHA-512, and also installs the mods it requires.
+- **From a URL:** `-e MC_MODS=https://example.com/my-mod-1.0.jar`.
+- **From a folder:** `-v ./mods:/mods:ro`. The container copies every `.jar` in that folder.
+- **By hand:** put jars in `/data/mods`. The container never touches jars that it did not install.
+
+If a mod can't be found or downloaded, the container stops with a message that says which one. Mods must match the image's loader and Minecraft version.
+
+The Baritone routes that start jobs (`goto`, `mine`, `follow` and so on) need `MCDT_PERMISSION=act` or higher. On a multiplayer server they also need that server in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`. Baritone is LGPL-3.0 and ships unmodified: it is the `libs/` jar pinned in `versions/<node>/gradle.properties`.
 
 > [!CAUTION]
 > Inside the container the API binds to `0.0.0.0`, but the examples above publish it only on the host's loopback. To reach it from other machines, put a TLS reverse proxy in front of it and set `MCDT_ALLOWED_HOSTS` to the proxy's host name, plus `MCDT_ORIGIN_ALLOWLIST` if you use the dashboard. Always set a strong `MCDT_TOKEN`. Anyone with the token and `act` permission controls the client. `act` and `reflect-write` stay blocked on multiplayer servers that are not in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`.

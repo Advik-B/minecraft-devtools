@@ -55,7 +55,8 @@ build.fabric.gradle.kts, build.neoforge.gradle.kts  the per-loader node build sc
 buildSrc/                               DownloadVerified task (pinned-SHA downloads); McdtBuild (jar-in-jar walk, Baritone jars)
 tests/live/                             Python live suite (uv + pytest) run against a real client
 web/                                    Svelte 5 + Vite + Tailwind 4 + daisyUI 5 dashboard (Bun)
-scripts/                                MCP stdio shim (mcdt-mcp.py / .ps1); ci/live-client.sh for CI live tests
+scripts/                                MCP stdio shim (mcdt-mcp.py / .ps1); ci/live-client.sh (CI live tests), ci/node-env.sh (node facts)
+docker/                                 entrypoint.sh and setup/ (the :docker-setup project: mod install at container start)
 http/                                   .http request samples per area
 libs/                                   pinned Baritone API jars, one per loader and version (committed via .gitignore exceptions)
 docs/MULTIVERSION.md                    the multi-version / multi-loader plan and its progress
@@ -72,7 +73,7 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
 - `runClient` serves the dashboard straight from `web/dist` (Gradle passes `-Dmcdt.webDist`), so `cd web && bun run build` followed by a browser reload picks up UI changes without restarting the game.
 - WebUI dev: run `cd web && bun run dev` (Vite on :5173). It proxies `/v1`, `/mcp`, `/docs`, and `/openapi.json` to :25580. Add `http://localhost:5173` to `originAllowlist` in the config, or the API rejects the Origin. Type-check with `bun run check`.
 - Shared versions (Fabric Loader, Loom, ModDevGradle, Shadow, Javalin, Jackson, ...) live in `gradle.properties`; per-node ones (Minecraft, Fabric API or NeoForge, Parchment, YACL, Mod Menu, Baritone + SHA-256, Java) in `versions/<node>/gradle.properties`.
-- Docker: `Dockerfile` builds the jar (JDK 25 + Bun) and runs a headless client with Xvfb, Mesa, and portablemc. `docker/entrypoint.sh` launches it. The image is the `1.21.4-fabric` node (`MINECRAFT_VERSION`); if you bump that node's Minecraft, Loader, or Fabric API, update the matching `ARG`s and the Fabric API SHA-512 in the `Dockerfile` too. The image ships the node's pinned `libs/` Baritone jar, so a `baritone_version` bump reaches it automatically. `MCDT_*` environment overrides are applied in `ConfigStore.applyEnv`. `MCDT_TOKEN` is handled in `McdtCore`.
+- Docker: `Dockerfile` builds one image per node (`--build-arg NODE=1.21.1-neoforge`; default `1.21.4-fabric`) with Xvfb, Mesa and the native portablemc binary. There is no Python in the image. The node's facts (loader, launcher target, pinned Fabric API URL + SHA-512, Baritone jar) come from `versions/<node>/gradle.properties` through `scripts/ci/node-env.sh`, so a version bump reaches the image automatically. The image holds **no Minecraft files** (the EULA forbids publishing them): the game downloads into `/data/.portablemc` on first start. `docker/entrypoint.sh` runs `docker/setup` (the `:docker-setup` Java project) before the launch. It installs the image's jars and the user's mods (`/mods`, `MC_MODS`, `MC_MODRINTH`), tracks them in `/data/mods/.mcdt-managed`, and leaves other jars alone. `.github/workflows/docker.yml` live-tests every image and publishes `ghcr.io/advik-b/mcdt-<node>` (`:edge` from master, `:<version>` + `:latest` from `v*` tags). `MCDT_*` environment overrides are applied in `ConfigStore.applyEnv`. `MCDT_TOKEN` is handled in `McdtCore`.
 
 ## Stonecutter (versions and loaders)
 
@@ -81,7 +82,7 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
 - Switch with `./gradlew "Set active project to 1.21.1-neoforge"` (rewrites the comments in `src/`), and switch back with `./gradlew "Reset active project"` **before you commit**.
 - Conditional code: `//? if fabric {` ... `//?}`, `//? if >=1.21.2 {` ... `//?} else {` ... `//?}`. Inactive branches are block-commented (`/*` ... `*///?}`). Write both branches as plain code, then run `./gradlew "Refresh active project"` to comment the inactive ones.
 - Loader-only code lives in `platform/<loader>/`, each file wrapped whole in `//? if <loader> {`. Loader-only resources (mod metadata, SPI service files) live in `src/<loader>/resources/`. Small version differences use inline conditionals (see `ToastManagerAccessor`, `ViewerWorld`).
-- Add a node: a `version(...)` line in `settings.gradle.kts`; `versions/<node>/gradle.properties` (copy a sibling; pin the Baritone jar's SHA-256 from the GitHub release asset digest); a `.gitignore` exception for a new loader's Baritone jar; and a `live.yml` row with the node's expected capabilities.
+- Add a node: a `version(...)` line in `settings.gradle.kts`; `versions/<node>/gradle.properties` (copy a sibling; pin the Baritone jar's SHA-256 from the GitHub release asset digest); for Fabric, `fabric_api_url` and `fabric_api_sha512`; a `.gitignore` exception for a new loader's Baritone jar; and an entry in `.github/nodes.json` with the node's expected capabilities (the live and docker workflows both read it).
 
 ## Core invariants: do not break these
 
@@ -125,7 +126,7 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
 - Game-specific code in `MinecraftGameClient`, mixins, and `bridge/` is not unit-tested. Check it live with the Python suite in `tests/live/` (uv + pytest + httpx). It finds the instance via `~/.mcdt/instances/<pid>.json` or `run/config/mcdt/instance.json`:
   1. `./gradlew :1.21.4-fabric:runClient` (or another node).
   2. On the title screen: `uv run --project tests/live pytest tests/live`. In a world: add `--state world`. `--baritone installed|absent` asserts which Baritone mode is expected; `--shutdown` finishes with the quit flow.
-- CI runs the same suite on real headless clients (`.github/workflows/live.yml` -> `scripts/ci/live-client.sh`): title screen, then a generated superflat world (world and Baritone checks), then the quit flow. Every node runs once with Baritone and once without; each matrix row pins the capabilities the node must report (`MCDT_EXPECT_CAPABILITIES`). Never run Docker locally; use CI.
+- CI runs the same suite on real headless clients (`.github/workflows/live.yml` -> `scripts/ci/live-client.sh`): title screen, then a generated superflat world (world and Baritone checks), then the quit flow. Every node runs once with Baritone and once without; each matrix row pins the capabilities the node must report (`MCDT_EXPECT_CAPABILITIES`, from `.github/nodes.json`). `docker.yml` runs the same script with `LAUNCH=docker` against each node's image. Never run Docker locally; use CI.
 - Before you call a change done, run `./gradlew test`, plus `bun run check` in `web/` if you touched the WebUI, followed by live verification on the running client.
 
 ## Conventions
