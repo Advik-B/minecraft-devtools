@@ -44,6 +44,8 @@ public final class BaritoneBridge implements BaritoneService {
 	 * Only touched on the client thread.
 	 */
 	private boolean activeJobCalculating;
+	/** Goal of the active coordinate goto, or null. Client thread only. */
+	private Goal activeGoal;
 
 	public BaritoneBridge(HandleTable handleTable, BaritoneJobManager jobManager) {
 		this.handleTable = handleTable;
@@ -70,7 +72,12 @@ public final class BaritoneBridge implements BaritoneService {
 				} else if (event == PathEvent.CALC_FAILED || event == PathEvent.NEXT_CALC_FAILED) {
 					jobManager.updateActiveJob("failed", "Path calculation failed: " + event.name());
 				} else if (event == PathEvent.CANCELED) {
-					jobManager.updateActiveJob("cancelled", "Pathing was cancelled");
+					// CustomGoalProcess reports arrival by giving up control, which cancels the path: check where we are.
+					if (activeGoal != null && activeGoal.isInGoal(baritone.getPlayerContext().playerFeet())) {
+						jobManager.updateActiveJob("completed", "Arrived at goal");
+					} else {
+						jobManager.updateActiveJob("cancelled", "Pathing was cancelled");
+					}
 				} else if (event == PathEvent.CALC_FINISHED_NOW_EXECUTING) {
 					jobManager.updateActiveJob("running", "Executing path");
 				}
@@ -81,6 +88,7 @@ public final class BaritoneBridge implements BaritoneService {
 	/** Creates the job that path events now report on. */
 	private JobResponse newJob(String type, String message) {
 		activeJobCalculating = false;
+		activeGoal = null;
 		return jobManager.createJob(type, message);
 	}
 
@@ -192,6 +200,7 @@ public final class BaritoneBridge implements BaritoneService {
 
 		baritone.getCustomGoalProcess().setGoalAndPath(goal);
 		JobResponse job = newJob("goto", "Going to " + goal);
+		activeGoal = goal;
 		EventHub.getInstance().publish("baritone.process", Map.of("process", "CustomGoalProcess", "active", true));
 		return job;
 	}
