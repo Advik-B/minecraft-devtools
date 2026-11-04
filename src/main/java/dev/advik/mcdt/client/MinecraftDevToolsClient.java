@@ -146,6 +146,10 @@ public final class MinecraftDevToolsClient implements ClientModInitializer {
 					Instant.now()
 			);
 
+			dev.advik.mcdt.events.EventHub.setTickSource(() -> {
+				McdtCore current = core;
+				return current != null ? current.queue().clock().current() : 0L;
+			});
 			core = McdtCore.start(env, System.getenv(), dev.advik.mcdt.game.MinecraftGameClient.getInstance(), baritoneService);
 			Mcdt.LOGGER.info("MCDT initialized. API available at {}", core.server().baseUrl());
 		} catch (IOException e) {

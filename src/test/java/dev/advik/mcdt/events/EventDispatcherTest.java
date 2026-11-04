@@ -1,5 +1,6 @@
 package dev.advik.mcdt.events;
 
+import dev.advik.mcdt.http.WsEventSink;
 import dev.advik.mcdt.json.Json;
 import io.javalin.Javalin;
 import org.junit.jupiter.api.AfterEach;
@@ -34,13 +35,13 @@ class EventDispatcherTest {
 		app = Javalin.create(cfg -> {
 			cfg.routes.ws("/test/events", ws -> {
 				ws.onConnect(ctx -> {
-					EventSubscriber sub = eventHub.registerSubscriber(ctx, 32);
+					EventSubscriber sub = eventHub.registerSubscriber(new WsEventSink(ctx), 32);
 					SubscriptionRequest req = new SubscriptionRequest();
 					req.action = "subscribe";
 					req.topics = List.of("*", "tick");
 					sub.updateSubscription(req);
 				});
-				ws.onClose(ctx -> eventHub.removeSubscriber(ctx));
+				ws.onClose(ctx -> eventHub.removeSubscriber(ctx.sessionId()));
 			});
 		}).start("127.0.0.1", 0);
 

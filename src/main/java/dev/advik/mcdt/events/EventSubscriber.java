@@ -2,7 +2,6 @@ package dev.advik.mcdt.events;
 
 import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.json.Json;
-import io.javalin.websocket.WsContext;
 
 import java.util.Collections;
 import java.util.Map;
@@ -18,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Drops events if the subscriber is too slow and generates gap notifications.
  */
 public final class EventSubscriber {
-	private final WsContext ctx;
+	private final EventSink sink;
 	private final BlockingQueue<String> outgoingQueue;
 	private final Set<String> subscribedTopics = ConcurrentHashMap.newKeySet();
 	private final Map<String, SubscriptionRequest.TopicFilter> filters = new ConcurrentHashMap<>();
@@ -26,16 +25,16 @@ public final class EventSubscriber {
 	private final AtomicBoolean closed = new AtomicBoolean(false);
 	private final Thread senderThread;
 
-	public EventSubscriber(WsContext ctx, int queueCapacity) {
-		this.ctx = ctx;
+	public EventSubscriber(EventSink sink, int queueCapacity) {
+		this.sink = sink;
 		this.outgoingQueue = new ArrayBlockingQueue<>(Math.max(32, queueCapacity));
-		this.senderThread = new Thread(this::runSender, "MCDT-EventSubscriber-" + ctx.sessionId());
+		this.senderThread = new Thread(this::runSender, "MCDT-EventSubscriber-" + sink.id());
 		this.senderThread.setDaemon(true);
 		this.senderThread.start();
 	}
 
-	public WsContext context() {
-		return ctx;
+	public EventSink sink() {
+		return sink;
 	}
 
 	public boolean isClosed() {
@@ -150,7 +149,7 @@ public final class EventSubscriber {
 			try {
 				String msg = outgoingQueue.take();
 				try {
-					ctx.send(msg);
+					sink.send(msg);
 				} catch (Exception e) {
 					close();
 					break;
@@ -159,7 +158,7 @@ public final class EventSubscriber {
 				Thread.currentThread().interrupt();
 				break;
 			} catch (Exception e) {
-				Mcdt.LOGGER.debug("Error sending event to subscriber {}: {}", ctx.sessionId(), e.getMessage());
+				Mcdt.LOGGER.debug("Error sending event to subscriber {}: {}", sink.id(), e.getMessage());
 				close();
 				break;
 			}

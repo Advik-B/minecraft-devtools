@@ -1,17 +1,16 @@
 package dev.advik.mcdt.events;
 
 import dev.advik.mcdt.Mcdt;
-import dev.advik.mcdt.client.MinecraftDevToolsClient;
-import io.javalin.websocket.WsContext;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 
 /**
  * Composition root and central facade for MCDT's event streaming subsystem.
  */
 public final class EventHub implements AutoCloseable {
 	private static volatile EventHub instance;
+	private static volatile LongSupplier tickSource = () -> 0L;
 
 	private final EventRingBuffer ringBuffer;
 	private final EventDispatcher dispatcher;
@@ -38,6 +37,11 @@ public final class EventHub implements AutoCloseable {
 			}
 			instance = new EventHub(ringBufferSize);
 		}
+	}
+
+	/** Sets where {@link #publish(String, Object)} reads the current game tick; the platform sets this at startup. */
+	public static void setTickSource(LongSupplier source) {
+		tickSource = source != null ? source : () -> 0L;
 	}
 
 	public static void resetForTesting() {
@@ -74,25 +78,22 @@ public final class EventHub implements AutoCloseable {
 	 * Publishes an event with current game tick resolved automatically.
 	 */
 	public long publish(String topic, Object payload) {
-		long tick = MinecraftDevToolsClient.core()
-				.map(c -> c.queue().clock().current())
-				.orElse(0L);
-		return publish(topic, tick, payload);
+		return publish(topic, tickSource.getAsLong(), payload);
 	}
 
-	public EventSubscriber registerSubscriber(WsContext ctx, int queueCapacity) {
-		EventSubscriber sub = new EventSubscriber(ctx, queueCapacity);
-		subscribersBySession.put(ctx.sessionId(), sub);
+	public EventSubscriber registerSubscriber(EventSink sink, int queueCapacity) {
+		EventSubscriber sub = new EventSubscriber(sink, queueCapacity);
+		subscribersBySession.put(sink.id(), sub);
 		dispatcher.addSubscriber(sub);
 		return sub;
 	}
 
-	public EventSubscriber getSubscriber(WsContext ctx) {
-		return subscribersBySession.get(ctx.sessionId());
+	public EventSubscriber getSubscriber(String sinkId) {
+		return subscribersBySession.get(sinkId);
 	}
 
-	public void removeSubscriber(WsContext ctx) {
-		EventSubscriber sub = subscribersBySession.remove(ctx.sessionId());
+	public void removeSubscriber(String sinkId) {
+		EventSubscriber sub = subscribersBySession.remove(sinkId);
 		if (sub != null) {
 			dispatcher.removeSubscriber(sub);
 		}
@@ -117,9 +118,9 @@ public final class EventHub implements AutoCloseable {
 	public void closeAll(int statusCode, String reason) {
 		for (EventSubscriber sub : subscribersBySession.values()) {
 			try {
-				sub.context().closeSession(statusCode, reason);
+				sub.sink().close(statusCode, reason);
 			} catch (Exception e) {
-				Mcdt.LOGGER.debug("Error closing subscriber session {}: {}", sub.context().sessionId(), e.getMessage());
+				Mcdt.LOGGER.debug("Error closing subscriber session {}: {}", sub.sink().id(), e.getMessage());
 			}
 			sub.close();
 		}

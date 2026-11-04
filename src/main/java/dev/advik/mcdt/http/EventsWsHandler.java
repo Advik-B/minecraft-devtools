@@ -49,7 +49,7 @@ public final class EventsWsHandler implements Consumer<WsConfig> {
 			return;
 		}
 
-		EventSubscriber sub = eventHub.registerSubscriber(ctx, config.eventSubscriberQueueCapacity);
+		EventSubscriber sub = eventHub.registerSubscriber(new WsEventSink(ctx), config.eventSubscriberQueueCapacity);
 
 		try {
 			String welcome = Json.MAPPER.writeValueAsString(Map.of(
@@ -71,7 +71,7 @@ public final class EventsWsHandler implements Consumer<WsConfig> {
 	}
 
 	private void handleMessage(WsMessageContext ctx) {
-		EventSubscriber sub = eventHub.getSubscriber(ctx);
+		EventSubscriber sub = eventHub.getSubscriber(ctx.sessionId());
 		if (sub == null) {
 			ctx.closeSession(1008, "Subscriber not registered");
 			return;
@@ -103,12 +103,12 @@ public final class EventsWsHandler implements Consumer<WsConfig> {
 	}
 
 	private void handleClose(WsContext ctx) {
-		eventHub.removeSubscriber(ctx);
+		eventHub.removeSubscriber(ctx.sessionId());
 	}
 
 	private void handleError(io.javalin.websocket.WsErrorContext ctx) {
 		Mcdt.LOGGER.debug("WebSocket error on session {}: {}", ctx.sessionId(), ctx.error() != null ? ctx.error().getMessage() : "unknown");
-		eventHub.removeSubscriber(ctx);
+		eventHub.removeSubscriber(ctx.sessionId());
 	}
 
 	private boolean validateHandshake(WsContext ctx) {
