@@ -4,6 +4,7 @@ with --baritone=absent every route must report 501 baritone-not-installed."""
 from __future__ import annotations
 
 import math
+import time
 from typing import Any
 
 import pytest
@@ -107,23 +108,48 @@ def test_settings_round_trip(api: Api, baritone: str) -> None:
         expect(api.patch("/v1/baritone/settings", {"allowBreak": original}), 200)
 
 
+def snapshot(api: Api, job_id: str) -> dict[str, Any]:
+    """Client state for diagnosing a Baritone run: job, player position, open screen, pause state."""
+    session = api.get("/v1/session").json()
+    screen = api.get("/v1/screen").json()
+    player = api.get("/v1/player")
+    return {
+        "t": round(time.monotonic(), 2),
+        "job": job(api, job_id)["status"],
+        "pos": [round(v, 2) for v in player.json()["pos"]] if player.status_code == 200 else player.status_code,
+        "screen": screen.get("className") if screen.get("open") else None,
+        "paused": session.get("paused"),
+    }
+
+
 @pytest.mark.world
 def test_goto_walks_to_target(api: Api, baritone: str) -> None:
     require(baritone, "installed")
     x, y, z = (math.floor(v) for v in player_pos(api))
     target = (x + 6, y, z + 3)
-    # chatDebug makes Baritone explain cancellations in chat; attached to the failure message below.
+    # chatDebug makes Baritone explain itself in chat; everything is attached to the failure message below.
     expect(api.patch("/v1/baritone/settings", {"chatDebug": True}), 200)
+    timeline: list[dict[str, Any]] = []
     try:
         with record_events(api, ["baritone.path", "baritone.process"]) as events:
             started = start(api, "goto", {"x": target[0], "y": target[1], "z": target[2]})
             assert started["type"] == "goto"
-            final = wait_for(lambda: job(api, started["jobId"]), lambda j: j["status"] in TERMINAL, timeout=120)
+            deadline = time.monotonic() + 120
+            while time.monotonic() < deadline:
+                timeline.append(snapshot(api, started["jobId"]))
+                if timeline[-1]["job"] in TERMINAL:
+                    break
+                time.sleep(0.25)
     finally:
         expect(api.patch("/v1/baritone/settings", {"chatDebug": False}), 200)
+    final = job(api, started["jobId"])
     path_events = [e["data"] for e in events if e.get("topic", "").startswith("baritone.")]
     chat = [m.get("text") for m in expect(api.get("/v1/chat?limit=40"), 200)["messages"]]
-    assert final["status"] == "completed", f"{final}; Baritone events: {path_events}; chat: {chat}"
+    assert final["status"] == "completed", (
+        f"{final}
+events: {path_events}
+timeline: {timeline}
+chat: {chat}")
 
     px, py, pz = player_pos(api)
     distance = math.dist((px, pz), (target[0] + 0.5, target[2] + 0.5))
