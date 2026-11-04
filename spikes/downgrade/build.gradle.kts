@@ -12,8 +12,8 @@ repositories {
 	mavenCentral()
 }
 
-val repoMain = rootDir.resolve("../../src/main/java")
-val repoTest = rootDir.resolve("../../src/test/java")
+val repoMain = rootDir.resolve("../../core/src/main/java")
+val repoTest = rootDir.resolve("../../core/src/test/java")
 
 // Packages with no Minecraft, Fabric or Javalin runtime types (see docs/MULTIVERSION.md, Phase 1 `core`).
 sourceSets {

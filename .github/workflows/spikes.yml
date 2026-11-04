@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - 'spikes/**'
-      - 'src/main/java/dev/advik/mcdt/json/**'
+      - 'core/src/main/java/dev/advik/mcdt/json/**'
       - '.github/workflows/spikes.yml'
   workflow_dispatch:
 
