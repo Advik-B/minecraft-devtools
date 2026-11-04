@@ -169,29 +169,6 @@ val downloadVineflower = tasks.register<DownloadVerified>("downloadVineflower") 
 	outputDir = layout.buildDirectory.dir("generated/vineflower")
 }
 
-val compileIsolatedRenamer = tasks.register<JavaCompile>("compileIsolatedRenamer") {
-	group = "build setup"
-	description = "Compiles the isolated identifier renamer against the pinned Vineflower jar."
-	dependsOn(downloadVineflower)
-
-	source = fileTree("src/main/isolated")
-	destinationDirectory = layout.buildDirectory.dir("generated/vineflower-classes")
-	classpath = files(layout.buildDirectory.file("generated/vineflower/mcdt-internal/vineflower.jar"))
-
-	options.release = 21
-	options.encoding = "UTF-8"
-}
-
-val packageIsolatedRenamer = tasks.register<Copy>("packageIsolatedRenamer") {
-	group = "build setup"
-	description = "Copies the compiled renamer class as .classBytes into the vineflower resources directory."
-	dependsOn(compileIsolatedRenamer)
-
-	from(layout.buildDirectory.file("generated/vineflower-classes/dev/advik/mcdt/decompiler/isolated/VineflowerRenamer.class"))
-	into(layout.buildDirectory.dir("generated/vineflower/mcdt-internal"))
-	rename { "VineflowerRenamer.classBytes" }
-}
-
 val downloadBaritoneApi = tasks.register<DownloadVerified>("downloadBaritoneApi") {
 	group = "build setup"
 	description = "Downloads the pinned Baritone API Fabric jar."
@@ -255,7 +232,6 @@ tasks.compileJava {
 
 tasks.processResources {
 	dependsOn(syncWebAssets)
-	dependsOn(packageIsolatedRenamer)
 	val version = version
 	inputs.property("version", version)
 
@@ -266,7 +242,6 @@ tasks.processResources {
 
 tasks.matching { it.name == "sourcesJar" }.configureEach {
 	dependsOn(syncWebAssets)
-	dependsOn(packageIsolatedRenamer)
 }
 
 tasks.register<JavaExec>("runTestServer") {

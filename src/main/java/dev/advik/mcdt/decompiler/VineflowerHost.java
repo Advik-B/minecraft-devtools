@@ -2,7 +2,6 @@ package dev.advik.mcdt.decompiler;
 
 import dev.advik.mcdt.Mcdt;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -20,15 +19,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class VineflowerHost implements AutoCloseable {
 	private static final String EMBEDDED_JAR_RESOURCE = "/mcdt-internal/vineflower.jar";
-	private static final String EMBEDDED_RENAMER_RESOURCE = "/mcdt-internal/VineflowerRenamer.classBytes";
-	public static final String RENAMER_CLASS_NAME = "dev.advik.mcdt.decompiler.isolated.VineflowerRenamer";
 
 	private final IsolatedClassLoader classLoader;
 	private final Class<?> fernflowerClass;
 	private final Class<?> bytecodeProviderClass;
 	private final Class<?> resultSaverClass;
 	private final Class<?> loggerClass;
-	private final Class<?> renamerClass;
 	private final AtomicBoolean closed = new AtomicBoolean(false);
 
 	public VineflowerHost(Path cacheDir) throws IOException {
@@ -44,13 +40,6 @@ public final class VineflowerHost implements AutoCloseable {
 			this.resultSaverClass = Class.forName("org.jetbrains.java.decompiler.main.extern.IResultSaver", true, classLoader);
 			this.loggerClass = Class.forName("org.jetbrains.java.decompiler.main.extern.IFernflowerLogger", true, classLoader);
 
-			// Load the renamer class from embedded classBytes
-			byte[] renamerBytes = loadRenamerBytes();
-			if (renamerBytes != null && renamerBytes.length > 0) {
-				this.renamerClass = classLoader.defineFromBytes(RENAMER_CLASS_NAME, renamerBytes);
-			} else {
-				this.renamerClass = null;
-			}
 			Mcdt.LOGGER.info("Vineflower decompiler host initialized successfully in isolated ClassLoader.");
 		} catch (ClassNotFoundException e) {
 			try {
@@ -82,35 +71,6 @@ public final class VineflowerHost implements AutoCloseable {
 		throw new IOException("Vineflower embedded jar not found at " + EMBEDDED_JAR_RESOURCE + " or " + devPath);
 	}
 
-	private static byte[] loadRenamerBytes() {
-		// 1. Try embedded resource
-		try (InputStream in = VineflowerHost.class.getResourceAsStream(EMBEDDED_RENAMER_RESOURCE)) {
-			if (in != null) {
-				return in.readAllBytes();
-			}
-		} catch (IOException ignored) {
-		}
-
-		// 2. Fallback for dev / test environments
-		Path devPath = Path.of("build/generated/vineflower/mcdt-internal/VineflowerRenamer.classBytes");
-		if (Files.isRegularFile(devPath)) {
-			try {
-				return Files.readAllBytes(devPath);
-			} catch (IOException ignored) {
-			}
-		}
-
-		Path compiledDevClass = Path.of("build/generated/vineflower-classes/dev/advik/mcdt/decompiler/isolated/VineflowerRenamer.class");
-		if (Files.isRegularFile(compiledDevClass)) {
-			try {
-				return Files.readAllBytes(compiledDevClass);
-			} catch (IOException ignored) {
-			}
-		}
-
-		return null;
-	}
-
 	public IsolatedClassLoader classLoader() {
 		return classLoader;
 	}
@@ -131,10 +91,6 @@ public final class VineflowerHost implements AutoCloseable {
 		return loggerClass;
 	}
 
-	public Class<?> renamerClass() {
-		return renamerClass;
-	}
-
 	@Override
 	public void close() throws IOException {
 		if (closed.compareAndSet(false, true)) {
@@ -142,16 +98,10 @@ public final class VineflowerHost implements AutoCloseable {
 		}
 	}
 
-	/**
-	 * URLClassLoader subclass allowing definition of classes from byte arrays within this isolated scope.
-	 */
+	/** The isolated loader for the Vineflower jar; its parent is the platform loader, so no game or mod classes. */
 	public static final class IsolatedClassLoader extends URLClassLoader {
 		public IsolatedClassLoader(URL[] urls, ClassLoader parent) {
 			super(urls, parent);
-		}
-
-		public Class<?> defineFromBytes(String name, byte[] bytes) {
-			return defineClass(name, bytes, 0, bytes.length);
 		}
 	}
 }

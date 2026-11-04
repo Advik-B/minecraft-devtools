@@ -41,6 +41,14 @@ public final class NameService {
 	private final Map<String, String> methodIntermediaryToMojang = new ConcurrentHashMap<>();
 	private final Map<String, String> methodMojangToIntermediary = new ConcurrentHashMap<>();
 
+	/**
+	 * Runtime member name to Mojang name, ignoring the owner. Intermediary and SRG member names are unique ids, so this
+	 * also resolves references through subclasses; a runtime name seen with two Mojang names maps to {@link #AMBIGUOUS}.
+	 */
+	private final Map<String, String> methodByRuntimeName = new ConcurrentHashMap<>();
+	private final Map<String, String> fieldByRuntimeName = new ConcurrentHashMap<>();
+	private static final String AMBIGUOUS = "(ambiguous)";
+
 	private boolean mappingsLoaded = false;
 	private boolean isDevEnvironment = true;
 	private final RuntimeNames runtimeNames;
@@ -69,8 +77,8 @@ public final class NameService {
 		private static final NameService INSTANCE = new NameService();
 	}
 
-	/** For tests: a production-mode service with the given obfuscated-to-runtime translation. */
-	NameService(RuntimeNames runtimeNames) {
+	/** For tests (also in other packages): a production-mode service with the given obfuscated-to-runtime translation. */
+	public NameService(RuntimeNames runtimeNames) {
 		this.isDevEnvironment = false;
 		this.runtimeNames = runtimeNames;
 	}
@@ -267,6 +275,7 @@ public final class NameService {
 
 				methodIntermediaryToMojang.put(currentRuntimeClass + "#" + runtimeMethod, mojangMethodName);
 				methodMojangToIntermediary.put(currentRuntimeClass + "#" + mojangMethodName, runtimeMethod);
+				putUnique(methodByRuntimeName, runtimeMethod, mojangMethodName);
 			} else if (!left.contains("(")) {
 				// Field: e.g. "net.minecraft.client.player.LocalPlayer player"
 				int lastSpace = left.lastIndexOf(' ');
@@ -277,6 +286,7 @@ public final class NameService {
 
 					fieldIntermediaryToMojang.put(currentRuntimeClass + "#" + runtimeField, mojangFieldName);
 					fieldMojangToIntermediary.put(currentRuntimeClass + "#" + mojangFieldName, runtimeField);
+					putUnique(fieldByRuntimeName, runtimeField, mojangFieldName);
 				}
 			}
 		}
@@ -433,6 +443,28 @@ public final class NameService {
 			}
 		}
 		return mojangFieldName;
+	}
+
+	private static void putUnique(Map<String, String> index, String runtimeName, String mojangName) {
+		index.merge(runtimeName, mojangName, (a, b) -> a.equals(b) ? a : AMBIGUOUS);
+	}
+
+	/** Mojang name of a runtime method name whatever its owner, or the name unchanged if unknown or ambiguous. */
+	public String resolveMethodNameAnyOwner(String runtimeMethodName) {
+		return byRuntimeName(methodByRuntimeName, runtimeMethodName);
+	}
+
+	/** Mojang name of a runtime field name whatever its owner, or the name unchanged if unknown or ambiguous. */
+	public String resolveFieldNameAnyOwner(String runtimeFieldName) {
+		return byRuntimeName(fieldByRuntimeName, runtimeFieldName);
+	}
+
+	private String byRuntimeName(Map<String, String> index, String runtimeName) {
+		if (runtimeName == null || isDevEnvironment) {
+			return runtimeName;
+		}
+		String mapped = index.get(runtimeName);
+		return mapped == null || AMBIGUOUS.equals(mapped) ? runtimeName : mapped;
 	}
 
 	public String resolveMethodByName(String ownerName, String runtimeMethodName) {

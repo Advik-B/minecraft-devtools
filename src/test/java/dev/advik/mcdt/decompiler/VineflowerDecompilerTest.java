@@ -47,10 +47,6 @@ class VineflowerDecompilerTest {
 		assertThrows(ClassNotFoundException.class, () ->
 				Class.forName("org.jetbrains.java.decompiler.main.extern.IBytecodeProvider", false, Thread.currentThread().getContextClassLoader())
 		);
-		// The renamer class should also not exist on the system classloader
-		assertThrows(ClassNotFoundException.class, () ->
-				Class.forName("dev.advik.mcdt.decompiler.isolated.VineflowerRenamer", false, ClassLoader.getSystemClassLoader())
-		);
 
 		// But they must exist inside the isolated classloader
 		assertNotNull(host.fernflowerClass());

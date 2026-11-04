@@ -8,14 +8,11 @@ import dev.advik.mcdt.reflection.ReflectionSecurity;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
 /**
  * Service that coordinates on-the-fly decompilation of Minecraft and installed mod classes.
@@ -111,6 +108,14 @@ public final class DecompilerService implements AutoCloseable {
 			ClassLoader loader = host.classLoader();
 			StringBuilder output = new StringBuilder();
 
+			// With remap, Vineflower only ever sees Mojang-named bytecode: the target class and every class it loads
+			// for context are remapped here, and the names it asks for are Mojang names.
+			MojangRemapper remapper = remap && !nameService.isDevEnvironment() ? new MojangRemapper(nameService) : null;
+			byte[] mainBytes = remapper != null ? remapper.remap(bytecode) : bytecode;
+			String mainName = remapper != null
+					? remapper.map(runtimeName.replace('.', '/')).replace('/', '.')
+					: runtimeName;
+
 			// Proxy for IBytecodeProvider
 			Object bytecodeProvider = Proxy.newProxyInstance(
 					loader,
@@ -120,11 +125,11 @@ public final class DecompilerService implements AutoCloseable {
 							String ext = (String) args[0];
 							String internal = (String) args[1];
 							if (internal == null || internal.isBlank()) {
-								return bytecode;
+								return mainBytes;
 							}
 							String targetName = internal.endsWith(".class") ? internal.substring(0, internal.length() - 6) : internal;
-							if (targetName.replace('/', '.').equals(runtimeName)) {
-								return bytecode;
+							if (targetName.replace('/', '.').equals(mainName)) {
+								return mainBytes;
 							}
 							if (targetName.startsWith("org/jetbrains/java/decompiler/") || targetName.startsWith("org/vineflower/")) {
 								try (var in = loader.getResourceAsStream(internal.endsWith(".class") ? internal : internal + ".class")) {
@@ -135,7 +140,10 @@ public final class DecompilerService implements AutoCloseable {
 								}
 							}
 							try {
-								return ClassBytecodeProvider.findBytecode(targetName);
+								if (remapper == null) {
+									return ClassBytecodeProvider.findBytecode(targetName);
+								}
+								return remapper.remap(ClassBytecodeProvider.findBytecode(runtimeNameOf(targetName.replace('/', '.'))));
 							} catch (Exception e) {
 								return null;
 							}
@@ -167,21 +175,14 @@ public final class DecompilerService implements AutoCloseable {
 			Map<String, Object> props = new HashMap<>();
 			props.put("dgs", "1"); // decompile generic signatures
 			props.put("asc", "1"); // ascii string characters
-			props.put("ren", "0"); // default no rename
-
-			// Configure remapper if requested and renamer class is present
-			if (remap && host.renamerClass() != null && !nameService.isDevEnvironment()) {
-				configureRenamer(host.renamerClass());
-				props.put("ren", "1");
-				props.put("urc", VineflowerHost.RENAMER_CLASS_NAME);
-			}
+			props.put("ren", "0"); // names are already remapped above
 
 			// Instantiate Fernflower
 			Object fernflower = host.fernflowerClass()
 					.getConstructor(host.bytecodeProviderClass(), host.resultSaverClass(), Map.class, host.loggerClass())
 					.newInstance(bytecodeProvider, resultSaver, props, logger);
 
-			String simpleName = runtimeName.substring(runtimeName.lastIndexOf('.') + 1);
+			String simpleName = mainName.substring(mainName.lastIndexOf('.') + 1);
 			File dummyFile = new File(simpleName + ".class");
 
 			Method addSourceMethod = host.fernflowerClass().getMethod("addSource", File.class);
@@ -197,42 +198,17 @@ public final class DecompilerService implements AutoCloseable {
 		}
 	}
 
-	private void configureRenamer(Class<?> renamerClass) {
-		try {
-			Field classRenamerField = renamerClass.getField("classRenamer");
-			Field fieldRenamerField = renamerClass.getField("fieldRenamer");
-			Field methodRenamerField = renamerClass.getField("methodRenamer");
-
-			BiFunction<String, String, String> classRenamer = (fullName, shortName) -> {
-				String dotted = fullName.replace('/', '.');
-				String mapped = nameService.resolveClassName(dotted);
-				if (!mapped.equals(dotted)) {
-					int lastDot = mapped.lastIndexOf('.');
-					return lastDot >= 0 ? mapped.substring(lastDot + 1) : mapped;
-				}
-				return null;
-			};
-
-			Function<String[], String> fieldRenamer = args -> {
-				String className = args[0];
-				String field = args[1];
-				String mapped = nameService.resolveFieldByName(className.replace('/', '.'), field);
-				return !mapped.equals(field) ? mapped : null;
-			};
-
-			Function<String[], String> methodRenamer = args -> {
-				String className = args[0];
-				String method = args[1];
-				String mapped = nameService.resolveMethodByName(className.replace('/', '.'), method);
-				return !mapped.equals(method) ? mapped : null;
-			};
-
-			classRenamerField.set(null, classRenamer);
-			fieldRenamerField.set(null, fieldRenamer);
-			methodRenamerField.set(null, methodRenamer);
-		} catch (Exception e) {
-			Mcdt.LOGGER.warn("Failed to configure Vineflower renamer: {}", e.getMessage());
+	/**
+	 * The runtime name of a Mojang class name. Anonymous and other unmapped nested classes keep the runtime suffix
+	 * of their mapped outer class ({@code net.minecraft.client.Minecraft$1} is {@code net.minecraft.class_310$1}).
+	 */
+	private String runtimeNameOf(String mojangName) {
+		String runtime = nameService.toRuntimeClassName(mojangName);
+		int nested = mojangName.indexOf('$');
+		if (!runtime.equals(mojangName) || nested < 0) {
+			return runtime;
 		}
+		return nameService.toRuntimeClassName(mojangName.substring(0, nested)) + mojangName.substring(nested);
 	}
 
 	public void clearCache() {
