@@ -9,7 +9,7 @@ Read game state, send input, stream events and poke around the live object graph
 
 [![Build](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml/badge.svg)](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml)
 [![Latest Release](https://img.shields.io/github/v/release/Advik-B/minecraft-devtools?logo=github)](https://github.com/Advik-B/minecraft-devtools/releases/latest)
-![Minecraft 1.21.1 | 1.21.4 | 1.21.11](https://img.shields.io/badge/Minecraft-1.21.1%20%7C%201.21.4%20%7C%201.21.11-62B47A?logo=modrinth&logoColor=white)
+![Minecraft 1.21.1 | 1.21.4 | 1.21.11 | 26.3](https://img.shields.io/badge/Minecraft-1.21.1%20%7C%201.21.4%20%7C%201.21.11%20%7C%2026.3-62B47A?logo=modrinth&logoColor=white)
 ![Fabric | NeoForge](https://img.shields.io/badge/loader-Fabric%20%7C%20NeoForge-DBD0B4)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -22,7 +22,7 @@ Read game state, send input, stream events and poke around the live object graph
 
 ## Overview
 
-MCDT is a **client-only mod for Fabric and NeoForge** (Minecraft 1.21.1, 1.21.4 and 1.21.11, see [Compatibility](#compatibility)). Inside the game it runs a small HTTP server on `127.0.0.1:25580`, and that server exposes the live client as a REST API (with an OpenAPI spec), WebSocket streams and a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. The Svelte dashboard is bundled in the same jar.
+MCDT is a **client-only mod for Fabric and NeoForge** (Minecraft 1.21.1, 1.21.4, 1.21.11 and 26.3, see [Compatibility](#compatibility)). Inside the game it runs a small HTTP server on `127.0.0.1:25580`, and that server exposes the live client as a REST API (with an OpenAPI spec), WebSocket streams and a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. The Svelte dashboard is bundled in the same jar.
 
 You can `curl` the game, script it from Python, or build an overlay in the browser. You can also hand it to an AI agent and let it play. You don't have to write a mod or attach a debugger, and nothing needs to scrape the screen.
 
@@ -40,7 +40,7 @@ You can `curl` the game, script it from Python, or build an overlay in the brows
 - **Live object graph.** Browse any object from named roots (`minecraft`, `player`, `level` and so on), follow dot-paths like `player.getInventory().items[0]`, read and write fields, invoke methods, or send raw serverbound packets.
 - **Real-time events.** WebSocket streams for chat, screens, entity spawns and removals, block updates, damage and death, world join and leave, inbound packets, and ticks.
 - **AI agents.** There's a native MCP server at `/mcp` with a set of hand-picked tools (`get_state`, `look`, `move`, `screenshot` and more), subscribable resources, and a stdio shim for desktop clients.
-- **Optional Baritone.** Install the [Baritone](https://github.com/cabaletta/baritone) API jar for your loader and version (1.17.0 on 1.21.11, 1.13.1 on 1.21.4, 1.11.3 on 1.21.1) and MCDT exposes goto, mine, follow, explore, farm and build as background jobs. Without it, those routes just return a `501`.
+- **Optional Baritone.** Install the [Baritone](https://github.com/cabaletta/baritone) API jar for your loader and version (1.20.0 on 26.3, 1.17.0 on 1.21.11, 1.13.1 on 1.21.4, 1.11.3 on 1.21.1) and MCDT exposes goto, mine, follow, explore, farm and build as background jobs. Without it, those routes just return a `501`.
 - **Proper dev tooling.** OpenAPI 3.1 at `/openapi.json`, offline Scalar and ReDoc docs, RFC 9457 problem responses, and per-day request logs in `logs/mcdt/`.
 - **Safe by default.** Loopback only, a fresh bearer token every launch, Host and Origin checks, a rate limit, read-only permission until you opt in, and a reflection denylist that redacts session credentials.
 - **Gentle on the game thread.** Every request crosses a bounded queue onto the client thread. The queue drains within a per-tick time budget (2 ms by default), and if it fills up, new requests get a `503` instead of piling up.
@@ -67,6 +67,7 @@ There's a Baritone tab aswell, which drives pathing, mining, and building when B
 
 | Minecraft | Fabric | NeoForge |
 |---|---|---|
+| **26.3** | Loader 0.20.1+ with Fabric API | 26.3.0.101+ |
 | **1.21.11** | Loader 0.19.5+ with Fabric API | 21.11.48+ |
 | **1.21.4** | Loader 0.19.5+ with Fabric API | 21.4.161+ |
 | **1.21.1** | Loader 0.19.5+ with Fabric API | 21.1.265+ |
@@ -75,8 +76,8 @@ Every combination is live-tested in CI on a real headless client, with and witho
 
 ### Prerequisites
 
-- Minecraft **1.21.1**, **1.21.4** or **1.21.11** with [Fabric Loader](https://fabricmc.net/use/) **0.19.5+** and [Fabric API](https://modrinth.com/mod/fabric-api), or with [NeoForge](https://neoforged.net)
-- Java **21** or newer
+- Minecraft **1.21.1**, **1.21.4**, **1.21.11** or **26.3** with [Fabric Loader](https://fabricmc.net/use/) **0.19.5+** (**0.20.1+** on 26.3) and [Fabric API](https://modrinth.com/mod/fabric-api), or with [NeoForge](https://neoforged.net)
+- Java **21** or newer (**25** on 26.3, which is what its launcher profile uses anyway)
 - Optional: [YACL 3](https://modrinth.com/mod/yacl) for an in-game config screen (on Fabric through [Mod Menu](https://modrinth.com/mod/modmenu), on NeoForge through the mod list), and the [Baritone](https://github.com/cabaletta/baritone) API jar for pathing
 
 ### Install
@@ -226,6 +227,8 @@ There's one image per Minecraft version and loader:
 
 | Image | Minecraft | Loader |
 | --- | --- | --- |
+| `ghcr.io/advik-b/mcdt-26.3-fabric` | 26.3 | Fabric |
+| `ghcr.io/advik-b/mcdt-26.3-neoforge` | 26.3 | NeoForge |
 | `ghcr.io/advik-b/mcdt-1.21.11-fabric` | 1.21.11 | Fabric |
 | `ghcr.io/advik-b/mcdt-1.21.11-neoforge` | 1.21.11 | NeoForge |
 | `ghcr.io/advik-b/mcdt-1.21.4-fabric` | 1.21.4 | Fabric |

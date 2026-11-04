@@ -4,7 +4,7 @@ Guide for coding agents working in this repo. Read it before you change code.
 
 ## What this is
 
-MCDT (Minecraft DevTools) is a **client-only mod for Fabric and NeoForge**. Mod id: `mcdt`. Targets: Minecraft 1.21.1, 1.21.4 and 1.21.11 on both loaders (six Stonecutter nodes), Java 21, Mojang mappings with a Parchment layer. The mod runs a Javalin 7 / Jetty 12 server inside the game on `127.0.0.1:25580` (it falls back to a random port if that one is taken). The server exposes the live client over REST, WebSocket, SSE, and an MCP server at `/mcp`. A Svelte 5 WebUI (in `web/`) is served at `/`.
+MCDT (Minecraft DevTools) is a **client-only mod for Fabric and NeoForge**. Mod id: `mcdt`. Targets: Minecraft 1.21.1, 1.21.4, 1.21.11 and 26.3 on both loaders (eight Stonecutter nodes), Java 21 (25 on 26.3), Mojang mappings with a Parchment layer (26.x is unobfuscated: no mappings, no Parchment). The mod runs a Javalin 7 / Jetty 12 server inside the game on `127.0.0.1:25580` (it falls back to a random port if that one is taken). The server exposes the live client over REST, WebSocket, SSE, and an MCP server at `/mcp`. A Svelte 5 WebUI (in `web/`) is served at `/`.
 
 What each document is for:
 
@@ -52,8 +52,10 @@ src/main/resources/META-INF/services/   registers the shared SPI implementations
 src/fabric/resources/                   fabric.mod.json and the Fabric-only services; src/neoforge/resources/ the same for NeoForge
 versions/<node>/gradle.properties       per-node versions (Minecraft, loader API, Parchment, YACL, Mod Menu, Baritone + SHA, Java)
 settings.gradle.kts, stonecutter.gradle.kts  the node list; the Stonecutter controller (collectJars, constants)
-build.fabric.gradle.kts, build.neoforge.gradle.kts  the per-loader node build scripts (Loom, ModDevGradle)
-buildSrc/                               DownloadVerified task (pinned-SHA downloads); McdtBuild (jar-in-jar walk, Baritone jars)
+build.fabric.gradle.kts, build.neoforge.gradle.kts  the per-loader node build scripts (Loom with remapping, ModDevGradle)
+build.fabric-unobf.gradle.kts           Fabric nodes on unobfuscated Minecraft (26.x): plain Loom, no mappings or remapping
+buildSrc/                               DownloadVerified task (pinned-SHA downloads); McdtBuild (jar-in-jar walk, Baritone jars);
+                                        mcdt.node plugin (the Fabric scripts' shared setup, free of Loom types)
 tests/live/                             Python live suite (uv + pytest) run against a real client
 web/                                    Svelte 5 + Vite + Tailwind 4 + daisyUI 5 dashboard (Bun)
 scripts/                                MCP stdio shim (mcdt-mcp.py / .ps1); ci/live-client.sh (CI live tests), ci/node-env.sh (node facts)
@@ -70,7 +72,7 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
 - `./gradlew test` runs JUnit 5 in `core`, `server` and every node, then the JaCoCo reports. To run one class: `./gradlew :server:test --tests 'dev.advik.mcdt.mcp.McpToolsTest'` (`:core:test`, or `:1.21.4-fabric:test` for a node).
 - `./gradlew :1.21.4-fabric:runClient` (or another node) starts a dev client in `run/`. On Fabric, YACL and Mod Menu are on the dev runtime (`modLocalRuntime`). Baritone is not.
 - A cold Gradle cache needs network access *at configure time*. `McdtBuild.baritoneJar` (buildSrc) verifies each node's Baritone jar in `libs/` against the SHA-256 pinned in `versions/<node>/gradle.properties` and downloads it again if the check fails. Scalar is downloaded the same way, pinned by version and SHA.
-- `core` and `server` compile with `--release 17`; each node with its `java_version` (21 for now). CI (`.github/workflows/build.yml`) runs `./gradlew build` on ubuntu with JDK 25 (Microsoft) and Bun. The Gradle configuration cache is on.
+- `core` and `server` compile with `--release 17`; each node with its `java_version` (21, or 25 on 26.x). CI (`.github/workflows/build.yml`) runs `./gradlew build` on ubuntu with JDK 25 (Microsoft) and Bun. The Gradle configuration cache is on.
 - `runClient` serves the dashboard straight from `web/dist` (Gradle passes `-Dmcdt.webDist`), so `cd web && bun run build` followed by a browser reload picks up UI changes without restarting the game.
 - WebUI dev: run `cd web && bun run dev` (Vite on :5173). It proxies `/v1`, `/mcp`, `/docs`, and `/openapi.json` to :25580. Add `http://localhost:5173` to `originAllowlist` in the config, or the API rejects the Origin. Type-check with `bun run check`.
 - Shared versions (Fabric Loader, Loom, ModDevGradle, Shadow, Javalin, Jackson, ...) live in `gradle.properties`; per-node ones (Minecraft, Fabric API or NeoForge, Parchment, YACL, Mod Menu, Baritone + SHA-256, Java) in `versions/<node>/gradle.properties`.
@@ -87,6 +89,7 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
 - Mojmap renamed `ResourceLocation` to `Identifier` in 1.21.11. A Stonecutter string replacement in `stonecutter.gradle.kts` swaps the name, so write whichever the active node uses.
 - Mixins whose target exists only on some versions are not listed in `mcdt.mixins.json`; `client/McdtMixinPlugin.getMixins()` adds them per version (the class file itself is wrapped in a conditional). Listing a mixin with a missing target crashes the game (`defaultRequire` is 1).
 - Add a node: a `version(...)` line in `settings.gradle.kts`; `versions/<node>/gradle.properties` (copy a sibling; pin the Baritone jar's SHA-256 from the GitHub release asset digest); for Fabric, `fabric_api_url` and `fabric_api_sha512`; a `.gitignore` exception for a new loader's Baritone jar; and an entry in `.github/nodes.json` with the node's expected capabilities (the live and docker workflows both read it).
+- Unobfuscated nodes (26.x): Fabric uses `build.fabric-unobf.gradle.kts`; leave `parchment_version` out (NeoForge skips Parchment without it). A node can pin its own `loader_version` (26.x needs a newer Fabric Loader); `fabric.mod.json` and `scripts/ci/node-env.sh` pick it up. The mixin compat level comes from `java_version`. 26.1 moved a lot of client API (the current screen to `Gui`, the HUD to `Gui.hud`, rendering to `com.mojang.renderpearl`, which also has a Vulkan backend): the `>=26.1` branches in `McCompat`, `PixelReader` and `ViewerWorld` show where.
 
 ## Core invariants: do not break these
 
