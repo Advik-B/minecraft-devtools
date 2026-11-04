@@ -1,10 +1,10 @@
 package dev.advik.mcdt.mixin;
 
+import dev.advik.mcdt.game.McRegistries;
 import dev.advik.mcdt.events.EventHub;
 import dev.advik.mcdt.world.stream.WorldStreamService;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,7 +17,7 @@ import java.util.Map;
 public abstract class ClientLevelMixin {
 	@Inject(method = "sendBlockUpdated", at = @At("HEAD"))
 	private void mcdt$onSendBlockUpdated(BlockPos pos, BlockState oldState, BlockState newState, int flags, CallbackInfo ci) {
-		String blockId = BuiltInRegistries.BLOCK.getKey(newState.getBlock()).toString();
+		String blockId = McRegistries.BLOCK.getKey(newState.getBlock()).toString();
 		EventHub.getInstance().publish("block.update", Map.of(
 				"x", pos.getX(),
 				"y", pos.getY(),

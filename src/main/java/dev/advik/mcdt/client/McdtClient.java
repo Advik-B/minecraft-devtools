@@ -1,5 +1,6 @@
 package dev.advik.mcdt.client;
 
+import dev.advik.mcdt.game.McRegistries;
 import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.McdtCore;
 import dev.advik.mcdt.McdtEnvironment;
@@ -14,7 +15,6 @@ import dev.advik.mcdt.reflection.HandleTable;
 import dev.advik.mcdt.world.stream.WorldStreamService;
 import dev.advik.mcdt.game.McCompat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 
@@ -158,7 +158,7 @@ public final class McdtClient {
 	}
 
 	public static void onEntityLoad(Entity entity) {
-		String type = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
+		String type = McRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
 		EventHub.getInstance().publish("entity.spawn", Map.of(
 				"id", entity.getId(),
 				"uuid", entity.getUUID().toString(),

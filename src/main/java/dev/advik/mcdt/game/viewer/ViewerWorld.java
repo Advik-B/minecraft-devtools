@@ -1,5 +1,6 @@
 package dev.advik.mcdt.game.viewer;
 
+import dev.advik.mcdt.game.McRegistries;
 import dev.advik.mcdt.api.v1.dto.BlockModelsDto;
 import dev.advik.mcdt.game.McCompat;
 import dev.advik.mcdt.game.serializers.BlockStateSerializer;
@@ -39,7 +40,6 @@ import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
@@ -282,7 +282,7 @@ public final class ViewerWorld {
 					: entity.hasCustomName() && entity.getCustomName() != null ? entity.getCustomName().getString() : null;
 			result.add(new ViewData.Entity(
 					entity.getId(),
-					BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString(),
+					McRegistries.ENTITY_TYPE.getKey(entity.getType()).toString(),
 					category(entity),
 					entity.getX(), entity.getY(), entity.getZ(),
 					entity.getYRot(),
@@ -323,7 +323,7 @@ public final class ViewerWorld {
 			BlockState state = Block.stateById(id);
 			if (state == null) continue;
 			String stateStr = BlockStateSerializer.toString(state);
-			int blockId = BuiltInRegistries.BLOCK.getId(state.getBlock());
+			int blockId = McRegistries.BLOCK.getId(state.getBlock());
 			if (state.isAir()) {
 				models.add(new BlockModelsDto.Model(id, stateStr, blockId, true, "solid", 0, false, false, false, 0, null, List.of()));
 				continue;

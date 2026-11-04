@@ -31,7 +31,9 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
+//? if >=1.21 {
 import net.minecraft.core.registries.BuiltInRegistries;
+//?}
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.resources.ResourceLocation;
@@ -84,7 +86,6 @@ import net.minecraft.util.HttpUtil;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.client.CameraType;
 import net.minecraft.server.packs.repository.Pack;
@@ -199,7 +200,7 @@ public final class MinecraftGameClient implements GameClient {
 
 		List<PlayerDto.EffectInfo> effects = new ArrayList<>();
 		for (var effect : player.getActiveEffects()) {
-			String id = BuiltInRegistries.MOB_EFFECT.getKey(effect.getEffect().value()).toString();
+			String id = McRegistries.MOB_EFFECT.getKey(effect.getEffect().value()).toString();
 			effects.add(new PlayerDto.EffectInfo(
 					id,
 					effect.getAmplifier(),
@@ -368,7 +369,7 @@ public final class MinecraftGameClient implements GameClient {
 
 		List<Entity> list = level.getEntities((Entity) null, aabb, e -> {
 			if (typeFilter != null && !typeFilter.isBlank()) {
-				String typeId = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
+				String typeId = McRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
 				if (!typeId.equalsIgnoreCase(typeFilter) && !typeId.endsWith(":" + typeFilter)) {
 					return false;
 				}
@@ -392,7 +393,7 @@ public final class MinecraftGameClient implements GameClient {
 		List<String> passive = new ArrayList<>();
 		Map<String, String> categories = new LinkedHashMap<>();
 
-		for (var entry : BuiltInRegistries.ENTITY_TYPE.entrySet()) {
+		for (var entry : McRegistries.ENTITY_TYPE.entrySet()) {
 			ResourceLocation rl = McCompat.location(entry.getKey());
 			net.minecraft.world.entity.EntityType<?> type = entry.getValue();
 			String id = rl.toString();
@@ -476,7 +477,7 @@ public final class MinecraftGameClient implements GameClient {
 		ScreenDto.ContainerInfo containerInfo = null;
 		if (screen instanceof AbstractContainerScreen<?> containerScreen) {
 			var menu = containerScreen.getMenu();
-			String menuType = BuiltInRegistries.MENU.getKey(menu.getType()).toString();
+			String menuType = McRegistries.MENU.getKey(menu.getType()).toString();
 			List<ScreenDto.SlotDetail> slots = new ArrayList<>(menu.slots.size());
 			for (Slot slot : menu.slots) {
 				slots.add(new ScreenDto.SlotDetail(
@@ -494,7 +495,7 @@ public final class MinecraftGameClient implements GameClient {
 
 	@Override
 	public RegistriesDto.ListResponse getRegistries() {
-		List<String> list = BuiltInRegistries.REGISTRY.keySet().stream()
+		List<String> list = McRegistries.REGISTRY.keySet().stream()
 				.map(ResourceLocation::toString)
 				.sorted()
 				.toList();
@@ -507,7 +508,7 @@ public final class MinecraftGameClient implements GameClient {
 				? ResourceLocation.parse(registryId)
 				: ResourceLocation.fromNamespaceAndPath("minecraft", registryId);
 
-		Registry<?> registry = BuiltInRegistries.REGISTRY.getOptional(rl).orElse(null);
+		Registry<?> registry = McRegistries.REGISTRY.getOptional(rl).orElse(null);
 		if (registry == null) {
 			throw Problems.registryNotFound(registryId);
 		}
@@ -2152,17 +2153,17 @@ public final class MinecraftGameClient implements GameClient {
 			if (stat.getType() == Stats.CUSTOM) {
 				custom.put(((ResourceLocation) stat.getValue()).toString(), val);
 			} else if (stat.getType() == Stats.BLOCK_MINED) {
-				mined.put(BuiltInRegistries.BLOCK.getKey((Block) stat.getValue()).toString(), val);
+				mined.put(McRegistries.BLOCK.getKey((Block) stat.getValue()).toString(), val);
 			} else if (stat.getType() == Stats.ITEM_CRAFTED) {
-				crafted.put(BuiltInRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
+				crafted.put(McRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
 			} else if (stat.getType() == Stats.ITEM_USED) {
-				used.put(BuiltInRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
+				used.put(McRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
 			} else if (stat.getType() == Stats.ITEM_BROKEN) {
-				broken.put(BuiltInRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
+				broken.put(McRegistries.ITEM.getKey((Item) stat.getValue()).toString(), val);
 			} else if (stat.getType() == Stats.ENTITY_KILLED) {
-				killed.put(BuiltInRegistries.ENTITY_TYPE.getKey((EntityType<?>) stat.getValue()).toString(), val);
+				killed.put(McRegistries.ENTITY_TYPE.getKey((EntityType<?>) stat.getValue()).toString(), val);
 			} else if (stat.getType() == Stats.ENTITY_KILLED_BY) {
-				killedBy.put(BuiltInRegistries.ENTITY_TYPE.getKey((EntityType<?>) stat.getValue()).toString(), val);
+				killedBy.put(McRegistries.ENTITY_TYPE.getKey((EntityType<?>) stat.getValue()).toString(), val);
 			}
 		}
 
@@ -2209,12 +2210,12 @@ public final class MinecraftGameClient implements GameClient {
 				/*title = TextSerializer.toPlainText(d.title());
 				desc = TextSerializer.toPlainText(d.description());
 				type = d.type().name().toLowerCase();
-				icon = BuiltInRegistries.ITEM.getKey(d.icon().item().value()).toString();
+				icon = McRegistries.ITEM.getKey(d.icon().item().value()).toString();
 				*///?} else {
 				title = TextSerializer.toPlainText(d.getTitle());
 				desc = TextSerializer.toPlainText(d.getDescription());
 				type = d.getType().name().toLowerCase();
-				icon = BuiltInRegistries.ITEM.getKey(d.getIcon().getItem()).toString();
+				icon = McRegistries.ITEM.getKey(d.getIcon().getItem()).toString();
 				//?}
 			}
 
@@ -2267,7 +2268,7 @@ public final class MinecraftGameClient implements GameClient {
 				String cat = BuiltInRegistries.RECIPE_BOOK_CATEGORY.getKey(entry.category()).toString();
 				RecipeDisplay display = entry.display();
 				ItemStack resultStack = context != null ? display.result().resolveForFirstStack(context) : ItemStack.EMPTY;
-				String resultId = resultStack.isEmpty() ? "" : BuiltInRegistries.ITEM.getKey(resultStack.getItem()).toString();
+				String resultId = resultStack.isEmpty() ? "" : McRegistries.ITEM.getKey(resultStack.getItem()).toString();
 				int resultCount = resultStack.getCount();
 				boolean isCraftable = collection.isCraftable(entry.id());
 
@@ -2312,34 +2313,34 @@ public final class MinecraftGameClient implements GameClient {
 			for (SlotDisplay sd : shaped.ingredients()) {
 				ItemStack is = sd.resolveForFirstStack(context);
 				if (!is.isEmpty()) {
-					ingredients.add(BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
+					ingredients.add(McRegistries.ITEM.getKey(is.getItem()).toString());
 				}
 			}
 		} else if (display instanceof ShapelessCraftingRecipeDisplay shapeless) {
 			for (SlotDisplay sd : shapeless.ingredients()) {
 				ItemStack is = sd.resolveForFirstStack(context);
 				if (!is.isEmpty()) {
-					ingredients.add(BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
+					ingredients.add(McRegistries.ITEM.getKey(is.getItem()).toString());
 				}
 			}
 		} else if (display instanceof FurnaceRecipeDisplay furnace) {
 			ItemStack is = furnace.ingredient().resolveForFirstStack(context);
 			if (!is.isEmpty()) {
-				ingredients.add(BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
+				ingredients.add(McRegistries.ITEM.getKey(is.getItem()).toString());
 			}
 		} else if (display instanceof StonecutterRecipeDisplay stonecutter) {
 			ItemStack is = stonecutter.input().resolveForFirstStack(context);
 			if (!is.isEmpty()) {
-				ingredients.add(BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
+				ingredients.add(McRegistries.ITEM.getKey(is.getItem()).toString());
 			}
 		} else if (display instanceof SmithingRecipeDisplay smithing) {
 			ItemStack b = smithing.base().resolveForFirstStack(context);
 			if (!b.isEmpty()) {
-				ingredients.add(BuiltInRegistries.ITEM.getKey(b.getItem()).toString());
+				ingredients.add(McRegistries.ITEM.getKey(b.getItem()).toString());
 			}
 			ItemStack a = smithing.addition().resolveForFirstStack(context);
 			if (!a.isEmpty()) {
-				ingredients.add(BuiltInRegistries.ITEM.getKey(a.getItem()).toString());
+				ingredients.add(McRegistries.ITEM.getKey(a.getItem()).toString());
 			}
 		}
 		return ingredients;

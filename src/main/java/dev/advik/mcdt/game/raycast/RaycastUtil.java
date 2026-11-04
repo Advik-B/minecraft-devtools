@@ -1,5 +1,6 @@
 package dev.advik.mcdt.game.raycast;
 
+import dev.advik.mcdt.game.McRegistries;
 import dev.advik.mcdt.api.v1.dto.RaycastDto;
 import dev.advik.mcdt.game.serializers.BlockStateSerializer;
 import net.minecraft.client.Minecraft;
@@ -41,7 +42,7 @@ public final class RaycastUtil {
 			Entity e = ehr.getEntity();
 			int id = e.getId();
 			String uuid = e.getStringUUID();
-			String type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
+			String type = McRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
 			String name = e.getName().getString();
 
 			double distance = Minecraft.getInstance().player != null
@@ -122,7 +123,7 @@ public final class RaycastUtil {
 					new RaycastDto.EntityHit(
 							e.getId(),
 							e.getStringUUID(),
-							net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString(),
+							McRegistries.ENTITY_TYPE.getKey(e.getType()).toString(),
 							e.getName().getString()
 					)
 			);
