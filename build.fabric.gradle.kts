@@ -1,8 +1,3 @@
-import org.gradle.api.artifacts.component.ComponentIdentifier
-import org.gradle.api.artifacts.component.ModuleComponentIdentifier
-import org.gradle.api.artifacts.result.ResolvedDependencyResult
-import java.net.URI
-
 plugins {
 	id("net.fabricmc.fabric-loom-remap")
 	`maven-publish`
@@ -51,26 +46,6 @@ loom {
 // Node properties (versions/<node>/gradle.properties) are project properties, not Gradle properties.
 fun prop(name: String): String = project.property(name).toString()
 
-fun ensureBaritoneJar(): File {
-	val version = prop("baritone_version")
-	val sha256 = prop("baritone_sha256")
-	val libsDir = rootProject.file("libs")
-	libsDir.mkdirs()
-	val jarFile = libsDir.resolve("baritone-api-fabric-$version.jar")
-	if (jarFile.isFile && ChecksumUtils.sha256Of(jarFile.readBytes()) == sha256.lowercase()) {
-		return jarFile
-	}
-	val url = "https://github.com/cabaletta/baritone/releases/download/v$version/baritone-api-fabric-$version.jar"
-	println("Downloading Baritone API Fabric jar from $url...")
-	val bytes = URI(url).toURL().openStream().use { it.readBytes() }
-	val actual = ChecksumUtils.sha256Of(bytes)
-	if (actual != sha256.lowercase()) {
-		throw GradleException("Checksum mismatch for $url: expected $sha256, got $actual")
-	}
-	jarFile.writeBytes(bytes)
-	return jarFile
-}
-
 // Third-party libraries that ship inside the mod jar (Loom jar-in-jar): everything the server module needs at
 // runtime. Loom's `include` is not transitive, so every resolved external artifact is added to `include` below.
 // The core and server modules' own classes are merged into the mod jar instead (see tasks.jar).
@@ -87,29 +62,7 @@ val bundled: Configuration = configurations.create("bundled") {
 configurations.implementation { extendsFrom(bundled) }
 
 configurations.include {
-	// Walks the resolved graph (no artifacts, so the project modules need not be built first) and includes every
-	// external module. Excluded: libraries provided by Minecraft and compile-only annotations. ASM (pulled in by
-	// Jetty) is provided by Fabric Loader; bundling a second copy causes a LinkageError against Mixin's ASM classes
-	// and crashes the game at startup.
-	dependencies.addAllLater(bundled.incoming.resolutionResult.rootComponent.map { root ->
-		val seen = mutableSetOf<ComponentIdentifier>()
-		val found = mutableListOf<Dependency>()
-		val queue = ArrayDeque(listOf(root))
-		while (queue.isNotEmpty()) {
-			for (dep in queue.removeFirst().dependencies) {
-				val selected = (dep as? ResolvedDependencyResult)?.selected ?: continue
-				if (!seen.add(selected.id)) continue
-				queue.add(selected)
-				val id = selected.id as? ModuleComponentIdentifier ?: continue
-				if (id.group == "org.slf4j" || id.group == "org.ow2.asm" ||
-					(id.group == "org.jetbrains" && id.module == "annotations")) {
-					continue
-				}
-				found.add(project.dependencies.create("${id.group}:${id.module}:${id.version}"))
-			}
-		}
-		found
-	})
+	dependencies.addAllLater(McdtBuild.bundledModules(project, bundled))
 }
 
 dependencies {
@@ -135,7 +88,7 @@ dependencies {
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
 	// Baritone API (optional, modCompileOnly)
-	val baritoneJar = ensureBaritoneJar()
+	val baritoneJar = McdtBuild.baritoneJar(project, "fabric", prop("baritone_version"), prop("baritone_sha256"))
 	modCompileOnly(files(baritoneJar))
 	testImplementation(files(baritoneJar))
 
@@ -149,10 +102,9 @@ dependencies {
 val downloadBaritoneApi = tasks.register<DownloadVerified>("downloadBaritoneApi") {
 	group = "build setup"
 	description = "Downloads the pinned Baritone API Fabric jar."
-	val version = prop("baritone_version")
-	url = "https://github.com/cabaletta/baritone/releases/download/v$version/baritone-api-fabric-$version.jar"
+	url = McdtBuild.baritoneUrl("fabric", prop("baritone_version"))
 	sha256 = prop("baritone_sha256")
-	relativePath = "baritone-api-fabric-$version.jar"
+	relativePath = McdtBuild.baritoneJarName("fabric", prop("baritone_version"))
 	outputDir = rootProject.layout.projectDirectory.dir("libs")
 }
 
