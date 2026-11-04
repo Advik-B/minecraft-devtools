@@ -176,6 +176,30 @@ What changes in the plan:
   - Add a CI job per node that boots the headless client and runs the Python live suite (`tests/live/`) through `scripts/ci/live-client.sh`.
   - Every later phase adds its nodes to this matrix.
 
+#### Phase 2 progress (2026-11-04)
+
+The step-by-step plan is `docs/PHASE2.md`. **All four nodes ship and pass the live suite in CI** (1.21.1 and 1.21.4 × Fabric and NeoForge, each with and without Baritone).
+
+**Done:**
+- **Capabilities.** `Capability` (18 ids) in core; `GameClient.capabilities()` per platform, narrowed at runtime by Baritone and the decompiler host. `/v1/health` lists them. A route whose capability is off answers 501 `feature-unavailable`: `HttpServer.requires(...)` for HTTP, a pre-upgrade check for WebSockets, the same gate for `/v1/batch` sub-requests. MCP hides and refuses the matching tools. The WebUI hides the Viewer, Textures and Baritone tabs when theirs is off. Covered by `CapabilitiesTest` and `tests/live/test_capabilities.py`; every live matrix row pins the exact set its node must report.
+- **Stonecutter 0.9.8.** Nodes `1.21.1-fabric`, `1.21.1-neoforge`, `1.21.4-fabric`, `1.21.4-neoforge` (VCS node `1.21.4-fabric`), versions in `versions/<node>/gradle.properties`, jars `mcdt-1.1.0+<mc>-<loader>.jar` collected in `build/libs/`. The 1.21.4-fabric jar matched the Phase 1 jar entry for entry (apart from the intended moves), and `openapi.json` only gained the health `capabilities` field.
+- **NeoForge** (ModDevGradle 2.0.148): `platform/neoforge/NeoForgeMod` forwards NeoForge events to the loader-neutral `client/McdtClient`. The core starts on the first `ClientTickEvent.Post`, once the game is fully up (Fabric's `CLIENT_STARTED`), instead of in `FMLClientSetupEvent`. Baritone's NeoForge jar uses the mod id `baritoe` (sic).
+- **1.21.1.** Small `//? if >=1.21.2` conditionals: `ToastComponent` vs `ToastManager`, `getMinBuildHeight` vs `getMinY`, and the old `getFaceOcclusionShape` signature. Every mixin and accessor target was checked against the 1.21.1 jar with javap; all match. The Baritone bridge compiles unchanged against Baritone 1.11.3.
+
+**Capability gaps:**
+- **1.21.1, both loaders: `recipes` is off.** `/v1/recipes` and its place action are built on recipe display ids (ints), which arrived in 1.21.2. 1.21.1 recipes are keyed by `ResourceLocation`, so porting would change the public DTO.
+- `toasts`, `bossbars`, `subtitles`, `offhand`, `item-components` and `chat-signing` describe parts of responses and gate no route. A node that turns one off must leave that field or HUD section out (null), not throw.
+
+**Found and fixed:**
+- **Jackson clash on NeoForge.** Minecraft 1.21.2+ ships Jackson 2.13 (for msal4j) as a module in a parent layer, so the nested Jackson 2.22 crashed NeoForge at startup (`reads more than one module named com.fasterxml.jackson.annotation`). The NeoForge jar now merges Jackson, Javalin and the OpenAPI plugins with Jackson relocated to `dev.advik.mcdt.shaded.jackson` (Shadow); the rest stays jar-in-jar. Fabric loads the bundled Jackson fine. `tests/live/test_runtime.py` checks the Jackson version the mod actually runs with, on every node. **Phase 3 NeoForge nodes need the same.**
+- NeoForge 1.21.1 pins slf4j 2.0.9 strictly, so slf4j is excluded from the NeoForge test classpath as well as from the jar.
+- The `baritone-not-installed` detail no longer names the Fabric jar.
+
+**Deviations from `docs/PHASE2.md`:**
+- MCP tool capabilities live in `McpToolRegistry.requiredCapabilityForTool` (like `requiredPermissionForTool`) rather than on `ToolDefinition`, so the `tools/list` JSON is unchanged.
+- The Mod Menu entrypoint moved to `platform/fabric/FabricModMenuApi`.
+- The Fabric and NeoForge builds share the jar-in-jar graph walk and the pinned Baritone download through `buildSrc/McdtBuild.kt`.
+
 ### Phase 3: Modern version spread (Mojmap era)
 Order: **1.21.11 → 26.x latest → 1.20.1 → 1.19.2 → 1.18.2 → 1.16.5 Fabric → 1.16.1 Fabric**.
 - **26.x:** Java 25, no remapping. Use `implementation` instead of `modImplementation`, Mixin `JAVA_25`, and the identity mappings.
