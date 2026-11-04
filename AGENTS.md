@@ -8,7 +8,8 @@ MCDT (Minecraft DevTools) is a **client-only mod for Fabric and NeoForge**. Mod 
 
 What each document is for:
 
-- `README.md`: the user-facing feature list.
+- `README.md`: the user-facing docs (install, API, config, Docker).
+- `CONTRIBUTING.md`: contributor setup, build, tests, and the PR workflow.
 - `MCDT.md`: the design doc and roadmap. **Parts of it are not built yet**, for example `/v1/view/blocks`, `/v1/hud`, `/v1/batch`, `/v1/worlds`, and `/v1/servers`.
 - `src/main/java/dev/advik/mcdt/http/HttpServer.java`: **the source of truth for which routes exist**. Check it before you trust either doc.
 

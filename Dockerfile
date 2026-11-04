@@ -4,7 +4,7 @@
 # OpenGL, so the MCDT API can be deployed as a service. One image per Stonecutter node:
 #   docker build --build-arg NODE=1.21.1-neoforge -t mcdt-1.21.1-neoforge .
 # The image has no Minecraft files: the game, the loader and the assets download into /data on first start.
-# See the Docker section of README.md.
+# Using the images: "Deploy with Docker" in README.md. Building them: CONTRIBUTING.md.
 
 ARG NODE=1.21.4-fabric
 # Must match java_version in versions/<NODE>/gradle.properties (CI passes it from scripts/ci/node-env.sh).

@@ -1,4 +1,4 @@
-# Headless MCDT. Put overrides in a .env file next to this one (see the Docker section of README.md).
+# Headless MCDT. Put overrides in a .env file next to this one (see "Deploy with Docker" in README.md).
 services:
   mcdt:
     # MCDT_NODE picks the Minecraft version and loader: 1.21.4-fabric, 1.21.4-neoforge, 1.21.1-fabric, 1.21.1-neoforge.
