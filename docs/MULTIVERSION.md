@@ -104,7 +104,26 @@ web/             Unchanged; reads capabilities and hides unsupported panels.
 4. On NeoForge 1.21.1, jar-in-jar Javalin, Jetty, and Jackson, and confirm they load on the JPMS module layer.
 5. Run JvmDowngrader on the current core jar, then run the DTO, MCP, and EventRingBuffer tests on JDK 8. In particular, check how Jackson serializes downgraded records.
 
-Record the outcomes in `MCDT.md`. If a spike fails, switch to the fallback tool named above.
+The spike code lives in `spikes/` and its CI in `.github/workflows/spikes.yml`. Launch tests run headless on GitHub Actions: portablemc 5.0.6, Xvfb, Mesa.
+
+#### Phase 0 results (2026-11-04): all spikes passed
+
+| # | Spike | Result |
+|---|---|---|
+| 1 | Build at `--release 17` | Passed (see above). |
+| 2 | Legacy Fabric on modern Java | **1.8.9 and 1.12.2 run on Java 8, 17 and 21**: the mixin applied, and the in-process HTTP server answered. |
+| 3 | One MCP source tree with Unimined | Passed. A single `spikes/legacy/mcp` tree built Forge 1.8.9 and 1.12.2 (searge + MCP stable 22 / 39, MixinBooter 9.3) and Legacy Fabric 1.8.9 and 1.12.2 (legacy intermediary in production, MCP names in dev). All four passed in-game. |
+| 4 | NeoForge 1.21.1 jar-in-jar | Passed. The same library set as the Fabric jar (about 45 nested jars) loads; Javalin is the named JPMS module `io.javalin`; HTTP and WebSocket both work. |
+| 5 | JvmDowngrader to Java 8 | Passed after one fix: 33/33 real core tests (config, exec, events, discovery, DTO JSON) pass as Java 8 bytecode on a Java 8 JVM. |
+| – | Plain Forge 1.12.2 on Java 17 (control) | Fails as expected: LaunchWrapper casts `AppClassLoader` to `URLClassLoader`. Plain Forge stays Java 8 only (Phase 6). |
+
+What changes in the plan:
+- **Legacy Fabric 1.8.9 and 1.12.2 ship in Phase 4 on the Java 17 core.** They also run on Java 8, so the Java 8 transport in Phase 5 benefits them too.
+- **Unimined is confirmed for the legacy era**, with no fallback needed. It also has a `cleanroom {}` patcher, so Cleanroom 1.12.2 needs no extra tooling. MCP names still differ between 1.8.9 and 1.12.2 (for example `Minecraft.mcDataDir` became `gameDir`), so the legacy era needs Stonecutter conditionals too.
+- **NeoForge:** NeoForge pins slf4j `strictly 2.0.9`, so slf4j (and ASM) must be excluded from the library dependencies. That's fine, because they're never bundled. MDG's `jarJar` is not transitive, so every resolved artifact is added explicitly, the same way the Fabric `bundled` configuration works.
+- **Downgraded records:** Jackson (Java 8 bytecode) cannot see records without `java.lang.Record`, so it serialized them as `{}` and couldn't construct them. `dev.advik.mcdt.json.RecordCompatIntrospector` fixes that. It's registered only when `java.lang.Record` is missing; JvmDowngrader keeps the component metadata that `Class.isRecord()` / `getRecordComponents()` read. One cosmetic difference remains: a downgraded record's `toString()` uses the binary name (`ChatDto$SendResponse[...]`).
+- **Headless CI notes:** `--mc-dir` is a `start` option in portablemc 5. LWJGL 2 needs `xrandr` (`x11-xserver-utils`).
+- **Unrelated bug found while planning Baritone tests:** the Baritone MCP tools ran off the client thread. Fixed in `fix(mcp): run baritone tools on client thread`.
 
 ### Phase 1: Module split + seams (still Fabric 1.21.4 only, no behavior change)
 - Split the code into `core` / `server-javalin` / `platform`. Move `GameClient`, the DTOs, and everything else not tied to Minecraft into `core`.
