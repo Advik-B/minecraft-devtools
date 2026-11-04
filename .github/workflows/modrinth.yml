@@ -39,7 +39,9 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
       - id: read
-        run: echo "nodes=$(jq -c '[.[].node]' .github/nodes.json)" >> "$GITHUB_OUTPUT"
+        # Cleanroom stays on GitHub Releases only: Modrinth has no Cleanroom tag, and a `forge` tag would show the
+        # jar to plain Forge 1.12.2 (Java 8) players, where it can't load.
+        run: echo "nodes=$(jq -c '[.[].node | select(endswith("-cleanroom") | not)]' .github/nodes.json)" >> "$GITHUB_OUTPUT"
 
   publish:
     needs: nodes
@@ -69,12 +71,10 @@ jobs:
           VERSION="$(basename "$JAR" .jar)"
           VERSION="${VERSION#mcdt-}"
 
-          # Modrinth loader tags: there is no Cleanroom tag, and Cleanroom loads Forge mods.
           case "$LOADER" in
             fabric) SLUG=fabric; NAME=Fabric; DEPS='fabric-api(required) modmenu(optional) yacl(optional)' ;;
             neoforge) SLUG=neoforge; NAME=NeoForge; DEPS='yacl(optional)' ;;
             legacyfabric) SLUG=legacy-fabric; NAME='Legacy Fabric'; DEPS='' ;;
-            cleanroom) SLUG=forge; NAME=Cleanroom; DEPS='' ;;
             *) echo "unknown loader: $LOADER" >&2; exit 1 ;;
           esac
           case "$TAG" in
