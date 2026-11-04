@@ -111,7 +111,6 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
   1. `./gradlew runClient`.
   2. On the title screen: `uv run --project tests/live pytest tests/live`. In a world: add `--state world`. `--baritone installed|absent` asserts which Baritone mode is expected; `--shutdown` finishes with the quit flow.
 - CI runs the same suite on real headless clients (`.github/workflows/live.yml` -> `scripts/ci/live-client.sh`): title screen, then a generated superflat world (world and Baritone checks), then the quit flow. Each node runs once with Baritone and once without. Never run Docker locally; use CI.
-- `scripts/test-live-client.ps1` is the older PowerShell version of the title-screen suite.
 - Before you call a change done, run `./gradlew test`, plus `bun run check` in `web/` if you touched the WebUI, followed by live verification on the running client.
 
 ## Conventions

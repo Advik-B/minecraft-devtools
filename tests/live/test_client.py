@@ -1,4 +1,4 @@
-"""Port of scripts/test-live-client.ps1: the title-screen suite plus MCP checks."""
+"""Title-screen suite plus MCP checks (formerly the PowerShell smoke test)."""
 
 from __future__ import annotations
 

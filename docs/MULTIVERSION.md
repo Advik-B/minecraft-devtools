@@ -146,7 +146,7 @@ What changes in the plan:
   - the Python suite on the title screen;
   - a superflat world from the dedicated server, loaded through `POST /v1/worlds/{id}/load`, with the world and Baritone checks;
   - the two-step quit flow.
-- **Python live suite** (`tests/live/`, uv + pytest + httpx + websockets): a port of `test-live-client.ps1` plus Baritone, world, and events-stream tests.
+- **Python live suite** (`tests/live/`, uv + pytest + httpx + websockets): a port of the old PowerShell smoke test plus Baritone, world, and events-stream tests.
 
 **Bugs the live suite found and fixed** (all pre-existing on `master`):
 - **Remapped decompile broken in production.** `/v1/classes/{name}/source?remap=true` failed with an NPE inside Vineflower's lambda processor whenever its identifier renamer was on. Fix: class files are now remapped with ASM before decompiling (`MojangRemapper`), and the isolated renamer was removed.
@@ -166,14 +166,14 @@ What changes in the plan:
 - Stonecutter with branches `fabric` and `neoforge`, and nodes 1.21.1 and 1.21.4.
 - NeoForge entrypoint: `ClientTickEvent.Post` drains the queue, `IConfigScreenFactory` + YACL for config, jarJar for the bundled libs, and the identity `MappingProvider`.
 - Baritone: pin the API jar and SHA per node and loader in each node's `gradle.properties`. The bridge stays under `baritone/bridge/`. Where Baritone's API changed between releases, add a Stonecutter conditional or a per-range bridge class. Nodes with no Baritone release (expected: 1.7.10, 1.8.9) ship without the bridge and report the `BARITONE` capability as off.
-- **Baritone live coverage** (added to `scripts/test-live-client.ps1`, which has none today):
+- **Baritone live coverage** (in the Python live suite, `tests/live/`):
   - **With Baritone:** `GET /v1/baritone/status`; `POST /v1/baritone/goto` a few blocks away, then poll `GET /v1/baritone/jobs/{id}` until it reaches a terminal state; `GET /v1/baritone/path`; `POST /v1/baritone/cancel`; read `GET /v1/baritone/settings` and round-trip a `PATCH`; `POST /v1/baritone/command`; a short `mine` / `follow` / `explore` / `farm` / `build` start followed by cancel; and the `baritone*` MCP tools through `/mcp`.
   - **Without Baritone:** the same routes return 501 `baritone-not-installed`, and the capability is off.
   - **Docker:** each node runs twice, `MC_BARITONE=true` and `MC_BARITONE=false`. `docker/entrypoint.sh` and the `Dockerfile` copy the Baritone jar that matches the node's MC version and loader (today they hardcode `baritone-api-fabric-*`).
 - Versioning: `mcdt-<modver>+<mc>-<loader>.jar`, replacing `1.1.0-mc_1.21.4`.
 - **Live-test matrix starts here:**
   - Parameterize `Dockerfile` ARGs as `MC_VERSION` + `LOADER` (portablemc launches fabric, forge, and neoforge).
-  - Add a CI job per node that boots the headless client and runs `scripts/test-live-client.ps1` (add pwsh to the image, or port the script to bash).
+  - Add a CI job per node that boots the headless client and runs the Python live suite (`tests/live/`) through `scripts/ci/live-client.sh`.
   - Every later phase adds its nodes to this matrix.
 
 ### Phase 3: Modern version spread (Mojmap era)
@@ -239,7 +239,7 @@ Also add **Forge 1.16.5** (modern era, Java 8, downgraded node) and let the **1.
 1. `./gradlew test`: the unit and integration suites in `core` / `server-*` using `MockGameClient`. From Phase 5 on, they run against both transports, plus a JDK 8 job on the downgraded jars.
 2. `./gradlew chiseledBuild`: every Stonecutter node compiles.
 3. `cd web && bun run check` if the WebUI changed.
-4. **Live, for every node added in the phase:** a Docker headless client with `MC_VERSION`/`LOADER`, then `scripts/test-live-client.ps1` (including `-ShutdownClient`). For Cleanroom, lwjgl3ify, and plain legacy Forge, use a Prism Launcher instance and the manual checklist: open a world, hit `/v1/health` (correct capabilities), read player/world/inventory, send chat, inject input, use reflection to read the session class (it must be redacted), and connect MCP from `scripts/mcdt-mcp.py`.
+4. **Live, for every node added in the phase:** a Docker headless client with `MC_VERSION`/`LOADER`, then the Python live suite in `tests/live/` (including `--shutdown`). For Cleanroom, lwjgl3ify, and plain legacy Forge, use a Prism Launcher instance and the manual checklist: open a world, hit `/v1/health` (correct capabilities), read player/world/inventory, send chat, inject input, use reflection to read the session class (it must be redacted), and connect MCP from `scripts/mcdt-mcp.py`.
 5. Security regression on each era: Host/Origin checks, no token in the query string, `ACT` blocked on a non-allowlisted multiplayer server.
 6. **Baritone, on every node that has a Baritone release:** run the live Baritone section with Baritone installed *and* without it (see Phase 2). Also keep `BaritoneIntegrationTest` / `BaritoneNotInstalledTest` (`MockBaritoneService`) green in the unit suite, and run them against both transports from Phase 5 on.
 

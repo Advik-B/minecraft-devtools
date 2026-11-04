@@ -244,7 +244,7 @@ The Baritone routes that start jobs (`goto`, `mine`, `follow` and so on) need `M
 ./gradlew build                 # mod jar with the dashboard and all libraries bundled (jar-in-jar)
 ./gradlew test                  # JUnit 5 suite (no Minecraft needed) + JaCoCo report
 ./gradlew runClient             # dev client in ./run with Mod Menu + YACL
-pwsh scripts/test-live-client.ps1   # smoke-test a running dev client
+uv run --project tests/live pytest tests/live   # live suite against a running dev client
 ```
 
 To work on the dashboard with hot reload:
