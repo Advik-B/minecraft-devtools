@@ -8,7 +8,8 @@ MCDT (Minecraft DevTools) is a **client-only mod for Fabric and NeoForge**. Mod 
 
 What each document is for:
 
-- `README.md`: the user-facing feature list.
+- `README.md`: the user-facing docs (install, API, config, Docker).
+- `CONTRIBUTING.md`: contributor setup, build, tests, and the PR workflow.
 - `MCDT.md`: the design doc and roadmap. **Parts of it are not built yet**, for example `/v1/view/blocks`, `/v1/hud`, `/v1/batch`, `/v1/worlds`, and `/v1/servers`.
 - `src/main/java/dev/advik/mcdt/http/HttpServer.java`: **the source of truth for which routes exist**. Check it before you trust either doc.
 
@@ -142,5 +143,5 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
 - `run/`, `build/`, `web/node_modules`, `web/dist`, `.agents/`, and `skills-lock.json` are gitignored. A local daisyUI agent skill lives in `.agents/skills/daisyui/`. Use it for WebUI styling work if it is present.
 - `NameService.initialize` runs inside the `HttpServer` constructor. On Fabric in production (intermediary namespace) it synchronously downloads the Mojang client mappings from piston-meta on first launch, caches them in `config/mcdt/mappings/`, and falls back to intermediary names if the download fails. Dev runs, NeoForge (always Mojang names) and tests skip it. Curated endpoints, events, and `/v1/packets` use `NameService.getInstance()` only to show or accept Mojang class names, and they fall back to runtime names. Never use class *names* for security decisions: `ReflectionSecurity` identifies the session `User` class by type, because its name is intermediary in production.
 - The README lists `GET /v1/baritone/jobs` (a list endpoint), but only `/v1/baritone/jobs/{id}` is registered. This is one more reason to check `HttpServer` before you trust the docs.
-- The license is CC0-1.0 (`LICENSE`, `fabric.mod.json`, `neoforge.mods.toml`).
+- The license is MIT (`LICENSE`, `fabric.mod.json`, `neoforge.mods.toml`).
 - Compiling a node does not check mixin targets. When you add a node, compare every `@Accessor`/`@Invoker`/`@Inject` target against that version's named Minecraft jar (javap), or the game crashes at startup (`defaultRequire` is 1).

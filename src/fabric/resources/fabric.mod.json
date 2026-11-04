@@ -10,7 +10,7 @@
 	"contact": {
 		"sources": "https://github.com/Advik-B/minecraft-devtools"
 	},
-	"license": "CC0-1.0",
+	"license": "MIT",
 	"icon": "assets/mcdt/icon.png",
 	"environment": "client",
 	"entrypoints": {
