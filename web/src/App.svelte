@@ -60,7 +60,7 @@
     <div class="flex items-center gap-2">
       <span class="font-semibold text-base-content/80">Minecraft DevTools</span>
       <span>&bull;</span>
-      <span>Fabric 1.21.4</span>
+      <span>Minecraft {appState.gameVersion || '?'}</span>
     </div>
     <div class="flex items-center gap-4">
       <a href="/docs/scalar" class="link link-hover hover:text-primary transition-colors">Scalar Docs</a>
