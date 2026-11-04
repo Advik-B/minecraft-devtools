@@ -1,0 +1,21 @@
+[project]
+name = "mcdt-live-tests"
+version = "0.0.0"
+description = "Live tests that run against a running Minecraft client with MCDT installed."
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.28",
+    "pytest>=8.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+markers = [
+    "menu: needs the client on the title screen (no world loaded)",
+    "world: needs a singleplayer world loaded",
+    "baritone: Baritone checks; installed or absent is decided by --baritone",
+    "shutdown: quits the client; runs last and only with --shutdown",
+]
