@@ -5,41 +5,14 @@ set -eu
 DATA_DIR=/data
 log() { echo "[mcdt-docker] $*"; }
 
-# 1. Install the bundled mods. Older MCDT, Fabric API and Baritone jars are replaced; other mods stay.
-mkdir -p "$DATA_DIR/mods"
-rm -f "$DATA_DIR"/mods/mcdt-*.jar "$DATA_DIR"/mods/fabric-api-*.jar "$DATA_DIR"/mods/baritone-api-fabric-*.jar
-cp /opt/mcdt/mods/*.jar "$DATA_DIR/mods/"
-case "${MC_BARITONE:-true}" in
-	true) cp /opt/mcdt/baritone/*.jar "$DATA_DIR/mods/" ;;
-	false) ;;
-	*)
-		log "MC_BARITONE must be 'true' or 'false', got '${MC_BARITONE}'."
-		exit 1
-		;;
-esac
+# LOADER, MC_VERSION, MC_TARGET (the portablemc version spec), ... of this image's node.
+. /opt/mcdt/node.env
 
-# 2. Seed light settings on first start. An existing options.txt is left alone.
-if [ ! -f "$DATA_DIR/options.txt" ]; then
-	cat > "$DATA_DIR/options.txt" <<'EOF'
-pauseOnLostFocus:false
-onboardAccessibility:false
-skipMultiplayerWarning:true
-joinedFirstServer:true
-tutorialStep:none
-narrator:0
-realmsNotifications:false
-renderDistance:4
-simulationDistance:5
-maxFps:30
-enableVsync:false
-graphicsMode:0
-renderClouds:"false"
-particles:2
-soundCategory_master:0.0
-EOF
-fi
+# 1. Check the settings, install the image's and the user's mods (/mods, MC_MODS, MC_MODRINTH),
+#    and seed options.txt on first start (docker/setup).
+java -jar /opt/mcdt/setup.jar
 
-# 3. Virtual display for software OpenGL (Mesa llvmpipe).
+# 2. Virtual display for software OpenGL (Mesa llvmpipe).
 display_num="${DISPLAY#:}"
 display_num="${display_num%%.*}"
 rm -f "/tmp/.X${display_num}-lock" "/tmp/.X11-unix/X${display_num}"
@@ -56,7 +29,7 @@ while [ ! -S "/tmp/.X11-unix/X${display_num}" ]; do
 	sleep 0.2
 done
 
-# 4. Account.
+# 3. Account.
 set -- --mc-dir "$DATA_DIR" --bin-dir /tmp/mcdt-natives --jvm-policy system \
 	--resolution "${MC_WIDTH}x${MC_HEIGHT}" \
 	"--jvm-arg=-Xmx${MC_MAX_MEMORY}"
@@ -92,7 +65,7 @@ case "${MC_AUTH}" in
 		;;
 esac
 
-# 5. Optional Quick Play. By default the client stays on the title screen.
+# 4. Optional Quick Play. By default the client stays on the title screen.
 if [ -n "${MC_JOIN_SERVER:-}" ]; then
 	set -- "$@" --join-server "$MC_JOIN_SERVER" --join-server-port "${MC_JOIN_SERVER_PORT:-25565}"
 elif [ -n "${MC_JOIN_WORLD:-}" ]; then
@@ -107,12 +80,12 @@ done
 if [ -z "${MCDT_TOKEN:-}" ]; then
 	log "MCDT_TOKEN is not set, so the API uses a random token. Read it with: docker exec <container> cat $DATA_DIR/config/mcdt/token"
 fi
-log "Starting ${MC_VERSION}. The API will listen on port ${MCDT_PORT}."
+log "Starting ${MC_TARGET}. The first start downloads the game into $DATA_DIR/.portablemc. The API will listen on port ${MCDT_PORT}."
 
 # tini -g sends `docker stop`'s SIGTERM to this whole process group. The launcher exits before the game
 # JVM has run its shutdown hooks, so stay alive until the JVM is gone too.
 trap 'log "Stopping..."' TERM INT
-portablemc start "$@" "$MC_VERSION" &
+portablemc start "$@" "$MC_TARGET" &
 launcher=$!
 status=0
 while kill -0 "$launcher" 2>/dev/null; do
