@@ -11,16 +11,19 @@ ARG LOADER_VERSION=0.19.5
 FROM oven/bun:1.3.14 AS bun
 
 FROM eclipse-temurin:25-jdk-noble AS build
+ARG MINECRAFT_VERSION
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /src
 COPY . .
 RUN --mount=type=cache,target=/root/.gradle \
 	chmod +x gradlew \
-	&& ./gradlew build -x test --no-daemon --console=plain \
+	&& NODE="${MINECRAFT_VERSION}-fabric" \
+	&& ./gradlew ":${NODE}:build" -x test --no-daemon --console=plain \
 	&& mkdir -p /out \
-	&& find build/libs -maxdepth 1 -name 'mcdt-*.jar' ! -name '*-sources.jar' -exec cp {} /out/ \; \
+	&& cp build/libs/mcdt-*+"${NODE}".jar /out/ \
 	&& mkdir -p /out/baritone \
-	&& cp libs/baritone-api-fabric-*.jar /out/baritone/
+	&& BARITONE_VERSION="$(sed -n 's/^baritone_version=//p' "versions/${NODE}/gradle.properties" | tr -d '\r')" \
+	&& cp "libs/baritone-api-fabric-${BARITONE_VERSION}.jar" /out/baritone/
 
 # ---- Runtime ------------------------------------------------------------------------------------
 FROM eclipse-temurin:21-jre-noble

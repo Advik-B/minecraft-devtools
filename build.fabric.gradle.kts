@@ -25,6 +25,16 @@ repositories {
 	mavenCentral()
 }
 
+// One Stonecutter node (versions/<node>/gradle.properties holds its versions); sources come from the root src/.
+val minecraftVersion = prop("minecraft_version")
+val javaVersion = prop("java_version").toInt()
+val modVersion = rootProject.version.toString()
+
+version = "$modVersion+$minecraftVersion-fabric"
+base.archivesName = "mcdt"
+
+sourceSets.main { resources.srcDir(rootProject.file("src/fabric/resources")) }
+
 loom {
 	mods {
 		register("mcdt") {
@@ -32,17 +42,19 @@ loom {
 		}
 	}
 	runs.configureEach {
+		runDir("../../run")
 		// Dev runs serve the dashboard straight from web/dist so `bun run build` shows up on reload
-		vmArg("-Dmcdt.webDist=${layout.projectDirectory.dir("web/dist").asFile.absolutePath}")
+		vmArg("-Dmcdt.webDist=${rootProject.layout.projectDirectory.dir("web/dist").asFile.absolutePath}")
 	}
 }
 
-fun prop(name: String): String = providers.gradleProperty(name).get()
+// Node properties (versions/<node>/gradle.properties) are project properties, not Gradle properties.
+fun prop(name: String): String = project.property(name).toString()
 
 fun ensureBaritoneJar(): File {
 	val version = prop("baritone_version")
 	val sha256 = prop("baritone_sha256")
-	val libsDir = file("libs")
+	val libsDir = rootProject.file("libs")
 	libsDir.mkdirs()
 	val jarFile = libsDir.resolve("baritone-api-fabric-$version.jar")
 	if (jarFile.isFile && ChecksumUtils.sha256Of(jarFile.readBytes()) == sha256.lowercase()) {
@@ -141,7 +153,7 @@ val downloadBaritoneApi = tasks.register<DownloadVerified>("downloadBaritoneApi"
 	url = "https://github.com/cabaletta/baritone/releases/download/v$version/baritone-api-fabric-$version.jar"
 	sha256 = prop("baritone_sha256")
 	relativePath = "baritone-api-fabric-$version.jar"
-	outputDir = layout.projectDirectory.dir("libs")
+	outputDir = rootProject.layout.projectDirectory.dir("libs")
 }
 
 tasks.compileJava {
@@ -149,16 +161,21 @@ tasks.compileJava {
 }
 
 tasks.processResources {
-	val version = version
-	inputs.property("version", version)
+	val metadata = mapOf(
+		"version" to project.version.toString(),
+		"minecraft_version" to minecraftVersion,
+		"java_version" to javaVersion.toString(),
+		"baritone_version" to prop("baritone_version"),
+	)
+	inputs.properties(metadata)
 
 	filesMatching("fabric.mod.json") {
-		expand("version" to version)
+		expand(metadata)
 	}
 }
 
 tasks.withType<JavaCompile>().configureEach {
-	options.release = 21
+	options.release = javaVersion
 	options.encoding = "UTF-8"
 }
 
@@ -183,12 +200,12 @@ java {
 	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	sourceCompatibility = JavaVersion.toVersion(javaVersion)
+	targetCompatibility = JavaVersion.toVersion(javaVersion)
 }
 
 tasks.jar {
-	val projectName = project.name
+	val projectName = "mcdt"
 	inputs.property("projectName", projectName)
 
 	// One mod jar: the core and server modules' classes and resources are merged in (their libraries are jar-in-jar).
@@ -199,13 +216,25 @@ tasks.jar {
 		from(project(module).layout.buildDirectory.dir("resources/main"))
 	}
 
-	from("LICENSE") {
+	from(rootProject.file("LICENSE")) {
 		rename { "${it}_$projectName" }
 	}
 }
 
 tasks.assemble {
 	dependsOn(":server:exportOpenApi")
+}
+
+// Copies the mod jar to the root build/libs/, where CI, the Dockerfile and releases pick up every node.
+val collectJar = tasks.register<Copy>("collectJar") {
+	group = "build"
+	description = "Copies this node's mod jar to the root build/libs/."
+	from(tasks.remapJar.flatMap { it.archiveFile })
+	into(rootProject.layout.buildDirectory.dir("libs"))
+}
+
+tasks.build {
+	finalizedBy(collectJar)
 }
 
 // configure the maven publication

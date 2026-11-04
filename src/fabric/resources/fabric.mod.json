@@ -3,7 +3,7 @@
 	"id": "mcdt",
 	"version": "${version}",
 	"name": "Minecraft DevTools",
-	"description": "Local REST and WebSocket API for the live Minecraft 1.21.4 client.",
+	"description": "Local REST and WebSocket API for the live Minecraft ${minecraft_version} client.",
 	"authors": [
 		"Advik"
 	],
@@ -25,14 +25,14 @@
 		"mcdt.mixins.json"
 	],
 	"suggests": {
-		"baritone": "1.13.1",
+		"baritone": "${baritone_version}",
 		"yet_another_config_lib_v3": "*",
 		"modmenu": "*"
 	},
 	"depends": {
 		"fabricloader": ">=0.19.5",
-		"minecraft": "~1.21.4",
-		"java": ">=21",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=${java_version}",
 		"fabric-api": "*"
 	}
 }
