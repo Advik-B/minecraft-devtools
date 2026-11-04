@@ -34,6 +34,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption("--baritone", choices=("auto", "installed", "absent"), default="auto",
                     help="whether Baritone must be installed; auto accepts either (default: auto)")
     group.addoption("--shutdown", action="store_true", help="finish with the two-step quit flow")
+    group.addoption("--capabilities", default=os.environ.get("MCDT_EXPECT_CAPABILITIES"),
+                    help="comma-separated capability ids the platform must report exactly (baritone is checked by --baritone); "
+                         "unset checks consistency only")
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -167,3 +170,9 @@ def api(request: pytest.FixtureRequest) -> Api:
     client = Api(url, token)
     yield client
     client.http.close()
+
+
+@pytest.fixture(scope="session")
+def capabilities(api: Api) -> set[str]:
+    """Capability ids the running client reports in /v1/health."""
+    return set(expect(api.get("/v1/health"), 200)["capabilities"])

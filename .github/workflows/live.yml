@@ -14,7 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         node:
-          - { name: fabric-1.21.4, mc: '1.21.4', target: 'fabric:1.21.4:0.19.5', java: '21' }
+          # caps: what the node must report besides baritone (no YACL in CI, so no config-screen)
+          - { name: fabric-1.21.4, mc: '1.21.4', target: 'fabric:1.21.4:0.19.5', java: '21',
+              caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
         baritone: [installed, absent]
     name: ${{ matrix.node.name }} (baritone ${{ matrix.baritone }})
     steps:
@@ -54,6 +56,7 @@ jobs:
           MC_VERSION: ${{ matrix.node.mc }}
           MC_TARGET: ${{ matrix.node.target }}
           BARITONE: ${{ matrix.baritone }}
+          MCDT_EXPECT_CAPABILITIES: ${{ matrix.node.caps }}
         run: |
           export JAVA_BIN="$(eval echo "\$JAVA_HOME_${{ matrix.node.java }}_X64")/bin/java"
           bash scripts/ci/live-client.sh "$RUNNER_TEMP"/mods/*.jar
