@@ -1,5 +1,6 @@
 # Live client tests: real headless clients on GitHub Actions, with and without Baritone.
-# Each matrix row is one version/loader node (see docs/MULTIVERSION.md); add rows as nodes are added.
+# The nodes and the capabilities each must report are in .github/nodes.json; versions come from
+# versions/<node>/gradle.properties (scripts/ci/node-env.sh).
 name: live
 
 on:
@@ -7,44 +8,42 @@ on:
   workflow_dispatch:
 
 jobs:
+  nodes:
+    runs-on: ubuntu-24.04
+    outputs:
+      nodes: ${{ steps.read.outputs.nodes }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: read
+        run: echo "nodes=$(jq -c . .github/nodes.json)" >> "$GITHUB_OUTPUT"
+
   live:
+    needs: nodes
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
-        # node: the Stonecutter node; caps: what it must report besides baritone (no YACL in CI, so no config-screen);
-        # fabric_api: Fabric API download URL and SHA-512 (Fabric nodes only).
-        node:
-          - { name: fabric-1.21.4, node: 1.21.4-fabric, loader: fabric, mc: '1.21.4', target: 'fabric:1.21.4:0.19.5', java: '21',
-              fabric_api: 'https://cdn.modrinth.com/data/P7dR8mSH/versions/p96k10UR/fabric-api-0.119.4%2B1.21.4.jar 16b679f6a42549ca3b6bc147de710b2c8ba2d5e4661ed88df22782c05a4a5f6c1163d7b13867687ed91acde0fdfe5a5037d05662431c946865b58396284e7ee7',
-              caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
-          # 1.21.1: no recipes (recipe display ids arrived in 1.21.2)
-          - { name: fabric-1.21.1, node: 1.21.1-fabric, loader: fabric, mc: '1.21.1', target: 'fabric:1.21.1:0.19.5', java: '21',
-              fabric_api: 'https://cdn.modrinth.com/data/P7dR8mSH/versions/Mys3P7lK/fabric-api-0.116.17%2B1.21.1.jar 98c478217da19181f0e4df3ea6c2da6bdbda271c7544a4aea048513a49b444f1ff5b71dc0df6303017c48e8ff69b7bb6af6179bdf0d0e09ab3c1ee08411857a8',
-              caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
-          - { name: neoforge-1.21.1, node: 1.21.1-neoforge, loader: neoforge, mc: '1.21.1', target: 'neoforge::21.1.265', java: '21',
-              fabric_api: '',
-              caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
-          - { name: neoforge-1.21.4, node: 1.21.4-neoforge, loader: neoforge, mc: '1.21.4', target: 'neoforge::21.4.161', java: '21',
-              fabric_api: '',
-              caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
+        # caps: what the node must report besides baritone (no YACL here, so no config-screen).
+        node: ${{ fromJSON(needs.nodes.outputs.nodes) }}
         baritone: [installed, absent]
-    name: ${{ matrix.node.name }} (baritone ${{ matrix.baritone }})
+    name: ${{ matrix.node.node }} (baritone ${{ matrix.baritone }})
     steps:
       - uses: actions/checkout@v6
+      - name: node facts
+        run: sh scripts/ci/node-env.sh "${{ matrix.node.node }}" | tee -a "$GITHUB_ENV"
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: |
-            ${{ matrix.node.java }}
+            ${{ env.JAVA_VERSION }}
             25
       - uses: oven-sh/setup-bun@v2
       - uses: gradle/actions/setup-gradle@v6
       - name: build mod
         run: |
           chmod +x ./gradlew
-          ./gradlew ":${{ matrix.node.node }}:build" -x test --console=plain
+          ./gradlew ":$NODE:build" -x test --console=plain
       - name: install display and launcher
         run: |
           sudo apt-get update -q
@@ -54,30 +53,26 @@ jobs:
       - name: collect mods
         run: |
           mkdir -p "$RUNNER_TEMP/mods"
-          cp build/libs/mcdt-*+${{ matrix.node.node }}.jar "$RUNNER_TEMP/mods/"
-          if [ -n "${{ matrix.node.fabric_api }}" ]; then
-            read -r url sha512 <<< "${{ matrix.node.fabric_api }}"
-            curl -fsSL -o "$RUNNER_TEMP/mods/fabric-api.jar" "$url"
-            echo "$sha512  $RUNNER_TEMP/mods/fabric-api.jar" | sha512sum -c -
+          cp build/libs/mcdt-*+"$NODE".jar "$RUNNER_TEMP/mods/"
+          if [ -n "$FABRIC_API_URL" ]; then
+            curl -fsSL -o "$RUNNER_TEMP/mods/fabric-api.jar" "$FABRIC_API_URL"
+            echo "$FABRIC_API_SHA512  $RUNNER_TEMP/mods/fabric-api.jar" | sha512sum -c -
           fi
           if [ "${{ matrix.baritone }}" = "installed" ]; then
-            version="$(sed -n 's/^baritone_version=//p' versions/${{ matrix.node.node }}/gradle.properties)"
-            cp "libs/baritone-api-${{ matrix.node.loader }}-$version.jar" "$RUNNER_TEMP/mods/"
+            cp "libs/$BARITONE_JAR" "$RUNNER_TEMP/mods/"
           fi
           ls -la "$RUNNER_TEMP/mods"
       - name: live tests
         env:
-          MC_VERSION: ${{ matrix.node.mc }}
-          MC_TARGET: ${{ matrix.node.target }}
           BARITONE: ${{ matrix.baritone }}
           MCDT_EXPECT_CAPABILITIES: ${{ matrix.node.caps }}
         run: |
-          export JAVA_BIN="$(eval echo "\$JAVA_HOME_${{ matrix.node.java }}_X64")/bin/java"
+          export JAVA_BIN="$(eval echo "\$JAVA_HOME_${JAVA_VERSION}_X64")/bin/java"
           bash scripts/ci/live-client.sh "$RUNNER_TEMP"/mods/*.jar
       - name: upload results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: live-${{ matrix.node.name }}-baritone-${{ matrix.baritone }}
+          name: live-${{ matrix.node.node }}-baritone-${{ matrix.baritone }}
           path: ${{ env.LIVE_RESULTS }}
           if-no-files-found: ignore

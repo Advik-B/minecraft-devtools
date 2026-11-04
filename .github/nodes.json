@@ -1,0 +1,18 @@
+[
+  {
+    "node": "1.21.4-fabric",
+    "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler"
+  },
+  {
+    "node": "1.21.1-fabric",
+    "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler"
+  },
+  {
+    "node": "1.21.1-neoforge",
+    "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler"
+  },
+  {
+    "node": "1.21.4-neoforge",
+    "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler"
+  }
+]
