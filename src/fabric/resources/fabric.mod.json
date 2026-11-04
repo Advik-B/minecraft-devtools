@@ -17,8 +17,7 @@
 		"client": [
 			"dev.advik.mcdt.platform.fabric.FabricEntrypoint"
 		],
-		"modmenu": [
-			"dev.advik.mcdt.platform.fabric.FabricModMenuApi"
+		"modmenu": [${modmenu_entrypoint}
 		]
 	},
 	"mixins": [

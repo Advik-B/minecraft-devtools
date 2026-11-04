@@ -1,3 +1,4 @@
+//? if >=1.21 {
 package dev.advik.mcdt.client.config;
 
 import dev.advik.mcdt.Mcdt;
@@ -218,3 +219,4 @@ public final class McdtConfigScreen {
 				.build();
 	}
 }
+//?}
