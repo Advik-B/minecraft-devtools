@@ -5,7 +5,6 @@ import dev.advik.mcdt.McdtEnvironment;
 import dev.advik.mcdt.api.v1.*;
 import dev.advik.mcdt.reflection.*;
 import dev.advik.mcdt.game.GameClient;
-import dev.advik.mcdt.game.MinecraftGameClient;
 import dev.advik.mcdt.baritone.BaritoneService;
 import dev.advik.mcdt.baritone.UnavailableBaritoneService;
 import dev.advik.mcdt.config.ConfigStore;
@@ -48,17 +47,6 @@ public final class HttpServer implements AutoCloseable {
 	private final Javalin app;
 	private final AtomicInteger boundPort = new AtomicInteger();
 	private volatile Runnable onQuitCallback = () -> {};
-
-	public HttpServer(
-			McdtEnvironment env,
-			McdtConfig config,
-			BearerToken token,
-			TaskQueue queue,
-			RequestLogWriter logWriter,
-			Map<String, String> envOverrides
-	) {
-		this(env, config, token, queue, logWriter, envOverrides, MinecraftGameClient.getInstance(), new UnavailableBaritoneService());
-	}
 
 	public HttpServer(
 			McdtEnvironment env,

@@ -1,5 +1,7 @@
 package dev.advik.mcdt.http;
 
+import dev.advik.mcdt.api.v1.MockGameClient;
+import dev.advik.mcdt.baritone.UnavailableBaritoneService;
 import dev.advik.mcdt.McdtEnvironment;
 import dev.advik.mcdt.config.McdtConfig;
 import dev.advik.mcdt.config.Permission;
@@ -59,7 +61,7 @@ class HttpServerTest {
 		queue = new TaskQueue(256, clock);
 		logWriter = new RequestLogWriter(tempDir.resolve("logs"));
 
-		server = new HttpServer(env, config, token, queue, logWriter, Map.of());
+		server = new HttpServer(env, config, token, queue, logWriter, Map.of(), new MockGameClient(), new UnavailableBaritoneService());
 		httpClient = java.net.http.HttpClient.newHttpClient();
 	}
 

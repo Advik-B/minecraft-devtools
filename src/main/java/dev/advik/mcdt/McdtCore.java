@@ -29,14 +29,6 @@ public final class McdtCore implements AutoCloseable {
 	private final DiscoveryFile discovery;
 	private final Thread shutdownHook;
 
-	public static McdtCore start(McdtEnvironment env) throws IOException {
-		return start(env, System.getenv());
-	}
-
-	public static McdtCore start(McdtEnvironment env, Map<String, String> envOverrides) throws IOException {
-		return start(env, envOverrides, dev.advik.mcdt.game.MinecraftGameClient.getInstance());
-	}
-
 	public static McdtCore start(McdtEnvironment env, Map<String, String> envOverrides, dev.advik.mcdt.game.GameClient gameClient) throws IOException {
 		return start(env, envOverrides, gameClient, new dev.advik.mcdt.baritone.UnavailableBaritoneService());
 	}
