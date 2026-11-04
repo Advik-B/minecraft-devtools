@@ -1,20 +1,32 @@
 package dev.advik.mcdt.decompiler;
 
+import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.http.Problems;
-import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.ModContainer;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.List;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 
 /**
  * Resolves raw class bytecode (.class) for any requested class from the live game runtime,
  * including vanilla Minecraft classes, inner classes, and classes from any installed mod.
  */
 public final class ClassBytecodeProvider {
+	private static final List<ModResourceSource> MOD_SOURCES = loadModSources();
+
 	private ClassBytecodeProvider() {
+	}
+
+	private static List<ModResourceSource> loadModSources() {
+		try {
+			return ServiceLoader.load(ModResourceSource.class, ClassBytecodeProvider.class.getClassLoader())
+					.stream().map(ServiceLoader.Provider::get).toList();
+		} catch (ServiceConfigurationError e) {
+			Mcdt.LOGGER.warn("Could not load the platform mod resource source: {}", e.getMessage());
+			return List.of();
+		}
 	}
 
 	/**
@@ -63,19 +75,15 @@ public final class ClassBytecodeProvider {
 		} catch (IOException ignored) {
 		}
 
-		// 4. Try Fabric mod containers (find file in mod jars)
-		try {
-			for (ModContainer mod : FabricLoader.getInstance().getAllMods()) {
-				try {
-					var originPath = mod.findPath(resourcePath.substring(1));
-					if (originPath.isPresent() && Files.isRegularFile(originPath.get())) {
-						return Files.readAllBytes(originPath.get());
-					}
-				} catch (Throwable ignored) {
+		// 4. Look in the installed mods' files through the platform (Fabric mod containers, ...).
+		for (ModResourceSource source : MOD_SOURCES) {
+			try {
+				byte[] bytes = source.read(resourcePath.substring(1));
+				if (bytes != null) {
+					return bytes;
 				}
+			} catch (Throwable ignored) {
 			}
-		} catch (Throwable ignored) {
-			// FabricLoader might not be initialized in non-fabric unit tests
 		}
 
 		throw Problems.classNotFound(runtimeClassName);
