@@ -2,6 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "dev.advik.mcdt.mixin",
+  "plugin": "dev.advik.mcdt.client.McdtMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ChatComponentAccessor",
@@ -19,8 +20,6 @@
     "PlayerTabOverlayAccessor",
     "SubtitleOverlayAccessor",
     "ToastManagerAccessor",
-    "DebugScreenOverlayAccessor",
-    "DebugRendererAccessor",
     "StatsCounterAccessor",
     "ClientAdvancementsAccessor"
   ],

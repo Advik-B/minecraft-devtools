@@ -106,7 +106,8 @@ public final class RaycastUtil {
 					startVec,
 					endVec,
 					searchBox,
-					e -> !e.isSpectator() && e.isPickable()
+					e -> !e.isSpectator() && e.isPickable(),
+					0.3f
 			);
 		}
 

@@ -12,7 +12,7 @@ import dev.advik.mcdt.game.MinecraftGameClient;
 import dev.advik.mcdt.game.input.MovementTracker;
 import dev.advik.mcdt.reflection.HandleTable;
 import dev.advik.mcdt.world.stream.WorldStreamService;
-import net.minecraft.SharedConstants;
+import dev.advik.mcdt.game.McCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -47,7 +47,7 @@ public final class McdtClient {
 
 			// The game's own version id (e.g. "1.21.4"). getLaunchedVersion() is the launcher profile name, which for
 			// Fabric is something like "fabric-loader-0.19.5-1.21.4" and is not in Mojang's version manifest.
-			String gameVersion = SharedConstants.getCurrentVersion().getName();
+			String gameVersion = McCompat.gameVersionName();
 			String playerName = client.getUser() != null ? client.getUser().getName() : "Player";
 
 			boolean baritoneApiAvailable = false;
@@ -114,7 +114,7 @@ public final class McdtClient {
 	}
 
 	public static void onJoin(Minecraft client) {
-		String dimension = client.level != null ? client.level.dimension().location().toString() : "unknown";
+		String dimension = client.level != null ? McCompat.location(client.level.dimension()).toString() : "unknown";
 		boolean isSingleplayer = client.isSingleplayer();
 		McdtCore instance = core;
 		if (!isSingleplayer && instance != null) {

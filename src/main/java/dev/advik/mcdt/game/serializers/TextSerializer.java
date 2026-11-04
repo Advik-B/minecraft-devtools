@@ -3,7 +3,9 @@ package dev.advik.mcdt.game.serializers;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
+import com.mojang.serialization.JsonOps;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 
 public final class TextSerializer {
 	private TextSerializer() {}
@@ -41,7 +43,8 @@ public final class TextSerializer {
 		}
 		HolderLookup.Provider lookup = provider != null ? provider : RegistryAccess.EMPTY;
 		try {
-			return Component.Serializer.toJson(component, lookup);
+			return ComponentSerialization.CODEC.encodeStart(lookup.createSerializationContext(JsonOps.INSTANCE), component)
+					.getOrThrow().toString();
 		} catch (Exception e) {
 			return "{\"text\":\"" + component.getString().replace("\"", "\\\"") + "\"}";
 		}
