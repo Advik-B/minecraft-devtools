@@ -23,6 +23,7 @@ import java.net.http.HttpResponse;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 
 /**
  * Registry of curated MCP tools, schemas, and execution dispatcher.
@@ -263,10 +264,13 @@ public final class McpToolRegistry {
 				case "inventory_click" -> executeInventoryClick(args, timeoutMs);
 				case "screen_action" -> executeScreenAction(args, timeoutMs);
 				case "chat" -> executeChat(args, timeoutMs);
-				case "baritone_goto" -> executeBaritoneGoto(args);
-				case "baritone_mine" -> executeBaritoneMine(args);
-				case "baritone_follow" -> executeBaritoneFollow(args);
-				case "baritone_cancel" -> executeBaritoneCancel();
+				case "baritone_goto" -> executeBaritone(timeoutMs,
+						() -> baritoneService.startGoto(Json.MAPPER.convertValue(args, BaritoneDto.GotoRequest.class)));
+				case "baritone_mine" -> executeBaritone(timeoutMs,
+						() -> baritoneService.startMine(Json.MAPPER.convertValue(args, BaritoneDto.MineRequest.class)));
+				case "baritone_follow" -> executeBaritone(timeoutMs,
+						() -> baritoneService.startFollow(Json.MAPPER.convertValue(args, BaritoneDto.FollowRequest.class)));
+				case "baritone_cancel" -> executeBaritone(timeoutMs, baritoneService::cancel);
 				case "decompile_class" -> executeDecompileClass(args);
 				default -> CompletableFuture.completedFuture(ToolCallResult.error("Unknown tool: " + name));
 			};
@@ -626,39 +630,15 @@ public final class McpToolRegistry {
 				.exceptionally(ex -> ToolCallResult.error("Chat send failed: " + ex.getMessage()));
 	}
 
-	private CompletableFuture<ToolCallResult> executeBaritoneGoto(JsonNode args) {
+	/** Runs a Baritone call on the client thread, like the HTTP routes; Baritone and registries are not thread-safe. */
+	private CompletableFuture<ToolCallResult> executeBaritone(long timeoutMs, Supplier<Object> action) {
 		if (!baritoneService.isInstalled()) {
 			return CompletableFuture.completedFuture(ToolCallResult.error("Baritone is not installed."));
 		}
-		var req = Json.MAPPER.convertValue(args, BaritoneDto.GotoRequest.class);
-		var job = baritoneService.startGoto(req);
-		return CompletableFuture.completedFuture(ToolCallResult.text(Json.MAPPER.valueToTree(job).toPrettyString()));
-	}
-
-	private CompletableFuture<ToolCallResult> executeBaritoneMine(JsonNode args) {
-		if (!baritoneService.isInstalled()) {
-			return CompletableFuture.completedFuture(ToolCallResult.error("Baritone is not installed."));
-		}
-		var req = Json.MAPPER.convertValue(args, BaritoneDto.MineRequest.class);
-		var job = baritoneService.startMine(req);
-		return CompletableFuture.completedFuture(ToolCallResult.text(Json.MAPPER.valueToTree(job).toPrettyString()));
-	}
-
-	private CompletableFuture<ToolCallResult> executeBaritoneFollow(JsonNode args) {
-		if (!baritoneService.isInstalled()) {
-			return CompletableFuture.completedFuture(ToolCallResult.error("Baritone is not installed."));
-		}
-		var req = Json.MAPPER.convertValue(args, BaritoneDto.FollowRequest.class);
-		var job = baritoneService.startFollow(req);
-		return CompletableFuture.completedFuture(ToolCallResult.text(Json.MAPPER.valueToTree(job).toPrettyString()));
-	}
-
-	private CompletableFuture<ToolCallResult> executeBaritoneCancel() {
-		if (!baritoneService.isInstalled()) {
-			return CompletableFuture.completedFuture(ToolCallResult.error("Baritone is not installed."));
-		}
-		var job = baritoneService.cancel();
-		return CompletableFuture.completedFuture(ToolCallResult.text(Json.MAPPER.valueToTree(job).toPrettyString()));
+		return queue.submit(() -> Json.MAPPER.valueToTree(action.get()), timeoutMs)
+				.thenApply(r -> ToolCallResult.text(r.body().toPrettyString()))
+				.exceptionally(ex -> ToolCallResult.error("Baritone call failed: "
+						+ (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage())));
 	}
 
 	// Schema Helpers

@@ -13,6 +13,8 @@ public class MockBaritoneService implements BaritoneService {
 	public final Map<String, JobResponse> jobs = new HashMap<>();
 	public final Map<String, SettingInfo> settings = new LinkedHashMap<>();
 	public final List<String> executedCommands = new ArrayList<>();
+	/** Names of the threads that called the start and cancel methods, in call order. */
+	public final List<String> callThreads = java.util.Collections.synchronizedList(new ArrayList<>());
 
 	public MockBaritoneService() {
 		settings.put("allowBreak", new SettingInfo("allowBreak", "Boolean", true, true));
@@ -46,6 +48,7 @@ public class MockBaritoneService implements BaritoneService {
 
 	@Override
 	public JobResponse startGoto(GotoRequest req) {
+		callThreads.add(Thread.currentThread().getName());
 		if (!installed) throw Problems.baritoneNotInstalled();
 		String id = "job_" + UUID.randomUUID().toString().substring(0, 8);
 		Instant now = Instant.now();
@@ -56,6 +59,7 @@ public class MockBaritoneService implements BaritoneService {
 
 	@Override
 	public JobResponse startMine(MineRequest req) {
+		callThreads.add(Thread.currentThread().getName());
 		if (!installed) throw Problems.baritoneNotInstalled();
 		String id = "job_" + UUID.randomUUID().toString().substring(0, 8);
 		Instant now = Instant.now();
@@ -66,6 +70,7 @@ public class MockBaritoneService implements BaritoneService {
 
 	@Override
 	public JobResponse startFollow(FollowRequest req) {
+		callThreads.add(Thread.currentThread().getName());
 		if (!installed) throw Problems.baritoneNotInstalled();
 		String id = "job_" + UUID.randomUUID().toString().substring(0, 8);
 		Instant now = Instant.now();
@@ -76,6 +81,7 @@ public class MockBaritoneService implements BaritoneService {
 
 	@Override
 	public JobResponse startExplore(ExploreRequest req) {
+		callThreads.add(Thread.currentThread().getName());
 		if (!installed) throw Problems.baritoneNotInstalled();
 		String id = "job_" + UUID.randomUUID().toString().substring(0, 8);
 		Instant now = Instant.now();
@@ -86,6 +92,7 @@ public class MockBaritoneService implements BaritoneService {
 
 	@Override
 	public JobResponse startFarm(FarmRequest req) {
+		callThreads.add(Thread.currentThread().getName());
 		if (!installed) throw Problems.baritoneNotInstalled();
 		String id = "job_" + UUID.randomUUID().toString().substring(0, 8);
 		Instant now = Instant.now();
@@ -96,6 +103,7 @@ public class MockBaritoneService implements BaritoneService {
 
 	@Override
 	public JobResponse startBuild(BuildRequest req) {
+		callThreads.add(Thread.currentThread().getName());
 		if (!installed) throw Problems.baritoneNotInstalled();
 		String id = "job_" + UUID.randomUUID().toString().substring(0, 8);
 		Instant now = Instant.now();
@@ -106,6 +114,7 @@ public class MockBaritoneService implements BaritoneService {
 
 	@Override
 	public CancelResponse cancel() {
+		callThreads.add(Thread.currentThread().getName());
 		if (!installed) throw Problems.baritoneNotInstalled();
 		return new CancelResponse(true);
 	}

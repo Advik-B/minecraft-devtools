@@ -25,6 +25,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -84,6 +85,8 @@ class McpToolsTest {
 		EventHub.resetForTesting();
 	}
 
+	private static final String DRAIN_THREAD = "mcdt-test-client-thread";
+
 	private void drainQueue() {
 		clock.advance();
 		queue.drain(TimeUnit.SECONDS.toNanos(1));
@@ -106,6 +109,7 @@ class McpToolsTest {
 				} catch (InterruptedException ignored) {}
 			}
 		});
+		drainer.setName(DRAIN_THREAD);
 		drainer.start();
 
 		HttpRequest httpReq = HttpRequest.newBuilder()
@@ -257,6 +261,9 @@ class McpToolsTest {
 
 		JsonNode cancelRes = callMcp("tools/call", Map.of("name", "baritone_cancel", "arguments", Map.of()));
 		assertFalse(cancelRes.get("result").get("isError").asBoolean());
+
+		// Baritone touches game state, so MCP calls must run on the queue-draining (client) thread, not Jetty's.
+		assertEquals(List.of(DRAIN_THREAD, DRAIN_THREAD, DRAIN_THREAD, DRAIN_THREAD), baritoneService.callThreads);
 	}
 
 	@Test
