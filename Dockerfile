@@ -58,7 +58,7 @@ ARG PORTABLEMC_SHA256
 LABEL org.opencontainers.image.title="mcdt-${NODE}" \
 	org.opencontainers.image.description="Headless Minecraft client with MCDT (Minecraft DevTools), ${NODE}" \
 	org.opencontainers.image.source="https://github.com/Advik-B/minecraft-devtools" \
-	org.opencontainers.image.licenses="CC0-1.0" \
+	org.opencontainers.image.licenses="MIT" \
 	org.opencontainers.image.version="${MCDT_VERSION}"
 
 RUN apt-get update \

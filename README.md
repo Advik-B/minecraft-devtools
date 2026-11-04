@@ -12,7 +12,7 @@ Read game state, send input, stream events and poke around the live object graph
 ![Minecraft 1.21.1 | 1.21.4](https://img.shields.io/badge/Minecraft-1.21.1%20%7C%201.21.4-62B47A?logo=modrinth&logoColor=white)
 ![Fabric | NeoForge](https://img.shields.io/badge/loader-Fabric%20%7C%20NeoForge-DBD0B4)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
-[![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 [Features](#features) | [Getting started](#getting-started) | [AI agents (MCP)](#use-it-from-an-ai-agent-mcp) | [API](#api-at-a-glance) | [Configuration](#configuration) | [Docker](#deploy-with-docker) | [Contributing](CONTRIBUTING.md)
 
@@ -333,4 +333,4 @@ Built with [Fabric](https://fabricmc.net), [NeoForge](https://neoforged.net), [S
 
 ## License
 
-CC0-1.0. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
