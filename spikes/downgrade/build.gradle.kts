@@ -34,6 +34,7 @@ sourceSets {
 				"dev/advik/mcdt/http/Problem.java",
 				"dev/advik/mcdt/http/Problems.java",
 				"dev/advik/mcdt/http/ProblemException.java",
+				"dev/advik/mcdt/api/v1/Capability.java",
 				"dev/advik/mcdt/api/v1/dto/**",
 				"dev/advik/mcdt/mcp/dto/**",
 			)
