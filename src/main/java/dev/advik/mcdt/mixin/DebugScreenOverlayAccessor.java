@@ -1,3 +1,4 @@
+//? if <1.21.11 {
 package dev.advik.mcdt.mixin;
 
 import net.minecraft.client.gui.components.DebugScreenOverlay;
@@ -6,6 +7,7 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 import java.util.List;
 
+/** Applied only where the F3 screen still builds its text here (before 1.21.11; see McdtMixinPlugin). */
 @Mixin(DebugScreenOverlay.class)
 public interface DebugScreenOverlayAccessor {
 	@Invoker("getGameInformation")
@@ -14,3 +16,4 @@ public interface DebugScreenOverlayAccessor {
 	@Invoker("getSystemInformation")
 	List<String> invokeGetSystemInformation();
 }
+//?}

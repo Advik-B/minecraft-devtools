@@ -10,6 +10,11 @@ stonecutter active file(".sc_active_version")
 // `//? if fabric {` / `//? if neoforge {` blocks in src/, chosen by the node name's suffix.
 stonecutter parameters {
 	constants.match(current.project.substringAfterLast('-'), "fabric", "neoforge")
+
+	// Mojmap renamed ResourceLocation to Identifier in 1.21.11; write whichever the active node uses.
+	replacements.string(eval(current.version, ">=1.21.11")) {
+		replace("ResourceLocation", "Identifier")
+	}
 }
 
 // Copies every node's mod jar to build/libs/, where CI, the Dockerfile and releases pick them up.

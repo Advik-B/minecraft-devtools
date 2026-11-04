@@ -1,6 +1,7 @@
 package dev.advik.mcdt.game.viewer;
 
 import dev.advik.mcdt.api.v1.dto.BlockModelsDto;
+import dev.advik.mcdt.game.McCompat;
 import dev.advik.mcdt.game.serializers.BlockStateSerializer;
 import dev.advik.mcdt.world.stream.ViewData;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
@@ -10,11 +11,18 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+//? if >=1.21.11 {
+/*import net.minecraft.client.model.geom.builders.UVPair;
+import net.minecraft.client.renderer.block.model.BlockModelPart;
+import net.minecraft.client.renderer.block.model.BlockStateModel;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+*///?} else {
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.resources.model.BakedModel;
+//?}
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
@@ -73,7 +81,7 @@ public final class ViewerWorld {
 		if (level == null) return null;
 		return new ViewData.Level(
 				System.identityHashCode(level),
-				level.dimension().location().toString(),
+				McCompat.location(level.dimension()).toString(),
 				//? if >=1.21.2 {
 				level.getMinY(),
 				//?} else {
@@ -233,8 +241,18 @@ public final class ViewerWorld {
 				player.getX(), player.getY(), player.getZ(),
 				player.getYRot(), player.getXRot(),
 				level.getDayTime(),
-				level.getSkyDarken(1.0f)
+				skyBrightness(level)
 		);
+	}
+
+	/** Sky brightness from 0.2 (night, storm) to 1.0 (clear day), as the renderer scales it. */
+	private static float skyBrightness(ClientLevel level) {
+		//? if >=1.21.11 {
+		/*// Only the 0-11 darkness level is left; map it onto the old 0.2-1.0 scale.
+		return (1.0f - level.getSkyDarken() / 11.0f) * 0.8f + 0.2f;
+		*///?} else {
+		return level.getSkyDarken(1.0f);
+		//?}
 	}
 
 	public static List<ViewData.Entity> entities(double centerX, double centerZ, double radius, int limit) {
@@ -248,7 +266,7 @@ public final class ViewerWorld {
 			double dx = entity.getX() - centerX;
 			double dz = entity.getZ() - centerZ;
 			if (dx * dx + dz * dz > r2) continue;
-			String name = entity instanceof Player p ? p.getGameProfile().getName()
+			String name = entity instanceof Player p ? McCompat.profileName(p.getGameProfile())
 					: entity.hasCustomName() && entity.getCustomName() != null ? entity.getCustomName().getString() : null;
 			result.add(new ViewData.Entity(
 					entity.getId(),
@@ -278,7 +296,7 @@ public final class ViewerWorld {
 		Minecraft client = Minecraft.getInstance();
 		var shaper = client.getModelManager().getBlockModelShaper();
 		BlockColors colors = client.getBlockColors();
-		var atlas = client.getTextureAtlas(TextureAtlas.LOCATION_BLOCKS);
+		TextureAtlas atlas = (TextureAtlas) client.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
 		RandomSource random = RandomSource.create();
 		List<BlockModelsDto.Model> models = new ArrayList<>();
 
@@ -308,14 +326,29 @@ public final class ViewerWorld {
 				}
 			}
 
-			BakedModel model = shaper.getBlockModel(state);
 			List<BlockModelsDto.Quad> quads = new ArrayList<>();
+			//? if >=1.21.11 {
+			/*BlockStateModel model = shaper.getBlockModel(state);
+			random.setSeed(42L);
+			List<BlockModelPart> parts = model.collectParts(random);
+			boolean ambientOcclusion = false;
+			for (BlockModelPart part : parts) {
+				for (Direction cull : Direction.values()) {
+					addQuads(quads, part.getQuads(cull), cull, state, colors);
+				}
+				addQuads(quads, part.getQuads(null), null, state, colors);
+				ambientOcclusion |= part.useAmbientOcclusion();
+			}
+			*///?} else {
+			BakedModel model = shaper.getBlockModel(state);
 			for (Direction cull : Direction.values()) {
 				random.setSeed(42L);
 				addQuads(quads, model.getQuads(state, cull, random), cull, state, colors);
 			}
 			random.setSeed(42L);
 			addQuads(quads, model.getQuads(state, null, random), null, state, colors);
+			boolean ambientOcclusion = model.useAmbientOcclusion();
+			//?}
 
 			BlockModelsDto.Fluid fluid = null;
 			FluidState fluidState = state.getFluidState();
@@ -327,8 +360,8 @@ public final class ViewerWorld {
 						fluidState.getOwnHeight(),
 						fluidState.hasProperty(FlowingFluid.FALLING) && fluidState.getValue(FlowingFluid.FALLING),
 						layerName(ItemBlockRenderTypes.getRenderLayer(fluidState)),
-						rect(atlas.apply(ResourceLocation.withDefaultNamespace(prefix + "_still"))),
-						rect(atlas.apply(ResourceLocation.withDefaultNamespace(prefix + "_flow")))
+						rect(atlas.getSprite(ResourceLocation.withDefaultNamespace(prefix + "_still"))),
+						rect(atlas.getSprite(ResourceLocation.withDefaultNamespace(prefix + "_flow")))
 				);
 			}
 
@@ -341,7 +374,7 @@ public final class ViewerWorld {
 					occlusion,
 					state.skipRendering(state, Direction.UP),
 					state.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, BlockPos.ZERO),
-					model.useAmbientOcclusion() && state.getLightEmission() == 0,
+					ambientOcclusion && state.getLightEmission() == 0,
 					state.getLightEmission(),
 					fluid,
 					quads
@@ -352,10 +385,23 @@ public final class ViewerWorld {
 
 	private static void addQuads(List<BlockModelsDto.Quad> out, List<BakedQuad> quads, Direction cull, BlockState state, BlockColors colors) {
 		for (BakedQuad quad : quads) {
-			int[] v = quad.getVertices();
-			int stride = v.length / 4;
 			float[] pos = new float[12];
 			float[] uv = new float[8];
+			//? if >=1.21.11 {
+			/*for (int i = 0; i < 4; i++) {
+				var p = quad.position(i);
+				pos[i * 3] = p.x();
+				pos[i * 3 + 1] = p.y();
+				pos[i * 3 + 2] = p.z();
+				uv[i * 2] = UVPair.unpackU(quad.packedUV(i));
+				uv[i * 2 + 1] = UVPair.unpackV(quad.packedUV(i));
+			}
+			int tintIndex = quad.tintIndex();
+			int direction = quad.direction().get3DDataValue();
+			boolean shade = quad.shade();
+			*///?} else {
+			int[] v = quad.getVertices();
+			int stride = v.length / 4;
 			for (int i = 0; i < 4; i++) {
 				int base = i * stride;
 				pos[i * 3] = Float.intBitsToFloat(v[base]);
@@ -364,10 +410,14 @@ public final class ViewerWorld {
 				uv[i * 2] = Float.intBitsToFloat(v[base + 4]);
 				uv[i * 2 + 1] = Float.intBitsToFloat(v[base + 5]);
 			}
+			int tintIndex = quad.getTintIndex();
+			int direction = quad.getDirection().get3DDataValue();
+			boolean shade = quad.isShade();
+			//?}
 			int tint = TINT_NONE;
 			int color = 0;
 			if (quad.isTinted()) {
-				int c = colors.getColor(state, TintProbe.INSTANCE, BlockPos.ZERO, quad.getTintIndex()) & 0xFFFFFF;
+				int c = colors.getColor(state, TintProbe.INSTANCE, BlockPos.ZERO, tintIndex) & 0xFFFFFF;
 				switch (c) {
 					case SENTINEL_GRASS -> tint = TINT_GRASS;
 					case SENTINEL_FOLIAGE -> tint = TINT_FOLIAGE;
@@ -382,11 +432,11 @@ public final class ViewerWorld {
 			out.add(new BlockModelsDto.Quad(
 					pos,
 					uv,
-					quad.getDirection().get3DDataValue(),
+					direction,
 					cull != null ? cull.get3DDataValue() : -1,
 					tint,
 					color,
-					quad.isShade()
+					shade
 			));
 		}
 	}
@@ -395,6 +445,17 @@ public final class ViewerWorld {
 		return new float[] {sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1()};
 	}
 
+	//? if >=1.21.11 {
+	/*/^* Chunk layers lost the cutout/cutout-mipped split; mipped cutout is now just "cutout". ^/
+	private static String layerName(ChunkSectionLayer layer) {
+		return switch (layer) {
+			case TRANSLUCENT -> "translucent";
+			case CUTOUT -> "cutout";
+			case TRIPWIRE -> "tripwire";
+			default -> "solid";
+		};
+	}
+	*///?} else {
 	private static String layerName(RenderType type) {
 		if (type == RenderType.translucent()) return "translucent";
 		if (type == RenderType.cutout()) return "cutout";
@@ -402,6 +463,7 @@ public final class ViewerWorld {
 		if (type == RenderType.tripwire()) return "tripwire";
 		return "solid";
 	}
+	//?}
 
 	/**
 	 * Tint lookups return a sentinel per biome resolver, so a block color provider reveals whether it reads grass,

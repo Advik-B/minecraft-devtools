@@ -4,7 +4,7 @@ Guide for coding agents working in this repo. Read it before you change code.
 
 ## What this is
 
-MCDT (Minecraft DevTools) is a **client-only mod for Fabric and NeoForge**. Mod id: `mcdt`. Targets: Minecraft 1.21.1 and 1.21.4 on both loaders (four Stonecutter nodes), Java 21, Mojang mappings with a Parchment layer. The mod runs a Javalin 7 / Jetty 12 server inside the game on `127.0.0.1:25580` (it falls back to a random port if that one is taken). The server exposes the live client over REST, WebSocket, SSE, and an MCP server at `/mcp`. A Svelte 5 WebUI (in `web/`) is served at `/`.
+MCDT (Minecraft DevTools) is a **client-only mod for Fabric and NeoForge**. Mod id: `mcdt`. Targets: Minecraft 1.21.1, 1.21.4 and 1.21.11 on both loaders (six Stonecutter nodes), Java 21, Mojang mappings with a Parchment layer. The mod runs a Javalin 7 / Jetty 12 server inside the game on `127.0.0.1:25580` (it falls back to a random port if that one is taken). The server exposes the live client over REST, WebSocket, SSE, and an MCP server at `/mcp`. A Svelte 5 WebUI (in `web/`) is served at `/`.
 
 What each document is for:
 
@@ -83,6 +83,9 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
 - Switch with `./gradlew "Set active project to 1.21.1-neoforge"` (rewrites the comments in `src/`), and switch back with `./gradlew "Reset active project"` **before you commit**.
 - Conditional code: `//? if fabric {` ... `//?}`, `//? if >=1.21.2 {` ... `//?} else {` ... `//?}`. Inactive branches are block-commented (`/*` ... `*///?}`). Write both branches as plain code, then run `./gradlew "Refresh active project"` to comment the inactive ones.
 - Loader-only code lives in `platform/<loader>/`, each file wrapped whole in `//? if <loader> {`. Loader-only resources (mod metadata, SPI service files) live in `src/<loader>/resources/`. Small version differences use inline conditionals (see `ToastManagerAccessor`, `ViewerWorld`).
+- Prefer a helper over a conditional at the call site: `game/McCompat` (inventory, profiles, skins, options, input events, F3 text and toggles, disconnect) and `game/PixelReader` (screenshots and texture readback; since 1.21.5 an async GPU copy it waits for on the client thread). A bound like `>=1.21.11` names the first *supported node* with the change, not the Minecraft release that introduced it.
+- Mojmap renamed `ResourceLocation` to `Identifier` in 1.21.11. A Stonecutter string replacement in `stonecutter.gradle.kts` swaps the name, so write whichever the active node uses.
+- Mixins whose target exists only on some versions are not listed in `mcdt.mixins.json`; `client/McdtMixinPlugin.getMixins()` adds them per version (the class file itself is wrapped in a conditional). Listing a mixin with a missing target crashes the game (`defaultRequire` is 1).
 - Add a node: a `version(...)` line in `settings.gradle.kts`; `versions/<node>/gradle.properties` (copy a sibling; pin the Baritone jar's SHA-256 from the GitHub release asset digest); for Fabric, `fabric_api_url` and `fabric_api_sha512`; a `.gitignore` exception for a new loader's Baritone jar; and an entry in `.github/nodes.json` with the node's expected capabilities (the live and docker workflows both read it).
 
 ## Core invariants: do not break these
@@ -145,3 +148,5 @@ spikes/                                 throwaway Phase 0 experiments (not shipp
 - The README lists `GET /v1/baritone/jobs` (a list endpoint), but only `/v1/baritone/jobs/{id}` is registered. This is one more reason to check `HttpServer` before you trust the docs.
 - The license is MIT (`LICENSE`, `fabric.mod.json`, `neoforge.mods.toml`).
 - Compiling a node does not check mixin targets. When you add a node, compare every `@Accessor`/`@Invoker`/`@Inject` target against that version's named Minecraft jar (javap), or the game crashes at startup (`defaultRequire` is 1).
+- NeoForge dev runs (`runClient`) put `core` and `server` into the `mcdt` mod module (they share packages with the platform code) and, before 21.11, the bundled libraries on MDG's `additionalRuntimeClasspath`. Known gap: on those older NeoForge dev runs `/openapi.json` is empty, because the OpenAPI plugin can't see the generated spec. The built jars are fine.
+- `GET /v1/debug` returns empty `f3Right` lines on 1.21.1 and 1.21.4 (seen live; the cause is not known yet, and `McCompat.debugLines` swallows any error from `getSystemInformation`). 1.21.11 builds both columns from the F3 entries.

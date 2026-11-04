@@ -18,10 +18,17 @@ public final class NeoForgeModResourceSource implements ModResourceSource {
 			return null;
 		}
 		for (IModFileInfo file : mods.getModFiles()) {
+			//? if >=1.21.11 {
+			/^byte[] bytes = file.getFile().getContents().readFile(resourcePath);
+			if (bytes != null) {
+				return bytes;
+			}
+			^///?} else {
 			Path path = file.getFile().findResource(resourcePath.split("/"));
 			if (path != null && Files.isRegularFile(path)) {
 				return Files.readAllBytes(path);
 			}
+			//?}
 		}
 		return null;
 	}

@@ -1,7 +1,6 @@
 package dev.advik.mcdt.game;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.platform.Window;
 import dev.advik.mcdt.api.v1.dto.*;
 import dev.advik.mcdt.game.input.MovementTracker;
@@ -15,7 +14,6 @@ import dev.advik.mcdt.mixin.*;
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Checkbox;
@@ -28,7 +26,6 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.NonNullList;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.protocol.Packet;
@@ -73,7 +70,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.ConnectScreen;
-import net.minecraft.client.gui.screens.GenericMessageScreen;
 import net.minecraft.client.multiplayer.ServerList;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import dev.advik.mcdt.game.viewer.ViewerWorld;
@@ -87,7 +83,6 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.client.CameraType;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackRepository;
@@ -235,20 +230,20 @@ public final class MinecraftGameClient implements GameClient {
 			throw Problems.noPlayer();
 		}
 
-		int selectedSlot = player.getInventory().selected;
-		NonNullList<ItemStack> items = player.getInventory().items;
+		int selectedSlot = McCompat.selectedSlot(player.getInventory());
+		List<ItemStack> items = McCompat.mainItems(player.getInventory());
 		List<InventoryDto.SlotInfo> main = new ArrayList<>(items.size());
 		for (int i = 0; i < items.size(); i++) {
 			main.add(ItemSerializer.toSlotInfo(i, items.get(i)));
 		}
 
-		NonNullList<ItemStack> armor = player.getInventory().armor;
+		List<ItemStack> armor = McCompat.armor(player);
 		List<InventoryDto.SlotInfo> armorList = new ArrayList<>(armor.size());
 		for (int i = 0; i < armor.size(); i++) {
 			armorList.add(ItemSerializer.toSlotInfo(36 + i, armor.get(i)));
 		}
 
-		NonNullList<ItemStack> offhand = player.getInventory().offhand;
+		List<ItemStack> offhand = McCompat.offhand(player);
 		List<InventoryDto.SlotInfo> offhandList = new ArrayList<>(offhand.size());
 		for (int i = 0; i < offhand.size(); i++) {
 			offhandList.add(ItemSerializer.toSlotInfo(40 + i, offhand.get(i)));
@@ -265,7 +260,7 @@ public final class MinecraftGameClient implements GameClient {
 			throw Problems.noWorld();
 		}
 
-		String dimension = level.dimension().location().toString();
+		String dimension = McCompat.location(level.dimension()).toString();
 		long dayTime = level.getDayTime();
 		long gameTime = level.getGameTime();
 		WorldDto.TimeInfo time = new WorldDto.TimeInfo(
@@ -284,7 +279,7 @@ public final class MinecraftGameClient implements GameClient {
 
 		String difficulty = level.getDifficulty().getKey();
 		boolean hardcore = level.getLevelData().isHardcore();
-		BlockPos spawnPos = level.getSharedSpawnPos();
+		BlockPos spawnPos = McCompat.spawnPos(level);
 		WorldDto.SpawnInfo spawn = new WorldDto.SpawnInfo(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
 
 		int loadedChunks = level.getChunkSource() != null ? level.getChunkSource().getLoadedChunksCount() : 0;
@@ -395,7 +390,7 @@ public final class MinecraftGameClient implements GameClient {
 		Map<String, String> categories = new LinkedHashMap<>();
 
 		for (var entry : BuiltInRegistries.ENTITY_TYPE.entrySet()) {
-			ResourceLocation rl = entry.getKey().location();
+			ResourceLocation rl = McCompat.location(entry.getKey());
 			net.minecraft.world.entity.EntityType<?> type = entry.getValue();
 			String id = rl.toString();
 			net.minecraft.world.entity.MobCategory mobCat = type.getCategory();
@@ -547,10 +542,10 @@ public final class MinecraftGameClient implements GameClient {
 		int maxFps = opt.framerateLimit().get();
 		boolean fullscreen = opt.fullscreen().get();
 		boolean vsync = opt.enableVsync().get();
-		String graphicsMode = opt.graphicsMode().get().name().toLowerCase();
+		String graphicsMode = McCompat.graphicsMode(opt);
 		boolean bobView = opt.bobView().get();
 		double mouseSensitivity = opt.sensitivity().get();
-		boolean invertYMouse = opt.invertYMouse().get();
+		boolean invertYMouse = McCompat.invertMouseY(opt).get();
 
 		Map<String, Float> volumes = new LinkedHashMap<>();
 		for (SoundSource source : SoundSource.values()) {
@@ -561,7 +556,7 @@ public final class MinecraftGameClient implements GameClient {
 		for (KeyMapping km : opt.keyMappings) {
 			keyMappings.add(new OptionsDto.KeyMappingInfo(
 					km.getName(),
-					km.getCategory(),
+					McCompat.keyCategory(km),
 					km.getTranslatedKeyMessage().getString(),
 					km.saveString()
 			));
@@ -579,11 +574,10 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public byte[] captureScreenshot(float scale) {
 		Minecraft client = Minecraft.getInstance();
-		NativeImage image = Screenshot.takeScreenshot(client.getMainRenderTarget());
-		int srcWidth = image.getWidth();
-		int srcHeight = image.getHeight();
-		int[] pixels = image.makePixelArray();
-		image.close();
+		PixelReader.Image image = PixelReader.screenshot(client);
+		int srcWidth = image.width();
+		int srcHeight = image.height();
+		int[] pixels = image.argb();
 
 		float clampedScale = Math.max(0.1f, Math.min(1.0f, scale));
 		int targetWidth = Math.max(1, Math.round(srcWidth * clampedScale));
@@ -615,12 +609,12 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public PlayerSkinDto getPlayerSkinInfo(String targetPlayer, boolean embedImage) {
 		GameProfile profile = resolvePlayerProfile(targetPlayer);
-		PlayerSkin skin = resolvePlayerSkin(targetPlayer);
+		McCompat.Skin skin = resolvePlayerSkin(targetPlayer);
 
-		String model = skin.model() != null ? skin.model().id() : "wide";
+		String model = skin.model();
 		String textureUrl = skin.textureUrl();
-		String capeUrl = skin.capeTexture() != null ? skin.capeTexture().toString() : null;
-		String elytraUrl = skin.elytraTexture() != null ? skin.elytraTexture().toString() : null;
+		String capeUrl = skin.capeTexture();
+		String elytraUrl = skin.elytraTexture();
 
 		String base64 = null;
 		if (embedImage) {
@@ -629,8 +623,8 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		return new PlayerSkinDto(
-				profile.getName(),
-				profile.getId().toString(),
+				McCompat.profileName(profile),
+				McCompat.profileId(profile).toString(),
 				model,
 				textureUrl,
 				capeUrl,
@@ -642,31 +636,43 @@ public final class MinecraftGameClient implements GameClient {
 
 	@Override
 	public byte[] getPlayerSkinImage(String targetPlayer) {
-		PlayerSkin skin = resolvePlayerSkin(targetPlayer);
+		McCompat.Skin skin = resolvePlayerSkin(targetPlayer);
 		return extractTextureBytes(skin.texture(), 64, 64);
 	}
 
-	private PlayerSkin resolvePlayerSkin(String targetPlayer) {
+	private McCompat.Skin resolvePlayerSkin(String targetPlayer) {
 		Minecraft client = Minecraft.getInstance();
 		if (client.player == null) {
 			throw Problems.noPlayer();
 		}
-		if (targetPlayer == null || targetPlayer.isBlank()
-				|| targetPlayer.equalsIgnoreCase(client.player.getGameProfile().getName())
-				|| targetPlayer.equalsIgnoreCase(client.player.getStringUUID())) {
-			return client.player.getSkin();
+		if (isSelf(client, targetPlayer)) {
+			return McCompat.skin(client.player);
 		}
+		net.minecraft.client.multiplayer.PlayerInfo info = findPlayerInfo(client, targetPlayer);
+		if (info != null) {
+			return McCompat.skin(info);
+		}
+		throw Problems.playerNotFound(targetPlayer);
+	}
 
-		if (client.getConnection() != null) {
-			for (net.minecraft.client.multiplayer.PlayerInfo info : client.getConnection().getOnlinePlayers()) {
-				if (info.getProfile().getName().equalsIgnoreCase(targetPlayer)
-						|| info.getProfile().getId().toString().equalsIgnoreCase(targetPlayer)) {
-					return info.getSkin();
-				}
+	private static boolean isSelf(Minecraft client, String targetPlayer) {
+		return targetPlayer == null || targetPlayer.isBlank()
+				|| targetPlayer.equalsIgnoreCase(McCompat.profileName(client.player.getGameProfile()))
+				|| targetPlayer.equalsIgnoreCase(client.player.getStringUUID());
+	}
+
+	private static net.minecraft.client.multiplayer.PlayerInfo findPlayerInfo(Minecraft client, String targetPlayer) {
+		if (client.getConnection() == null) {
+			return null;
+		}
+		for (net.minecraft.client.multiplayer.PlayerInfo info : client.getConnection().getOnlinePlayers()) {
+			GameProfile profile = info.getProfile();
+			if (McCompat.profileName(profile).equalsIgnoreCase(targetPlayer)
+					|| McCompat.profileId(profile).toString().equalsIgnoreCase(targetPlayer)) {
+				return info;
 			}
 		}
-
-		throw Problems.playerNotFound(targetPlayer);
+		return null;
 	}
 
 	private GameProfile resolvePlayerProfile(String targetPlayer) {
@@ -674,21 +680,13 @@ public final class MinecraftGameClient implements GameClient {
 		if (client.player == null) {
 			throw Problems.noPlayer();
 		}
-		if (targetPlayer == null || targetPlayer.isBlank()
-				|| targetPlayer.equalsIgnoreCase(client.player.getGameProfile().getName())
-				|| targetPlayer.equalsIgnoreCase(client.player.getStringUUID())) {
+		if (isSelf(client, targetPlayer)) {
 			return client.player.getGameProfile();
 		}
-
-		if (client.getConnection() != null) {
-			for (net.minecraft.client.multiplayer.PlayerInfo info : client.getConnection().getOnlinePlayers()) {
-				if (info.getProfile().getName().equalsIgnoreCase(targetPlayer)
-						|| info.getProfile().getId().toString().equalsIgnoreCase(targetPlayer)) {
-					return info.getProfile();
-				}
-			}
+		net.minecraft.client.multiplayer.PlayerInfo info = findPlayerInfo(client, targetPlayer);
+		if (info != null) {
+			return info.getProfile();
 		}
-
 		throw Problems.playerNotFound(targetPlayer);
 	}
 
@@ -838,23 +836,16 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		var texture = client.getTextureManager().getTexture(loc);
-		if (texture != null && texture.getId() > 0) {
-			int width = defaultWidth;
-			int height = defaultHeight;
-			if (texture instanceof TextureAtlas atlas) {
-				width = getAtlasWidth(atlas);
-				height = getAtlasHeight(atlas);
-			}
-			texture.bind();
-			NativeImage nativeImage = new NativeImage(width, height, false);
-			nativeImage.downloadTexture(0, false);
-			int srcWidth = nativeImage.getWidth();
-			int srcHeight = nativeImage.getHeight();
-			int[] pixels = nativeImage.makePixelArray();
-			nativeImage.close();
-
-			BufferedImage bufferedImage = new BufferedImage(srcWidth, srcHeight, BufferedImage.TYPE_INT_ARGB);
-			bufferedImage.setRGB(0, 0, srcWidth, srcHeight, pixels, 0, srcWidth);
+		int width = defaultWidth;
+		int height = defaultHeight;
+		if (texture instanceof TextureAtlas atlas) {
+			width = getAtlasWidth(atlas);
+			height = getAtlasHeight(atlas);
+		}
+		PixelReader.Image image = texture != null ? PixelReader.texture(texture, width, height) : null;
+		if (image != null) {
+			BufferedImage bufferedImage = new BufferedImage(image.width(), image.height(), BufferedImage.TYPE_INT_ARGB);
+			bufferedImage.setRGB(0, 0, image.width(), image.height(), image.argb(), 0, image.width());
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			try {
 				ImageIO.write(bufferedImage, "png", baos);
@@ -902,7 +893,7 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public InputKeyDto.Response pressKey(InputKeyDto.Request request) {
 		Minecraft client = Minecraft.getInstance();
-		long window = client.getWindow().getWindow();
+		long window = McCompat.windowHandle(client);
 		String action = request.action() != null ? request.action().toLowerCase(Locale.ROOT) : "tap";
 
 		KeyMapping keyMapping = null;
@@ -948,16 +939,15 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		if (window != 0 && keyCode != 0) {
-			client.keyboardHandler.keyPress(window, keyCode, scanCode, glfwAction, 0);
+			McCompat.keyPress(client, window, keyCode, scanCode, glfwAction);
 			if ("tap".equals(action)) {
-				client.keyboardHandler.keyPress(window, keyCode, scanCode, 0, 0);
+				McCompat.keyPress(client, window, keyCode, scanCode, 0);
 			}
 		}
 
 		if (request.text() != null && !request.text().isEmpty()) {
-			var kbAccessor = (KeyboardHandlerAccessor) client.keyboardHandler;
 			for (char ch : request.text().toCharArray()) {
-				kbAccessor.invokeCharTyped(window, ch, 0);
+				McCompat.charTyped(client, window, ch);
 			}
 		}
 
@@ -967,7 +957,7 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public InputMouseDto.Response mouseInput(InputMouseDto.Request request) {
 		Minecraft client = Minecraft.getInstance();
-		long window = client.getWindow().getWindow();
+		long window = McCompat.windowHandle(client);
 		MouseHandlerAccessor accessor = (MouseHandlerAccessor) client.mouseHandler;
 		String action = request.action() != null ? request.action().toLowerCase(Locale.ROOT) : "click";
 
@@ -995,20 +985,20 @@ public final class MinecraftGameClient implements GameClient {
 				if (request.x() != null && request.y() != null) {
 					accessor.invokeOnMove(window, request.x(), request.y());
 				}
-				accessor.invokeOnPress(window, buttonCode, 1, 0);
-				accessor.invokeOnPress(window, buttonCode, 0, 0);
+				McCompat.mouseButton(client, window, buttonCode, 1);
+				McCompat.mouseButton(client, window, buttonCode, 0);
 			}
 			case "press" -> {
 				if (request.x() != null && request.y() != null) {
 					accessor.invokeOnMove(window, request.x(), request.y());
 				}
-				accessor.invokeOnPress(window, buttonCode, 1, 0);
+				McCompat.mouseButton(client, window, buttonCode, 1);
 			}
 			case "release" -> {
 				if (request.x() != null && request.y() != null) {
 					accessor.invokeOnMove(window, request.x(), request.y());
 				}
-				accessor.invokeOnPress(window, buttonCode, 0, 0);
+				McCompat.mouseButton(client, window, buttonCode, 0);
 			}
 			case "scroll" -> {
 				double sx = request.scrollX() != null ? request.scrollX() : 0.0;
@@ -1205,7 +1195,7 @@ public final class MinecraftGameClient implements GameClient {
 					ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN));
 			case "select_hotbar" -> {
 				if (request.slot() != null && request.slot() >= 0 && request.slot() <= 8) {
-					player.getInventory().selected = request.slot();
+					McCompat.setSelectedSlot(player.getInventory(), request.slot());
 				} else {
 					throw Problems.invalidParameter("slot", "Hotbar slot index must be 0-8");
 				}
@@ -1281,14 +1271,14 @@ public final class MinecraftGameClient implements GameClient {
 				}
 				int btn = request.button() != null ? request.button() : 0;
 				if (targetWidget instanceof Button b) {
-					b.onPress();
+					McCompat.pressButton(b);
 				} else {
-					targetWidget.mouseClicked(targetWidget.getX() + targetWidget.getWidth() / 2.0,
+					McCompat.mouseClicked(targetWidget, targetWidget.getX() + targetWidget.getWidth() / 2.0,
 							targetWidget.getY() + targetWidget.getHeight() / 2.0, btn);
 				}
 			} else if (request.x() != null && request.y() != null) {
 				int btn = request.button() != null ? request.button() : 0;
-				screen.mouseClicked(request.x(), request.y(), btn);
+				McCompat.mouseClicked(screen, request.x(), request.y(), btn);
 			} else {
 				throw Problems.invalidParameter("widgetIndex/x,y", "Either widgetIndex or (x, y) coordinates must be provided");
 			}
@@ -1312,12 +1302,12 @@ public final class MinecraftGameClient implements GameClient {
 					editBox.setValue(request.text());
 				} else {
 					for (char ch : request.text().toCharArray()) {
-						screen.charTyped(ch, 0);
+						McCompat.charTyped(screen, ch);
 					}
 				}
 			} else {
 				for (char ch : request.text().toCharArray()) {
-					screen.charTyped(ch, 0);
+					McCompat.charTyped(screen, ch);
 				}
 			}
 		} else {
@@ -1381,7 +1371,7 @@ public final class MinecraftGameClient implements GameClient {
 		if (request.vsync() != null) opt.enableVsync().set(request.vsync());
 		if (request.bobView() != null) opt.bobView().set(request.bobView());
 		if (request.mouseSensitivity() != null) opt.sensitivity().set(request.mouseSensitivity());
-		if (request.invertYMouse() != null) opt.invertYMouse().set(request.invertYMouse());
+		if (request.invertYMouse() != null) McCompat.invertMouseY(opt).set(request.invertYMouse());
 		if (request.pauseOnLostFocus() != null) opt.pauseOnLostFocus = request.pauseOnLostFocus();
 		if (request.language() != null && !request.language().isBlank()) opt.languageCode = request.language();
 
@@ -1853,8 +1843,8 @@ public final class MinecraftGameClient implements GameClient {
 				if (client.getConnection() != null) {
 					for (net.minecraft.client.multiplayer.PlayerInfo info : client.getConnection().getListedOnlinePlayers()) {
 						players.add(new HudDto.TabList.PlayerEntry(
-								info.getProfile().getName(),
-								info.getProfile().getId().toString(),
+								McCompat.profileName(info.getProfile()),
+								McCompat.profileId(info.getProfile()).toString(),
 								info.getLatency(),
 								info.getGameMode() != null ? info.getGameMode().getName() : "unknown",
 								info.getTabListDisplayName() != null ? TextSerializer.toPlainText(info.getTabListDisplayName()) : null
@@ -1918,7 +1908,7 @@ public final class MinecraftGameClient implements GameClient {
 		if (all || include.contains("helditem")) {
 			ItemStack main = player.getMainHandItem();
 			ItemStack off = player.getOffhandItem();
-			int selected = player.getInventory().selected;
+			int selected = McCompat.selectedSlot(player.getInventory());
 			heldItem = new HudDto.HeldItemInfo(
 					!main.isEmpty() ? ItemSerializer.toSlotInfo(selected, main) : null,
 					!off.isEmpty() ? ItemSerializer.toSlotInfo(40, off) : null,
@@ -2036,38 +2026,18 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public DebugDto.Response getDebug() {
 		Minecraft client = Minecraft.getInstance();
-		List<String> left = List.of();
-		List<String> right = List.of();
-
-		if (client.gui != null && client.gui.getDebugOverlay() instanceof DebugScreenOverlayAccessor dbgAccessor) {
-			try {
-				if (client.level != null && client.getConnection() != null) {
-					left = dbgAccessor.invokeGetGameInformation();
-				}
-				right = dbgAccessor.invokeGetSystemInformation();
-			} catch (Exception ignored) {
-			}
-		}
-
-		boolean hitboxes = client.getEntityRenderDispatcher().shouldRenderHitBoxes();
-		boolean chunkBorders = false;
-		if (client.debugRenderer instanceof DebugRendererAccessor dra) {
-			chunkBorders = dra.getRenderChunkborder();
-		}
-
-		return new DebugDto.Response(left, right, hitboxes, chunkBorders);
+		McCompat.DebugLines lines = McCompat.debugLines(client);
+		return new DebugDto.Response(lines.left(), lines.right(), McCompat.hitboxes(client), McCompat.chunkBorders(client));
 	}
 
 	@Override
 	public DebugDto.Response updateDebug(DebugDto.Request request) {
 		Minecraft client = Minecraft.getInstance();
 		if (request.hitboxes() != null) {
-			client.getEntityRenderDispatcher().setRenderHitBoxes(request.hitboxes());
+			McCompat.setHitboxes(client, request.hitboxes());
 		}
 		if (request.chunkBorders() != null) {
-			if (client.debugRenderer instanceof DebugRendererAccessor dra) {
-				dra.setRenderChunkborder(request.chunkBorders());
-			}
+			McCompat.setChunkBorders(client, request.chunkBorders());
 		}
 		return getDebug();
 	}
@@ -2079,7 +2049,7 @@ public final class MinecraftGameClient implements GameClient {
 		for (KeyMapping km : client.options.keyMappings) {
 			list.add(new KeybindsDto.KeyMappingDetail(
 					km.getName(),
-					km.getCategory(),
+					McCompat.keyCategory(km),
 					km.getTranslatedKeyMessage().getString(),
 					km.getDefaultKey().getName(),
 					km.isDefault(),
@@ -2442,15 +2412,8 @@ public final class MinecraftGameClient implements GameClient {
 			CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS).execute(() -> {
 				client.execute(() -> {
 					if (client.level != null) {
-						boolean isLocal = client.isLocalServer();
-						client.level.disconnect();
-						if (isLocal) {
-							client.disconnect(new GenericMessageScreen(net.minecraft.network.chat.Component.translatable("menu.savingLevel")));
-							client.setScreen(new TitleScreen());
-						} else {
-							client.disconnect();
-							client.setScreen(new TitleScreen());
-						}
+						McCompat.disconnect(client);
+						client.setScreen(new TitleScreen());
 					}
 				});
 			});

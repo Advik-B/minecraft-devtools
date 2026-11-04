@@ -75,8 +75,18 @@ online-mode=false
 server-port=25599
 spawn-protection=0
 EOF
-# Console commands run once the server has finished loading, so "stop" saves the new world and exits.
-(cd "$SRV" && printf 'stop\n' | timeout 600 "$JAVA_BIN" -Xmx1G -jar server.jar nogui > "$RESULTS/server.log" 2>&1)
+# Wait for the server to finish loading, then stop it with SIGTERM: its shutdown hook saves the world and exits.
+# (A "stop" piped into the console fails on 1.21.11: "An unexpected error occurred trying to execute that command".)
+(cd "$SRV" && exec "$JAVA_BIN" -Xmx1G -jar server.jar nogui < /dev/null > "$RESULTS/server.log" 2>&1) &
+SERVER=$!
+for _ in $(seq 1 300); do
+	grep -q 'Done (' "$RESULTS/server.log" 2>/dev/null && break
+	kill -0 "$SERVER" 2>/dev/null || break
+	sleep 2
+done
+grep -q 'Done (' "$RESULTS/server.log" || { kill "$SERVER" 2>/dev/null; tail -n 40 "$RESULTS/server.log"; log "the server never finished loading"; exit 1; }
+kill -TERM "$SERVER"
+wait "$SERVER" || true
 test -f "$SRV/$WORLD/level.dat"
 cp -r "$SRV/$WORLD" "$INST/saves/$WORLD"
 
