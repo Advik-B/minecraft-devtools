@@ -39,6 +39,17 @@ object McdtBuild {
 		group == "org.slf4j" || group == "org.ow2.asm" || (group == "org.jetbrains" && module == "annotations")
 
 	/**
+	 * Libraries the NeoForge jar merges in with Jackson relocated, instead of nesting them. Minecraft 1.21.2+ ships
+	 * Jackson 2.13 as a module in a parent layer, so a nested Jackson clashes with it ("reads more than one module named
+	 * com.fasterxml.jackson.annotation"). Javalin and its OpenAPI plugins reference Jackson, so they move in with it.
+	 */
+	fun isRelocatedOnNeoForge(group: String?): Boolean =
+		group != null && (group.startsWith("com.fasterxml.jackson") || group == "io.javalin" || group.startsWith("io.javalin."))
+
+	/** Package Jackson is relocated to on NeoForge. */
+	const val RELOCATED_JACKSON = "dev.advik.mcdt.shaded.jackson"
+
+	/**
 	 * The pinned Baritone API jar for a loader in `libs/`, downloaded again unless it matches [sha256]. Runs at
 	 * configuration time because the jar is a compile dependency.
 	 */

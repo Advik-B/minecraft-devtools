@@ -1,5 +1,6 @@
 plugins {
 	id("net.neoforged.moddev")
+	id("com.gradleup.shadow")
 	jacoco
 }
 
@@ -74,7 +75,16 @@ configurations.configureEach {
 }
 
 configurations.named("jarJar") {
-	dependencies.addAllLater(McdtBuild.bundledModules(project, bundled))
+	dependencies.addAllLater(McdtBuild.bundledModules(project, bundled).map { deps -> deps.filterNot { McdtBuild.isRelocatedOnNeoForge(it.group) } })
+}
+
+// Jackson, Javalin and its OpenAPI plugins are merged into the mod jar with Jackson relocated (see shadowJar and
+// McdtBuild.isRelocatedOnNeoForge), because Minecraft 1.21.2+ ships its own Jackson.
+val relocated: Configuration = configurations.create("relocated") {
+	isCanBeConsumed = false
+	isCanBeResolved = true
+	isTransitive = false
+	dependencies.addAllLater(McdtBuild.bundledModules(project, bundled).map { deps -> deps.filter { McdtBuild.isRelocatedOnNeoForge(it.group) } })
 }
 
 dependencies {
@@ -138,6 +148,8 @@ tasks.jacocoTestReport {
 }
 
 tasks.jar {
+	// The unrelocated jar; the mod jar is shadowJar.
+	archiveClassifier = "slim"
 	// One mod jar: the core and server modules' classes and resources are merged in (their libraries are jar-in-jar).
 	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 	for (module in listOf(":core", ":server")) {
@@ -155,11 +167,29 @@ tasks.assemble {
 	dependsOn(":server:exportOpenApi")
 }
 
+// The mod jar: tasks.jar (MCDT, its jar-in-jar libraries and their metadata) plus the relocated libraries.
+tasks.shadowJar {
+	archiveClassifier = ""
+	configurations = listOf(relocated)
+	from(tasks.jar.map { zipTree(it.archiveFile) }) {
+		exclude("META-INF/MANIFEST.MF")
+	}
+	relocate("com.fasterxml.jackson", McdtBuild.RELOCATED_JACKSON)
+	mergeServiceFiles()
+	duplicatesStrategy = DuplicatesStrategy.INCLUDE
+	// Merged libraries must not turn the mod into a named module, and their versioned classes would not be relocated.
+	exclude("module-info.class", "META-INF/versions/**", "META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+}
+
+tasks.assemble {
+	dependsOn(tasks.shadowJar)
+}
+
 // Copies the mod jar to the root build/libs/, where CI, the Dockerfile and releases pick up every node.
 val collectJar = tasks.register<Copy>("collectJar") {
 	group = "build"
 	description = "Copies this node's mod jar to the root build/libs/."
-	from(tasks.jar.flatMap { it.archiveFile })
+	from(tasks.shadowJar.flatMap { it.archiveFile })
 	into(rootProject.layout.buildDirectory.dir("libs"))
 }
 

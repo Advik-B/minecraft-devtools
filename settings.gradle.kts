@@ -19,6 +19,7 @@ pluginManagement {
 	plugins {
 		id("net.fabricmc.fabric-loom-remap") version providers.gradleProperty("loom_version")
 		id("net.neoforged.moddev") version providers.gradleProperty("moddev_version")
+		id("com.gradleup.shadow") version providers.gradleProperty("shadow_version")
 	}
 }
 
