@@ -1,7 +1,9 @@
-package dev.advik.mcdt.client.config;
+//? if fabric {
+package dev.advik.mcdt.platform.fabric;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
+import dev.advik.mcdt.client.config.McdtConfigScreen;
 import net.fabricmc.loader.api.FabricLoader;
 
 /**
@@ -9,7 +11,7 @@ import net.fabricmc.loader.api.FabricLoader;
  * YACL is installed too; {@link McdtConfigScreen} is the only class that touches YACL types and is never loaded
  * otherwise, so neither mod is required.
  */
-public final class McdtModMenuApi implements ModMenuApi {
+public final class FabricModMenuApi implements ModMenuApi {
 	static final String YACL_MOD_ID = "yet_another_config_lib_v3";
 
 	@Override
@@ -20,3 +22,4 @@ public final class McdtModMenuApi implements ModMenuApi {
 		return ModMenuApi.super.getModConfigScreenFactory();
 	}
 }
+//?}

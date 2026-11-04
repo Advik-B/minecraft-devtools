@@ -1,3 +1,4 @@
+//? if fabric {
 package dev.advik.mcdt.platform.fabric;
 
 import dev.advik.mcdt.decompiler.ModResourceSource;
@@ -26,3 +27,4 @@ public final class FabricModResourceSource implements ModResourceSource {
 		return null;
 	}
 }
+//?}

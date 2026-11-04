@@ -1,3 +1,4 @@
+//? if fabric {
 package dev.advik.mcdt.platform.fabric;
 
 import dev.advik.mcdt.reflection.MappingProvider;
@@ -48,3 +49,4 @@ public final class FabricMappingProvider implements MappingProvider {
 		}
 	}
 }
+//?}

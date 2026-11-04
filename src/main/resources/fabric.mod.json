@@ -15,10 +15,10 @@
 	"environment": "client",
 	"entrypoints": {
 		"client": [
-			"dev.advik.mcdt.client.MinecraftDevToolsClient"
+			"dev.advik.mcdt.platform.fabric.FabricEntrypoint"
 		],
 		"modmenu": [
-			"dev.advik.mcdt.client.config.McdtModMenuApi"
+			"dev.advik.mcdt.platform.fabric.FabricModMenuApi"
 		]
 	},
 	"mixins": [
