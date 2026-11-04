@@ -1,0 +1,15 @@
+{
+	"schemaVersion": 1,
+	"id": "mcdtspike",
+	"version": "0.0.0",
+	"name": "MCDT spike",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["dev.advik.mcdt.spike.entry.FabricEntry"]
+	},
+	"mixins": ["mcdtspike.mixins.json"],
+	"depends": {
+		"fabricloader": "*",
+		"minecraft": "1.8.9"
+	}
+}

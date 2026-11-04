@@ -1,0 +1,78 @@
+# Live client tests: real headless clients on GitHub Actions, with and without Baritone.
+# The nodes and the capabilities each must report are in .github/nodes.json; versions come from
+# versions/<node>/gradle.properties (scripts/ci/node-env.sh).
+name: live
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  nodes:
+    runs-on: ubuntu-24.04
+    outputs:
+      nodes: ${{ steps.read.outputs.nodes }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: read
+        run: echo "nodes=$(jq -c . .github/nodes.json)" >> "$GITHUB_OUTPUT"
+
+  live:
+    needs: nodes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        # caps: what the node must report besides baritone (no YACL here, so no config-screen).
+        node: ${{ fromJSON(needs.nodes.outputs.nodes) }}
+        baritone: [installed, absent]
+    name: ${{ matrix.node.node }} (baritone ${{ matrix.baritone }})
+    steps:
+      - uses: actions/checkout@v6
+      - name: node facts
+        run: sh scripts/ci/node-env.sh "${{ matrix.node.node }}" | tee -a "$GITHUB_ENV"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            ${{ env.JAVA_VERSION }}
+            25
+      - uses: oven-sh/setup-bun@v2
+      - uses: gradle/actions/setup-gradle@v6
+      - name: build mod
+        run: |
+          chmod +x ./gradlew
+          ./gradlew ":$NODE:build" -x test --console=plain
+      - name: install display and launcher
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb x11-xserver-utils libgl1 libgl1-mesa-dri libglx-mesa0 libegl1 libxrender1 libxtst6 libxi6 libxrandr2 libxcursor1 libxxf86vm1 libopenal1
+          pipx install portablemc==5.0.6
+          pipx install uv
+      - name: collect mods
+        run: |
+          mkdir -p "$RUNNER_TEMP/mods"
+          cp build/libs/mcdt-*+"$NODE".jar "$RUNNER_TEMP/mods/"
+          if [ -n "$FABRIC_API_URL" ]; then
+            curl -fsSL -o "$RUNNER_TEMP/mods/fabric-api.jar" "$FABRIC_API_URL"
+            echo "$FABRIC_API_SHA512  $RUNNER_TEMP/mods/fabric-api.jar" | sha512sum -c -
+          fi
+          if [ "${{ matrix.baritone }}" = "installed" ]; then
+            cp "libs/$BARITONE_JAR" "$RUNNER_TEMP/mods/"
+          fi
+          ls -la "$RUNNER_TEMP/mods"
+      - name: live tests
+        env:
+          BARITONE: ${{ matrix.baritone }}
+          MCDT_EXPECT_CAPABILITIES: ${{ matrix.node.caps }}
+        run: |
+          export JAVA_BIN="$(eval echo "\$JAVA_HOME_${JAVA_VERSION}_X64")/bin/java"
+          bash scripts/ci/live-client.sh "$RUNNER_TEMP"/mods/*.jar
+      - name: upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-${{ matrix.node.node }}-baritone-${{ matrix.baritone }}
+          path: ${{ env.LIVE_RESULTS }}
+          if-no-files-found: ignore

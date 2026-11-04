@@ -67,6 +67,7 @@ class PacketsEndpointTest {
 		queue = new TaskQueue(256, clock);
 		logWriter = new RequestLogWriter(tempDir.resolve("logs"));
 		mockGameClient = new MockGameClient();
+		mockGameClient.packetType = net.minecraft.network.protocol.Packet.class;
 
 		server = new HttpServer(env, config, token, queue, logWriter, Map.of(), mockGameClient);
 		httpClient = HttpClient.newHttpClient();

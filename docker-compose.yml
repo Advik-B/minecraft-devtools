@@ -1,8 +1,13 @@
 # Headless MCDT. Put overrides in a .env file next to this one (see the Docker section of README.md).
 services:
   mcdt:
-    build: .
-    image: mcdt:latest
+    # MCDT_NODE picks the Minecraft version and loader: 1.21.4-fabric, 1.21.4-neoforge, 1.21.1-fabric, 1.21.1-neoforge.
+    image: ghcr.io/advik-b/mcdt-${MCDT_NODE:-1.21.4-fabric}:${MCDT_TAG:-latest}
+    # `docker compose up -d --build` builds the image from this checkout instead.
+    build:
+      context: .
+      args:
+        NODE: ${MCDT_NODE:-1.21.4-fabric}
     container_name: mcdt
     restart: unless-stopped
     # Loopback only by default. To serve other machines, put a TLS reverse proxy in front and set
@@ -17,12 +22,16 @@ services:
       MCDT_ALLOWED_MULTIPLAYER_SERVERS: ${MCDT_ALLOWED_MULTIPLAYER_SERVERS:-}
       MC_AUTH: ${MC_AUTH:-offline}
       MC_BARITONE: ${MC_BARITONE:-true}
+      MC_MODRINTH: ${MC_MODRINTH:-}
+      MC_MODS: ${MC_MODS:-}
       MC_USERNAME: ${MC_USERNAME:-}
       MC_MAX_MEMORY: ${MC_MAX_MEMORY:-2G}
       MC_JOIN_SERVER: ${MC_JOIN_SERVER:-}
       MC_JOIN_WORLD: ${MC_JOIN_WORLD:-}
     volumes:
       - mcdt-data:/data
+      # Every .jar in ./mods is installed on each start.
+      # - ./mods:/mods:ro
     shm_size: 512m
     stop_grace_period: 30s
 

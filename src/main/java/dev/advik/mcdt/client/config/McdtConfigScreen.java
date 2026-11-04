@@ -2,7 +2,7 @@ package dev.advik.mcdt.client.config;
 
 import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.McdtCore;
-import dev.advik.mcdt.client.MinecraftDevToolsClient;
+import dev.advik.mcdt.client.McdtClient;
 import dev.advik.mcdt.config.ConfigStore;
 import dev.advik.mcdt.config.ConfigUpdater;
 import dev.advik.mcdt.config.McdtConfig;
@@ -19,7 +19,6 @@ import dev.isxander.yacl3.api.controller.IntegerFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.LongFieldControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.isxander.yacl3.api.controller.TickBoxControllerBuilder;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -52,14 +51,14 @@ public final class McdtConfigScreen {
 	}
 
 	public static Screen create(Screen parent) {
-		McdtCore core = MinecraftDevToolsClient.core().orElse(null);
+		McdtCore core = McdtClient.core().orElse(null);
 		McdtConfigScreen builder;
 		if (core != null) {
 			builder = new McdtConfigScreen(core.configStore(), core.config());
 		} else {
 			// The core failed to start, but the file can still be edited.
 			ConfigStore store = new ConfigStore(
-					FabricLoader.getInstance().getConfigDir().resolve(Mcdt.MOD_ID).resolve("config.json"));
+					McdtClient.configDir(net.minecraft.client.Minecraft.getInstance()).resolve("config.json"));
 			builder = new McdtConfigScreen(store, new McdtConfig());
 		}
 		return builder.build().generateScreen(parent);

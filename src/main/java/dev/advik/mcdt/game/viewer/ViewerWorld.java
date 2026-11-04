@@ -74,7 +74,11 @@ public final class ViewerWorld {
 		return new ViewData.Level(
 				System.identityHashCode(level),
 				level.dimension().location().toString(),
+				//? if >=1.21.2 {
 				level.getMinY(),
+				//?} else {
+				/*level.getMinBuildHeight(),
+				*///?}
 				level.getHeight(),
 				level.dimensionType().hasSkyLight()
 		);
@@ -293,7 +297,12 @@ public final class ViewerWorld {
 			int occlusion = 0;
 			if (state.canOcclude()) {
 				for (Direction dir : Direction.values()) {
-					if (Block.isFaceFull(state.getFaceOcclusionShape(dir), dir)) {
+					//? if >=1.21.2 {
+					net.minecraft.world.phys.shapes.VoxelShape face = state.getFaceOcclusionShape(dir);
+					//?} else {
+					/*net.minecraft.world.phys.shapes.VoxelShape face = state.getFaceOcclusionShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO, dir);
+					*///?}
+					if (Block.isFaceFull(face, dir)) {
 						occlusion |= 1 << dir.get3DDataValue();
 					}
 				}
@@ -440,7 +449,11 @@ public final class ViewerWorld {
 		}
 
 		@Override
+		//? if >=1.21.2 {
 		public int getMinY() {
+		//?} else {
+		/*public int getMinBuildHeight() {
+		*///?}
 			return -64;
 		}
 	}

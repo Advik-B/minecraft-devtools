@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "mcdt",
+	"version": "${version}",
+	"name": "Minecraft DevTools",
+	"description": "Local REST and WebSocket API for the live Minecraft ${minecraft_version} client.",
+	"authors": [
+		"Advik"
+	],
+	"contact": {
+		"sources": "https://github.com/Advik-B/minecraft-devtools"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/mcdt/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.advik.mcdt.platform.fabric.FabricEntrypoint"
+		],
+		"modmenu": [
+			"dev.advik.mcdt.platform.fabric.FabricModMenuApi"
+		]
+	},
+	"mixins": [
+		"mcdt.mixins.json"
+	],
+	"suggests": {
+		"baritone": "${baritone_version}",
+		"yet_another_config_lib_v3": "*",
+		"modmenu": "*"
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=${java_version}",
+		"fabric-api": "*"
+	}
+}

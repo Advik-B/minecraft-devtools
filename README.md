@@ -9,8 +9,8 @@ Read game state, send input, stream events and poke around the live object graph
 
 [![Build](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml/badge.svg)](https://github.com/Advik-B/minecraft-devtools/actions/workflows/build.yml)
 [![Latest Release](https://img.shields.io/github/v/release/Advik-B/minecraft-devtools?logo=github)](https://github.com/Advik-B/minecraft-devtools/releases/latest)
-![Minecraft 1.21.4](https://img.shields.io/badge/Minecraft-1.21.4-62B47A?logo=modrinth&logoColor=white)
-![Fabric](https://img.shields.io/badge/loader-Fabric-DBD0B4)
+![Minecraft 1.21.1 | 1.21.4](https://img.shields.io/badge/Minecraft-1.21.1%20%7C%201.21.4-62B47A?logo=modrinth&logoColor=white)
+![Fabric | NeoForge](https://img.shields.io/badge/loader-Fabric%20%7C%20NeoForge-DBD0B4)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 [![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -22,7 +22,7 @@ Read game state, send input, stream events and poke around the live object graph
 
 ## Overview
 
-MCDT is a **client-only Fabric mod**. Inside the game it runs a small HTTP server on `127.0.0.1:25580`, and that server exposes the live client as a REST API (with an OpenAPI spec), WebSocket streams and a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. The Svelte dashboard is bundled in the same jar.
+MCDT is a **client-only mod for Fabric and NeoForge** (Minecraft 1.21.1 and 1.21.4, see [Compatibility](#compatibility)). Inside the game it runs a small HTTP server on `127.0.0.1:25580`, and that server exposes the live client as a REST API (with an OpenAPI spec), WebSocket streams and a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. The Svelte dashboard is bundled in the same jar.
 
 You can `curl` the game, script it from Python, or build an overlay in the browser. You can also hand it to an AI agent and let it play. You don't have to write a mod or attach a debugger, and nothing needs to scrape the screen.
 
@@ -40,7 +40,7 @@ You can `curl` the game, script it from Python, or build an overlay in the brows
 - **Live object graph.** Browse any object from named roots (`minecraft`, `player`, `level` and so on), follow dot-paths like `player.getInventory().items[0]`, read and write fields, invoke methods, or send raw serverbound packets.
 - **Real-time events.** WebSocket streams for chat, screens, entity spawns and removals, block updates, damage and death, world join and leave, inbound packets, and ticks.
 - **AI agents.** There's a native MCP server at `/mcp` with a set of hand-picked tools (`get_state`, `look`, `move`, `screenshot` and more), subscribable resources, and a stdio shim for desktop clients.
-- **Optional Baritone.** Install [Baritone](https://github.com/cabaletta/baritone) 1.13.1 and MCDT exposes goto, mine, follow, explore, farm and build as background jobs. Without it, those routes just return a `501`.
+- **Optional Baritone.** Install the [Baritone](https://github.com/cabaletta/baritone) API jar for your loader and version (1.13.1 on 1.21.4, 1.11.3 on 1.21.1) and MCDT exposes goto, mine, follow, explore, farm and build as background jobs. Without it, those routes just return a `501`.
 - **Proper dev tooling.** OpenAPI 3.1 at `/openapi.json`, offline Scalar and ReDoc docs, RFC 9457 problem responses, and per-day request logs in `logs/mcdt/`.
 - **Safe by default.** Loopback only, a fresh bearer token every launch, Host and Origin checks, a rate limit, read-only permission until you opt in, and a reflection denylist that redacts session credentials.
 - **Gentle on the game thread.** Every request crosses a bounded queue onto the client thread. The queue drains within a per-tick time budget (2 ms by default), and if it fills up, new requests get a `503` instead of piling up.
@@ -63,20 +63,29 @@ There's a Baritone tab aswell, which drives pathing, mining, and building when B
 
 ## Getting started
 
+### Compatibility
+
+| Minecraft | Fabric | NeoForge |
+|---|---|---|
+| **1.21.4** | Loader 0.19.5+ with Fabric API | 21.4.161+ |
+| **1.21.1** | Loader 0.19.5+ with Fabric API | 21.1.265+ |
+
+Every combination is live-tested in CI on a real headless client, with and without Baritone. Features a version can't support are reported as off in `GET /v1/health` (`capabilities`), and their routes answer `501 feature-unavailable`. On **1.21.1**, `recipes` is off: `/v1/recipes` is built on the recipe display ids that arrived in 1.21.2.
+
 ### Prerequisites
 
-- Minecraft **1.21.4** with [Fabric Loader](https://fabricmc.net/use/) **0.19.5+** and [Fabric API](https://modrinth.com/mod/fabric-api)
+- Minecraft **1.21.1** or **1.21.4** with [Fabric Loader](https://fabricmc.net/use/) **0.19.5+** and [Fabric API](https://modrinth.com/mod/fabric-api), or with [NeoForge](https://neoforged.net)
 - Java **21** or newer
-- Optional: [Mod Menu](https://modrinth.com/mod/modmenu) + [YACL 3](https://modrinth.com/mod/yacl) for an in-game config screen, and [Baritone](https://github.com/cabaletta/baritone) 1.13.1 for pathing
+- Optional: [YACL 3](https://modrinth.com/mod/yacl) for an in-game config screen (on Fabric through [Mod Menu](https://modrinth.com/mod/modmenu), on NeoForge through the mod list), and the [Baritone](https://github.com/cabaletta/baritone) API jar for pathing
 
 ### Install
 
-1. Download the latest `mcdt-<version>.jar` from [GitHub Releases](https://github.com/Advik-B/minecraft-devtools/releases/latest).
-2. Copy the jar into your `.minecraft/mods/` folder next to Fabric API.
+1. Download `mcdt-<version>+<minecraft>-<loader>.jar` for your Minecraft version and loader from [GitHub Releases](https://github.com/Advik-B/minecraft-devtools/releases/latest), for example `mcdt-1.1.0+1.21.4-neoforge.jar`.
+2. Copy the jar into your `.minecraft/mods/` folder (next to Fabric API on Fabric).
 3. Launch the game.
 
 > [!TIP]
-> Each release ships with the compiled mod jar, the sources jar, the OpenAPI 3.1 specification (`openapi.json`), and SHA-256 checksums (`sha256sums.txt`). If you'd rather build from source or contribute, see [Development](#development).
+> Each release ships with a mod jar per Minecraft version and loader, the OpenAPI 3.1 specification (`openapi.json`), and SHA-256 checksums (`sha256sums.txt`). If you'd rather build from source or contribute, see [Development](#development).
 
 ### Make your first request
 
@@ -118,14 +127,16 @@ MCDT has a built-in MCP server at `/mcp`. `POST` takes JSON-RPC, and `GET` opens
 {
   "mcpServers": {
     "minecraft": {
-      "command": "python",
-      "args": ["/path/to/minecraft-devtools/scripts/mcdt-mcp.py"]
+      "command": "uv",
+      "args": ["run", "--script", "/path/to/minecraft-devtools/scripts/mcdt-mcp.py"]
     }
   }
 }
 ```
 
-For Claude Code: `claude mcp add minecraft -- python /path/to/minecraft-devtools/scripts/mcdt-mcp.py`
+For Claude Code: `claude mcp add minecraft -- uv run --script /path/to/minecraft-devtools/scripts/mcdt-mcp.py`
+
+The shim needs only [uv](https://docs.astral.sh/uv/): it has no dependencies, and uv provides the Python.
 
 The shim accepts `--url`, `--token`, `--port`, and `--no-sse`. There's also a PowerShell version, `mcdt-mcp.ps1`, which takes `-BaseUrl`, `-Token`, and `-Port`.
 
@@ -198,15 +209,28 @@ Environment variables override the file at startup. They are not written back to
 
 ## Run it in Docker
 
-The image runs a headless Minecraft 1.21.4 client with Fabric, Fabric API, MCDT and [Baritone](https://github.com/cabaletta/baritone) 1.13.1. The client draws to a virtual display (Xvfb) with software OpenGL (Mesa llvmpipe), so screenshots and texture endpoints still work. The image needs no GPU and is tested on `linux/amd64`. The client starts on the title screen. Join a world or server through the API.
+Each image runs a headless Minecraft client with MCDT and [Baritone](https://github.com/cabaletta/baritone), plus Fabric API on Fabric. There is one image for each Minecraft version and loader:
+
+| Image | Minecraft | Loader |
+| --- | --- | --- |
+| `ghcr.io/advik-b/mcdt-1.21.4-fabric` | 1.21.4 | Fabric |
+| `ghcr.io/advik-b/mcdt-1.21.4-neoforge` | 1.21.4 | NeoForge |
+| `ghcr.io/advik-b/mcdt-1.21.1-fabric` | 1.21.1 | Fabric |
+| `ghcr.io/advik-b/mcdt-1.21.1-neoforge` | 1.21.1 | NeoForge |
+
+Tags: `latest` is the newest release, `1.1.0` and so on are fixed releases, and `edge` is the latest `master` build. CI runs the full live suite against every image before it publishes it.
+
+The client draws to a virtual display (Xvfb) with software OpenGL (Mesa llvmpipe), so screenshots and texture endpoints still work. The image needs no GPU and is tested on `linux/amd64`. The client starts on the title screen. Join a world or server through the API.
 
 ```sh
-docker build -t mcdt .
 docker run -d --name mcdt -p 127.0.0.1:25580:25580 -v mcdt-data:/data \
-  -e MCDT_TOKEN="$(openssl rand -hex 32)" -e MCDT_PERMISSION=act mcdt
+  -e MCDT_TOKEN="$(openssl rand -hex 32)" -e MCDT_PERMISSION=act \
+  ghcr.io/advik-b/mcdt-1.21.4-fabric:latest
 ```
 
-You can also use `docker compose up -d --build`. Put your settings in a `.env` file next to `docker-compose.yml`. The first start takes a minute or two, and the container shows as `healthy` when the API is up. If you don't set `MCDT_TOKEN`, read the random token with `docker exec mcdt cat /data/config/mcdt/token`.
+The images do not contain Minecraft. On the first start the container downloads the game, the loader and the assets into the `/data` volume. That takes a few minutes, and later starts reuse the files. The container shows as `healthy` when the API is up. If you don't set `MCDT_TOKEN`, read the random token with `docker exec mcdt cat /data/config/mcdt/token`.
+
+You can also use `docker compose up -d`. Put your settings in a `.env` file next to `docker-compose.yml`. `MCDT_NODE` picks the image (default `1.21.4-fabric`) and `MCDT_TAG` the tag. To build an image yourself, run `docker build --build-arg NODE=1.21.1-neoforge -t mcdt .`.
 
 ```sh
 TOKEN=...   # your MCDT_TOKEN
@@ -219,6 +243,8 @@ curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 | --- | --- | --- |
 | `MC_AUTH` | `offline` | `offline`, or `microsoft` for a real account |
 | `MC_BARITONE` | `true` | Load the bundled Baritone. `false` leaves it out, and `/v1/baritone/*` then returns `501` |
+| `MC_MODRINTH` | | Modrinth projects to install, comma-separated: `slug` (newest version for the image) or `slug:version` |
+| `MC_MODS` | | Mod jar URLs to download, comma-separated |
 | `MC_USERNAME` | `McdtBot` | Offline player name. With `microsoft`, picks a stored account by name |
 | `MC_MAX_MEMORY` | `2G` | Game heap (`-Xmx`) |
 | `MC_JVM_ARGS` | | Extra JVM arguments, space-separated |
@@ -228,9 +254,20 @@ curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 
 **Offline accounts** only work in singleplayer and on servers with `online-mode=false`. For a **Microsoft account**, set `MC_AUTH=microsoft` and watch `docker logs -f mcdt` on the first start. It prints a link and a code to sign in with. The login is saved in the `/data` volume and reused on later starts.
 
-`/data` is the game directory. It holds `config/mcdt/`, `logs/`, `saves/`, `options.txt`, and `mods/`. You can add extra mods to `/data/mods`.
+`/data` is the game directory. It holds `config/mcdt/`, `logs/`, `saves/`, `options.txt`, and `mods/`.
 
-The Baritone routes that start jobs (`goto`, `mine`, `follow` and so on) need `MCDT_PERMISSION=act` or higher. On a multiplayer server they also need that server in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`. Baritone is LGPL-3.0 and ships unmodified: it is the `libs/` jar pinned in `gradle.properties`.
+### Add mods
+
+Use any mix of these. All of them are applied on each start, so to remove a mod, take it out and restart the container.
+
+- **From Modrinth:** `-e MC_MODRINTH=sodium,lithium,yacl:3.8.1+1.21.4-fabric`. The container picks the file for the image's Minecraft version and loader, checks its SHA-512, and also installs the mods it requires.
+- **From a URL:** `-e MC_MODS=https://example.com/my-mod-1.0.jar`.
+- **From a folder:** `-v ./mods:/mods:ro`. The container copies every `.jar` in that folder.
+- **By hand:** put jars in `/data/mods`. The container never touches jars that it did not install.
+
+If a mod can't be found or downloaded, the container stops with a message that says which one. Mods must match the image's loader and Minecraft version.
+
+The Baritone routes that start jobs (`goto`, `mine`, `follow` and so on) need `MCDT_PERMISSION=act` or higher. On a multiplayer server they also need that server in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`. Baritone is LGPL-3.0 and ships unmodified: it is the `libs/` jar pinned in `versions/<node>/gradle.properties`.
 
 > [!CAUTION]
 > Inside the container the API binds to `0.0.0.0`, but the examples above publish it only on the host's loopback. To reach it from other machines, put a TLS reverse proxy in front of it and set `MCDT_ALLOWED_HOSTS` to the proxy's host name, plus `MCDT_ORIGIN_ALLOWLIST` if you use the dashboard. Always set a strong `MCDT_TOKEN`. Anyone with the token and `act` permission controls the client. `act` and `reflect-write` stay blocked on multiplayer servers that are not in `MCDT_ALLOWED_MULTIPLAYER_SERVERS`.
@@ -241,10 +278,10 @@ The Baritone routes that start jobs (`goto`, `mine`, `follow` and so on) need `M
 > The Gradle build compiles the dashboard, so **[Bun](https://bun.sh) must be on your `PATH`**. A cold build also needs network access to fetch and verify the pinned Baritone and Scalar artifacts.
 
 ```bash
-./gradlew build                 # mod jar with the dashboard and all libraries bundled (jar-in-jar)
+./gradlew build                 # every node's mod jar in build/libs/, dashboard and libraries bundled
 ./gradlew test                  # JUnit 5 suite (no Minecraft needed) + JaCoCo report
-./gradlew runClient             # dev client in ./run with Mod Menu + YACL
-pwsh scripts/test-live-client.ps1   # smoke-test a running dev client
+./gradlew :1.21.4-fabric:runClient   # dev client in ./run (with Mod Menu + YACL on Fabric)
+uv run --project tests/live pytest tests/live   # live suite against a running dev client
 ```
 
 To work on the dashboard with hot reload:
@@ -260,22 +297,25 @@ Add `http://localhost:5173` to `originAllowlist`, or the API rejects the dev ser
 
 ### Project layout
 
+The mod is built with [Stonecutter](https://stonecutter.kikugie.dev): one node per Minecraft version and loader (`1.21.4-fabric`, `1.21.1-neoforge`, ...), all from the same `src/`. See [AGENTS.md](AGENTS.md) for the workflow.
+
 ```
+core/            no Minecraft types: GameClient seam, DTOs, task queue, events, reflection, MCP tools, capabilities
+server/          Javalin server, route handlers (@OpenApi), WebSockets, security, MCP transport
 src/main/java/dev/advik/mcdt/
-  api/v1/        one handler per route group, annotated with @OpenApi
-  game/          GameClient seam + the real Minecraft implementation
-  exec/          bounded task queue drained on the client tick
-  http/          Javalin server, routes, WebSockets, RFC 9457 problems
-  security/      bearer auth, Host/Origin checks, rate limiting, roles
-  reflection/    handle table, path evaluator, Mojang name mapping, denylist
-  events/        lock-free event hub behind /v1/events
-  mcp/           JSON-RPC MCP server, tools and resources
+  game/          the real Minecraft implementation of GameClient
+  client/        loader-neutral lifecycle (start, tick, events) and the config screen
+  platform/      fabric/ and neoforge/ entrypoints and loader SPIs
+  mixin/         mixins and accessors
   baritone/      optional integration (only bridge/ touches Baritone)
+src/<loader>/    loader metadata (fabric.mod.json, neoforge.mods.toml)
+versions/<node>/ per-node versions (gradle.properties)
 web/             Svelte 5 + Tailwind 4 + daisyUI dashboard
-scripts/         MCP stdio shims and the live-client test runner
+tests/live/      Python live suite run against a real client
+scripts/         MCP stdio shims and the CI live-client runner
 http/            sample requests per area
 ```
 
-Built with [Fabric](https://fabricmc.net), [Javalin](https://javalin.io), [Jackson](https://github.com/FasterXML/jackson), [Scalar](https://scalar.com), [Svelte](https://svelte.dev), and [daisyUI](https://daisyui.com).
+Built with [Fabric](https://fabricmc.net), [NeoForge](https://neoforged.net), [Stonecutter](https://stonecutter.kikugie.dev), [Javalin](https://javalin.io), [Jackson](https://github.com/FasterXML/jackson), [Scalar](https://scalar.com), [Svelte](https://svelte.dev), and [daisyUI](https://daisyui.com).
 
 For the design, architecture and roadmap, [MCDT.md](MCDT.md) is the place to look, though parts of it describe features that are planned but not built yet. If you're contributing, or you're a coding agent, start with [AGENTS.md](AGENTS.md).

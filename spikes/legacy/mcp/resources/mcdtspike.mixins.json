@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"minVersion": "0.7",
+	"package": "dev.advik.mcdt.spike.mixin",
+	"compatibilityLevel": "JAVA_8",
+	"client": [
+		"MinecraftMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -1,0 +1,15 @@
+pauseOnLostFocus:false
+onboardAccessibility:false
+skipMultiplayerWarning:true
+joinedFirstServer:true
+tutorialStep:none
+narrator:0
+realmsNotifications:false
+renderDistance:4
+simulationDistance:5
+maxFps:30
+enableVsync:false
+graphicsMode:0
+renderClouds:"false"
+particles:2
+soundCategory_master:0.0

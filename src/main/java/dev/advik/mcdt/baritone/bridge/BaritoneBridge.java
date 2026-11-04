@@ -15,12 +15,15 @@ import dev.advik.mcdt.baritone.BaritoneJobManager;
 import dev.advik.mcdt.baritone.BaritoneService;
 import dev.advik.mcdt.events.EventHub;
 import dev.advik.mcdt.http.Problems;
+import dev.advik.mcdt.reflection.GameTypeAdapter;
+import dev.advik.mcdt.reflection.GameTypeAdapters;
 import dev.advik.mcdt.reflection.HandleTable;
 import dev.advik.mcdt.reflection.TypeConverter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 
 import java.io.File;
@@ -35,6 +38,14 @@ public final class BaritoneBridge implements BaritoneService {
 	private final HandleTable handleTable;
 	private final BaritoneJobManager jobManager;
 	private final IBaritone baritone;
+	/**
+	 * Whether Baritone has started calculating for the active job. Baritone queues path events and delivers them
+	 * on the next tick, so a CANCELED queued while replacing the previous goal would otherwise end the new job.
+	 * Only touched on the client thread.
+	 */
+	private boolean activeJobCalculating;
+	/** Goal of the active coordinate goto, or null. Client thread only. */
+	private Goal activeGoal;
 
 	public BaritoneBridge(HandleTable handleTable, BaritoneJobManager jobManager) {
 		this.handleTable = handleTable;
@@ -48,17 +59,37 @@ public final class BaritoneBridge implements BaritoneService {
 				String eventName = event.name().toLowerCase(Locale.ROOT);
 				EventHub.getInstance().publish("baritone.path", Map.of("event", eventName));
 
+				if (event == PathEvent.CALC_STARTED || event == PathEvent.CALC_FINISHED_NOW_EXECUTING) {
+					activeJobCalculating = true;
+				} else if (!activeJobCalculating
+						&& (event == PathEvent.CANCELED || event == PathEvent.CALC_FAILED || event == PathEvent.NEXT_CALC_FAILED)) {
+					// Left over from the goal the active job replaced.
+					return;
+				}
+
 				if (event == PathEvent.AT_GOAL) {
 					jobManager.updateActiveJob("completed", "Arrived at goal");
 				} else if (event == PathEvent.CALC_FAILED || event == PathEvent.NEXT_CALC_FAILED) {
 					jobManager.updateActiveJob("failed", "Path calculation failed: " + event.name());
 				} else if (event == PathEvent.CANCELED) {
-					jobManager.updateActiveJob("cancelled", "Pathing was cancelled");
+					// CustomGoalProcess reports arrival by giving up control, which cancels the path: check where we are.
+					if (activeGoal != null && activeGoal.isInGoal(baritone.getPlayerContext().playerFeet())) {
+						jobManager.updateActiveJob("completed", "Arrived at goal");
+					} else {
+						jobManager.updateActiveJob("cancelled", "Pathing was cancelled");
+					}
 				} else if (event == PathEvent.CALC_FINISHED_NOW_EXECUTING) {
 					jobManager.updateActiveJob("running", "Executing path");
 				}
 			}
 		});
+	}
+
+	/** Creates the job that path events now report on. */
+	private JobResponse newJob(String type, String message) {
+		activeJobCalculating = false;
+		activeGoal = null;
+		return jobManager.createJob(type, message);
 	}
 
 	@Override
@@ -149,7 +180,7 @@ public final class BaritoneBridge implements BaritoneService {
 				throw Problems.badRequest("Unknown block type: " + req.block());
 			}
 			baritone.getGetToBlockProcess().getToBlock(b);
-			JobResponse job = jobManager.createJob("goto", "Going to block " + req.block());
+			JobResponse job = newJob("goto", "Going to block " + req.block());
 			EventHub.getInstance().publish("baritone.process", Map.of("process", "GetToBlockProcess", "active", true));
 			return job;
 		}
@@ -168,7 +199,8 @@ public final class BaritoneBridge implements BaritoneService {
 		}
 
 		baritone.getCustomGoalProcess().setGoalAndPath(goal);
-		JobResponse job = jobManager.createJob("goto", "Going to " + goal);
+		JobResponse job = newJob("goto", "Going to " + goal);
+		activeGoal = goal;
 		EventHub.getInstance().publish("baritone.process", Map.of("process", "CustomGoalProcess", "active", true));
 		return job;
 	}
@@ -180,7 +212,7 @@ public final class BaritoneBridge implements BaritoneService {
 		}
 		int quantity = req.quantity() != null && req.quantity() > 0 ? req.quantity() : 1;
 		baritone.getMineProcess().mineByName(quantity, req.blocks().toArray(String[]::new));
-		JobResponse job = jobManager.createJob("mine", "Mining " + quantity + " of " + req.blocks());
+		JobResponse job = newJob("mine", "Mining " + quantity + " of " + req.blocks());
 		EventHub.getInstance().publish("baritone.process", Map.of("process", "MineProcess", "active", true));
 		return job;
 	}
@@ -207,7 +239,7 @@ public final class BaritoneBridge implements BaritoneService {
 		}
 
 		baritone.getFollowProcess().follow(predicate);
-		JobResponse job = jobManager.createJob("follow", "Following " + targetDesc);
+		JobResponse job = newJob("follow", "Following " + targetDesc);
 		EventHub.getInstance().publish("baritone.process", Map.of("process", "FollowProcess", "active", true));
 		return job;
 	}
@@ -217,7 +249,7 @@ public final class BaritoneBridge implements BaritoneService {
 		int x = req.x() != null ? req.x() : 0;
 		int z = req.z() != null ? req.z() : 0;
 		baritone.getExploreProcess().explore(x, z);
-		JobResponse job = jobManager.createJob("explore", "Exploring from " + x + ", " + z);
+		JobResponse job = newJob("explore", "Exploring from " + x + ", " + z);
 		EventHub.getInstance().publish("baritone.process", Map.of("process", "ExploreProcess", "active", true));
 		return job;
 	}
@@ -230,7 +262,7 @@ public final class BaritoneBridge implements BaritoneService {
 		} else {
 			baritone.getFarmProcess().farm(range);
 		}
-		JobResponse job = jobManager.createJob("farm", "Farming range " + range);
+		JobResponse job = newJob("farm", "Farming range " + range);
 		EventHub.getInstance().publish("baritone.process", Map.of("process", "FarmProcess", "active", true));
 		return job;
 	}
@@ -248,7 +280,7 @@ public final class BaritoneBridge implements BaritoneService {
 		if (!started) {
 			throw Problems.badRequest("Schematic '" + req.name() + "' could not be loaded from schematics directory");
 		}
-		JobResponse job = jobManager.createJob("build", "Building schematic " + req.name() + " at " + origin);
+		JobResponse job = newJob("build", "Building schematic " + req.name() + " at " + origin);
 		EventHub.getInstance().publish("baritone.process", Map.of("process", "BuilderProcess", "active", true));
 		return job;
 	}
@@ -278,7 +310,8 @@ public final class BaritoneBridge implements BaritoneService {
 			if (s.isJavaOnly()) {
 				continue;
 			}
-			map.put(s.getName(), new SettingInfo(s.getName(), s.getValueClass().getSimpleName(), s.defaultValue, s.value));
+			map.put(s.getName(), new SettingInfo(s.getName(), s.getValueClass().getSimpleName(),
+					settingValue(s.defaultValue), settingValue(s.value)));
 		}
 		return map;
 	}
@@ -301,10 +334,42 @@ public final class BaritoneBridge implements BaritoneService {
 
 			Object converted = TypeConverter.convert(entry.getValue(), s.getValueClass(), handleTable);
 			((Settings.Setting<Object>) s).value = converted;
-			updated.put(s.getName(), s.value);
+			updated.put(s.getName(), settingValue(s.value));
 		}
 
 		return updated;
+	}
+
+	/** A setting value as JSON-safe data: registry ids for blocks and items, names for enums. */
+	private static Object settingValue(Object value) {
+		if (value == null || value instanceof Boolean || value instanceof Number || value instanceof String) {
+			return value;
+		}
+		if (value instanceof Enum<?> e) {
+			return e.name();
+		}
+		if (value instanceof Block block) {
+			return BuiltInRegistries.BLOCK.getKey(block).toString();
+		}
+		if (value instanceof Item item) {
+			return BuiltInRegistries.ITEM.getKey(item).toString();
+		}
+		if (value instanceof Collection<?> values) {
+			List<Object> out = new ArrayList<>(values.size());
+			for (Object v : values) {
+				out.add(settingValue(v));
+			}
+			return out;
+		}
+		if (value instanceof Map<?, ?> values) {
+			Map<String, Object> out = new LinkedHashMap<>();
+			for (Map.Entry<?, ?> entry : values.entrySet()) {
+				out.put(String.valueOf(settingValue(entry.getKey())), settingValue(entry.getValue()));
+			}
+			return out;
+		}
+		Object game = GameTypeAdapters.serialize(value);
+		return game != GameTypeAdapter.UNHANDLED ? game : String.valueOf(value);
 	}
 
 	@Override

@@ -34,6 +34,8 @@ class AppState {
   inGame = $state(false)
   mcdtVersion = $state('')
   gameVersion = $state('')
+  // Capability ids from /v1/health; null until known (everything is shown)
+  capabilities = $state<string[] | null>(null)
   playerName = $state('')
   fps = $state(0)
   tick = $state(0)

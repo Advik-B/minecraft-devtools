@@ -1,0 +1,189 @@
+# Phase 0 spikes for multi-version support (see docs/MULTIVERSION.md). Throwaway: remove once Phase 4 lands.
+name: spikes
+
+on:
+  push:
+    paths:
+      - 'spikes/**'
+      - 'core/src/main/java/dev/advik/mcdt/json/**'
+      - '.github/workflows/spikes.yml'
+  workflow_dispatch:
+
+jobs:
+  # Spike 5: real MCDT core classes and tests, downgraded to Java 8 bytecode, run on a Java 8 JVM.
+  downgrade:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: test on modern java, then downgraded on java 8
+        run: |
+          chmod +x ./gradlew
+          ./gradlew -p spikes/downgrade test testOnJava8 --console=plain
+
+
+  # Spike 4: do the bundled Javalin/Jetty/Jackson jars load from jar-in-jar on NeoForge 1.21.1?
+  neoforge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        id: java
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: build neoforge spike jar
+        run: |
+          chmod +x ./gradlew
+          ./gradlew -p spikes/neoforge jar --console=plain
+      - name: install display and launcher
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb libgl1 libgl1-mesa-dri libglx-mesa0 libegl1 libxrender1 libxtst6 libxi6 libxrandr2 libxcursor1 libxxf86vm1 libopenal1
+          pipx install portablemc==5.0.6
+      - name: launch until the spike reports
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          java21="$JAVA_HOME_21_X64/bin/java"
+          inst="$RUNNER_TEMP/inst"
+          mkdir -p "$inst/mods"
+          cp spikes/neoforge/build/libs/mcdt-spike-neoforge1211-0.0.0.jar "$inst/mods/"
+          printf 'pauseOnLostFocus:false\nonboardAccessibility:false\nsoundCategory_master:0.0\nrenderDistance:2\n' > "$inst/options.txt"
+          echo "INST=$inst" >> "$GITHUB_ENV"
+          portablemc --main-dir "$RUNNER_TEMP/pmc" start --mc-dir "$inst" --dry --jvm "$java21" "neoforge::21.1.265"
+          set +e
+          timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" \
+            portablemc --main-dir "$RUNNER_TEMP/pmc" start --mc-dir "$inst" \
+            --jvm "$java21" --jvm-arg=-Xmx2G -u SpikeBot "neoforge::21.1.265" > "$inst/launch.log" 2>&1
+          echo "launcher exit code: $?"
+          set -e
+          grep -E 'MCDT-SPIKE|Exception|Error' "$inst/launch.log" | head -40 || true
+          result="$(cat "$inst/mcdt-spike.txt" 2>/dev/null || true)"
+          echo "result: ${result:-<none>}"
+          case "$result" in *status=PASS*) ;; *) exit 1 ;; esac
+      - name: upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: neoforge-launch
+          path: |
+            ${{ env.INST }}/launch.log
+            ${{ env.INST }}/mcdt-spike.txt
+            ${{ env.INST }}/logs/
+            ${{ env.INST }}/crash-reports/
+          if-no-files-found: ignore
+
+  legacy-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: build legacy spike jars
+        run: |
+          chmod +x ./gradlew
+          ./gradlew -p spikes/legacy build --console=plain
+      - uses: actions/upload-artifact@v7
+        with:
+          name: legacy-spike-jars
+          path: spikes/legacy/*/build/libs/*.jar
+
+  legacy-launch:
+    needs: legacy-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Spike 2: does Legacy Fabric run on modern Java?
+          - { name: lf189-java8, module: lf189, version: 'legacyfabric:1.8.9', java: '8' }
+          - { name: lf189-java17, module: lf189, version: 'legacyfabric:1.8.9', java: '17' }
+          - { name: lf189-java21, module: lf189, version: 'legacyfabric:1.8.9', java: '21' }
+          - { name: lf1122-java8, module: lf1122, version: 'legacyfabric:1.12.2', java: '8' }
+          - { name: lf1122-java17, module: lf1122, version: 'legacyfabric:1.12.2', java: '17' }
+          - { name: lf1122-java21, module: lf1122, version: 'legacyfabric:1.12.2', java: '21' }
+          # Spike 3: the same MCP-named source on plain Forge (Java 8 is the only supported runtime).
+          - { name: forge189-java8, module: forge189, version: 'forge:1.8.9', java: '8', mixinbooter: true }
+          - { name: forge1122-java8, module: forge1122, version: 'forge:1.12.2', java: '8', mixinbooter: true }
+          # Informational: plain Forge on Java 17 is expected to fail (LaunchWrapper).
+          - { name: forge1122-java17, module: forge1122, version: 'forge:1.12.2', java: '17', mixinbooter: true, expect: fail }
+    name: launch ${{ matrix.name }}
+    steps:
+      - uses: actions/setup-java@v5
+        id: java
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - name: install display and launcher
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb x11-xserver-utils libgl1 libgl1-mesa-dri libglx-mesa0 libxrender1 libxtst6 libxi6 libxrandr2 libxcursor1 libxxf86vm1 libopenal1
+          pipx install portablemc==5.0.6
+      - uses: actions/download-artifact@v8
+        with:
+          name: legacy-spike-jars
+          path: jars
+      - name: prepare instance
+        run: |
+          inst="$RUNNER_TEMP/inst"
+          mkdir -p "$inst/mods"
+          cp "jars/${{ matrix.module }}/build/libs/mcdt-spike-${{ matrix.module }}-0.0.0.jar" "$inst/mods/"
+          if [ "${{ matrix.mixinbooter }}" = "true" ]; then
+            curl -fsSL -o "$inst/mods/mixinbooter-9.3.jar" https://maven.cleanroommc.com/zone/rong/mixinbooter/9.3/mixinbooter-9.3.jar
+          fi
+          printf 'pauseOnLostFocus:false\nsoundCategory_master:0.0\nrenderDistance:2\n' > "$inst/options.txt"
+          ls -la "$inst/mods"
+          echo "INST=$inst" >> "$GITHUB_ENV"
+      - name: install game
+        run: |
+          portablemc --main-dir "$RUNNER_TEMP/pmc" start --mc-dir "$INST" --dry \
+            --jvm "${{ steps.java.outputs.path }}/bin/java" "${{ matrix.version }}"
+      - name: launch until the spike reports
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          set +e
+          timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" \
+            portablemc --main-dir "$RUNNER_TEMP/pmc" start --mc-dir "$INST" \
+            --jvm "${{ steps.java.outputs.path }}/bin/java" --jvm-arg=-Xmx1G -u SpikeBot \
+            "${{ matrix.version }}" > "$INST/launch.log" 2>&1
+          code=$?
+          set -e
+          echo "launcher exit code: $code"
+          grep -E 'MCDT-SPIKE|Exception|Error' "$INST/launch.log" | head -40 || true
+          result="$(cat "$INST/mcdt-spike.txt" 2>/dev/null || true)"
+          echo "result: ${result:-<none>}"
+          case "$result" in *status=PASS*) passed=true ;; *) passed=false ;; esac
+          if [ "${{ matrix.expect }}" = "fail" ]; then
+            echo "expected failure; passed=$passed"
+            exit 0
+          fi
+          [ "$passed" = true ]
+      - name: upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: legacy-launch-${{ matrix.name }}
+          path: |
+            ${{ env.INST }}/launch.log
+            ${{ env.INST }}/mcdt-spike.txt
+            ${{ env.INST }}/logs/
+            ${{ env.INST }}/crash-reports/
+          if-no-files-found: ignore

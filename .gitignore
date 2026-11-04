@@ -5,6 +5,7 @@ build/
 out/
 libs/*
 !libs/baritone-api-fabric-*.jar
+!libs/baritone-api-neoforge-*.jar
 
 # eclipse
 
@@ -32,6 +33,7 @@ bin/
 # fabric
 
 run/
+versions/*/logs/
 
 # java
 
@@ -46,3 +48,13 @@ skills-lock.json
 
 # docker
 .env
+
+# Phase 0 spike builds
+spikes/*/build/
+spikes/*/*/build/
+spikes/*/.gradle/
+
+# Live test environment (uv)
+tests/live/.venv/
+__pycache__/
+.pytest_cache/
