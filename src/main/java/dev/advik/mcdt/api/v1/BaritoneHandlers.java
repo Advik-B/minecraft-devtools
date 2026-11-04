@@ -462,9 +462,13 @@ public final class BaritoneHandlers {
 	}
 
 	public static final class SettingsGetHandler implements Handler {
+		private final McdtConfig config;
+		private final TaskQueue queue;
 		private final BaritoneService baritoneService;
 
-		public SettingsGetHandler(BaritoneService baritoneService) {
+		public SettingsGetHandler(McdtConfig config, TaskQueue queue, BaritoneService baritoneService) {
+			this.config = config;
+			this.queue = queue;
 			this.baritoneService = baritoneService;
 		}
 
@@ -485,16 +489,25 @@ public final class BaritoneHandlers {
 			if (!baritoneService.isInstalled()) {
 				throw Problems.baritoneNotInstalled();
 			}
-			Map<String, SettingInfo> settings = baritoneService.getSettings();
-			ctx.contentType("application/json");
-			ctx.result(Json.MAPPER.valueToTree(settings).toString());
+			// Settings hold game objects (blocks, items) and are read by Baritone every tick: use the client thread.
+			CompletableFuture<Void> future = queue.submit(() -> Json.MAPPER.valueToTree(baritoneService.getSettings()),
+					config.requestTimeoutMs).thenAccept(res -> {
+				ctx.header("X-MCDT-Tick", String.valueOf(res.tick()));
+				ctx.contentType("application/json");
+				ctx.result(res.body().toString());
+			});
+			ctx.future(() -> future);
 		}
 	}
 
 	public static final class SettingsPatchHandler implements Handler {
+		private final McdtConfig config;
+		private final TaskQueue queue;
 		private final BaritoneService baritoneService;
 
-		public SettingsPatchHandler(BaritoneService baritoneService) {
+		public SettingsPatchHandler(McdtConfig config, TaskQueue queue, BaritoneService baritoneService) {
+			this.config = config;
+			this.queue = queue;
 			this.baritoneService = baritoneService;
 		}
 
@@ -518,9 +531,13 @@ public final class BaritoneHandlers {
 				throw Problems.baritoneNotInstalled();
 			}
 			Map<String, Object> patch = ctx.bodyAsClass(Map.class);
-			Map<String, Object> updated = baritoneService.patchSettings(patch);
-			ctx.contentType("application/json");
-			ctx.result(Json.MAPPER.valueToTree(updated).toString());
+			CompletableFuture<Void> future = queue.submit(() -> Json.MAPPER.valueToTree(baritoneService.patchSettings(patch)),
+					config.requestTimeoutMs).thenAccept(res -> {
+				ctx.header("X-MCDT-Tick", String.valueOf(res.tick()));
+				ctx.contentType("application/json");
+				ctx.result(res.body().toString());
+			});
+			ctx.future(() -> future);
 		}
 	}
 

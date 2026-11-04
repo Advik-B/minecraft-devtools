@@ -289,8 +289,8 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.post("/v1/baritone/build", new BaritoneHandlers.BuildHandler(config, queue, baritoneService), McdtRole.ACT);
 			cfg.routes.post("/v1/baritone/cancel", new BaritoneHandlers.CancelHandler(config, queue, baritoneService), McdtRole.ACT);
 			cfg.routes.get("/v1/baritone/jobs/{id}", new BaritoneHandlers.JobHandler(baritoneService), McdtRole.READ);
-			cfg.routes.get("/v1/baritone/settings", new BaritoneHandlers.SettingsGetHandler(baritoneService), McdtRole.READ);
-			cfg.routes.patch("/v1/baritone/settings", new BaritoneHandlers.SettingsPatchHandler(baritoneService), McdtRole.ACT);
+			cfg.routes.get("/v1/baritone/settings", new BaritoneHandlers.SettingsGetHandler(config, queue, baritoneService), McdtRole.READ);
+			cfg.routes.patch("/v1/baritone/settings", new BaritoneHandlers.SettingsPatchHandler(config, queue, baritoneService), McdtRole.ACT);
 			cfg.routes.post("/v1/baritone/command", new BaritoneHandlers.CommandHandler(config, queue, baritoneService), McdtRole.ACT);
 
 			// --- Milestone M4 WebSocket Routes ---
