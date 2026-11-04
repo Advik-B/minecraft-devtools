@@ -3,8 +3,6 @@ package dev.advik.mcdt.reflection;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.json.Json;
-import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.MappingResolver;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,6 +18,8 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,8 +30,6 @@ import java.util.regex.Pattern;
  */
 public final class NameService {
 	private static final String MOJANG_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
-	/** Fabric's namespace for the obfuscated names that Mojang's mappings map to. */
-	private static final String OFFICIAL_NAMESPACE = "official";
 	private static final Pattern METHOD_LINE = Pattern.compile("^(?:\\d+:\\d+:)?(\\S+) ([^\\s(]+)\\(([^)]*)\\)(?::\\d+:\\d+)?$");
 
 	private final Map<String, String> classIntermediaryToMojang = new ConcurrentHashMap<>();
@@ -48,8 +46,18 @@ public final class NameService {
 	private final RuntimeNames runtimeNames;
 
 	public NameService() {
-		detectEnvironment();
-		this.runtimeNames = isDevEnvironment ? RuntimeNames.IDENTITY : fabricRuntimeNames();
+		MappingProvider provider = findProvider();
+		this.isDevEnvironment = provider == null || provider.runtimeNamesAreMojang();
+		this.runtimeNames = isDevEnvironment ? RuntimeNames.IDENTITY : provider.officialToRuntime();
+	}
+
+	private static MappingProvider findProvider() {
+		try {
+			return ServiceLoader.load(MappingProvider.class, NameService.class.getClassLoader()).findFirst().orElse(null);
+		} catch (ServiceConfigurationError e) {
+			Mcdt.LOGGER.warn("Could not load the platform mapping provider; using Mojang names: {}", e.getMessage());
+			return null;
+		}
 	}
 
 	/** The shared instance, used by the HTTP server, game code and mixins. */
@@ -65,16 +73,6 @@ public final class NameService {
 	NameService(RuntimeNames runtimeNames) {
 		this.isDevEnvironment = false;
 		this.runtimeNames = runtimeNames;
-	}
-
-	private void detectEnvironment() {
-		try {
-			MappingResolver resolver = FabricLoader.getInstance().getMappingResolver();
-			String ns = resolver.getCurrentRuntimeNamespace();
-			isDevEnvironment = "named".equals(ns);
-		} catch (Throwable ignored) {
-			isDevEnvironment = true;
-		}
 	}
 
 	public boolean isDevEnvironment() {
@@ -311,7 +309,7 @@ public final class NameService {
 	}
 
 	/** Translates obfuscated ({@code official}) names into the runtime namespace. */
-	interface RuntimeNames {
+	public interface RuntimeNames {
 		RuntimeNames IDENTITY = new RuntimeNames() {
 			@Override
 			public String mapClass(String obfClass) {
@@ -334,33 +332,6 @@ public final class NameService {
 		String mapField(String obfOwner, String obfName, String obfDescriptor);
 
 		String mapMethod(String obfOwner, String obfName, String obfDescriptor);
-	}
-
-	private static RuntimeNames fabricRuntimeNames() {
-		try {
-			MappingResolver resolver = FabricLoader.getInstance().getMappingResolver();
-			if (!resolver.getNamespaces().contains(OFFICIAL_NAMESPACE)) {
-				return RuntimeNames.IDENTITY;
-			}
-			return new RuntimeNames() {
-				@Override
-				public String mapClass(String obfClass) {
-					return resolver.mapClassName(OFFICIAL_NAMESPACE, obfClass);
-				}
-
-				@Override
-				public String mapField(String obfOwner, String obfName, String obfDescriptor) {
-					return resolver.mapFieldName(OFFICIAL_NAMESPACE, obfOwner, obfName, obfDescriptor);
-				}
-
-				@Override
-				public String mapMethod(String obfOwner, String obfName, String obfDescriptor) {
-					return resolver.mapMethodName(OFFICIAL_NAMESPACE, obfOwner, obfName, obfDescriptor);
-				}
-			};
-		} catch (Throwable ignored) {
-			return RuntimeNames.IDENTITY;
-		}
 	}
 
 	/**
