@@ -1,0 +1,124 @@
+# Uploads a GitHub release's mod jars to Modrinth: one Modrinth version per Stonecutter node, tagged with the
+# node's loader and Minecraft version. Called by release.yml after the GitHub release exists; run it by hand to
+# (re)publish an existing tag, or with dry_run to see what would be uploaded.
+# Needs the MODRINTH_PROJECT_ID repository variable and the MODRINTH_TOKEN secret (a PAT with "create versions").
+name: modrinth
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      dry_run:
+        type: boolean
+        default: false
+    secrets:
+      MODRINTH_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v1.2.0)'
+        required: true
+      dry_run:
+        description: 'Only print what would be uploaded'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  nodes:
+    runs-on: ubuntu-24.04
+    outputs:
+      nodes: ${{ steps.read.outputs.nodes }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+      - id: read
+        run: echo "nodes=$(jq -c '[.[].node]' .github/nodes.json)" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: nodes
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        node: ${{ fromJSON(needs.nodes.outputs.nodes) }}
+    name: ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: release facts
+        id: facts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          NODE: ${{ matrix.node }}
+        run: |
+          eval "$(sh scripts/ci/node-env.sh "$NODE")"
+          mkdir -p dist
+          gh release download "$TAG" --dir dist --pattern "mcdt-*+$NODE.jar"
+          JAR="$(ls dist/mcdt-*+"$NODE".jar)"
+          VERSION="$(basename "$JAR" .jar)"
+          VERSION="${VERSION#mcdt-}"
+
+          # Modrinth loader tags: there is no Cleanroom tag, and Cleanroom loads Forge mods.
+          case "$LOADER" in
+            fabric) SLUG=fabric; NAME=Fabric; DEPS='fabric-api(required) modmenu(optional) yacl(optional)' ;;
+            neoforge) SLUG=neoforge; NAME=NeoForge; DEPS='yacl(optional)' ;;
+            legacyfabric) SLUG=legacy-fabric; NAME='Legacy Fabric'; DEPS='' ;;
+            cleanroom) SLUG=forge; NAME=Cleanroom; DEPS='' ;;
+            *) echo "unknown loader: $LOADER" >&2; exit 1 ;;
+          esac
+          case "$TAG" in
+            *alpha*) TYPE=alpha ;;
+            *beta*|*rc*) TYPE=beta ;;
+            *) TYPE=release ;;
+          esac
+
+          gh release view "$TAG" --json body --jq .body > changelog.md
+          {
+            echo "jar=$JAR"
+            echo "version=$VERSION"
+            echo "name=MCDT ${TAG#v} for $MC_VERSION $NAME"
+            echo "loader=$SLUG"
+            echo "mc=$MC_VERSION"
+            echo "type=$TYPE"
+            echo "deps<<EOF"
+            for dep in $DEPS; do echo "$dep"; done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### $NODE"
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| file | \`$(basename "$JAR")\` |"
+            echo "| version | \`$VERSION\` ($TYPE) |"
+            echo "| loader | \`$SLUG\` |"
+            echo "| game version | \`$MC_VERSION\` |"
+            echo "| dependencies | \`${DEPS:-none}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: upload to modrinth
+        if: ${{ !inputs.dry_run }}
+        uses: Kira-NT/mc-publish@v3.3.2
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: ${{ steps.facts.outputs.jar }}
+          name: ${{ steps.facts.outputs.name }}
+          version: ${{ steps.facts.outputs.version }}
+          version-type: ${{ steps.facts.outputs.type }}
+          changelog-file: changelog.md
+          loaders: ${{ steps.facts.outputs.loader }}
+          game-versions: ${{ steps.facts.outputs.mc }}
+          dependencies: ${{ steps.facts.outputs.deps }}
+          retry-attempts: 3
+          retry-delay: 10000

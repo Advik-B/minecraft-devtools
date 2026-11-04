@@ -18,6 +18,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.ver.outputs.tag }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -139,3 +141,13 @@ jobs:
               --title "$TAG" \
               --generate-notes
           fi
+
+  # Uploads every node's jar to Modrinth. Skipped until the MODRINTH_PROJECT_ID variable is set.
+  modrinth:
+    needs: release
+    if: ${{ vars.MODRINTH_PROJECT_ID != '' }}
+    uses: ./.github/workflows/modrinth.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets:
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
