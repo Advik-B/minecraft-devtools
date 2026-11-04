@@ -13,9 +13,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # node: the Stonecutter node; caps: what it must report besides baritone (no YACL in CI, so no config-screen);
+        # fabric_api: Fabric API download URL and SHA-512 (Fabric nodes only).
         node:
-          # caps: what the node must report besides baritone (no YACL in CI, so no config-screen)
-          - { name: fabric-1.21.4, mc: '1.21.4', target: 'fabric:1.21.4:0.19.5', java: '21',
+          - { name: fabric-1.21.4, node: 1.21.4-fabric, loader: fabric, mc: '1.21.4', target: 'fabric:1.21.4:0.19.5', java: '21',
+              fabric_api: 'https://cdn.modrinth.com/data/P7dR8mSH/versions/p96k10UR/fabric-api-0.119.4%2B1.21.4.jar 16b679f6a42549ca3b6bc147de710b2c8ba2d5e4661ed88df22782c05a4a5f6c1163d7b13867687ed91acde0fdfe5a5037d05662431c946865b58396284e7ee7',
+              caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
+          - { name: neoforge-1.21.4, node: 1.21.4-neoforge, loader: neoforge, mc: '1.21.4', target: 'neoforge::21.4.161', java: '21',
+              fabric_api: '',
               caps: 'textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler' }
         baritone: [installed, absent]
     name: ${{ matrix.node.name }} (baritone ${{ matrix.baritone }})
@@ -32,7 +37,7 @@ jobs:
       - name: build mod
         run: |
           chmod +x ./gradlew
-          ./gradlew build -x test --console=plain
+          ./gradlew ":${{ matrix.node.node }}:build" -x test --console=plain
       - name: install display and launcher
         run: |
           sudo apt-get update -q
@@ -42,13 +47,15 @@ jobs:
       - name: collect mods
         run: |
           mkdir -p "$RUNNER_TEMP/mods"
-          find build/libs -maxdepth 1 -name 'mcdt-*.jar' ! -name '*-sources.jar' -exec cp {} "$RUNNER_TEMP/mods/" \;
-          # Fabric API, pinned like the Dockerfile.
-          curl -fsSL -o "$RUNNER_TEMP/mods/fabric-api.jar" \
-            https://cdn.modrinth.com/data/P7dR8mSH/versions/p96k10UR/fabric-api-0.119.4%2B1.21.4.jar
-          echo "16b679f6a42549ca3b6bc147de710b2c8ba2d5e4661ed88df22782c05a4a5f6c1163d7b13867687ed91acde0fdfe5a5037d05662431c946865b58396284e7ee7  $RUNNER_TEMP/mods/fabric-api.jar" | sha512sum -c -
+          cp build/libs/mcdt-*+${{ matrix.node.node }}.jar "$RUNNER_TEMP/mods/"
+          if [ -n "${{ matrix.node.fabric_api }}" ]; then
+            read -r url sha512 <<< "${{ matrix.node.fabric_api }}"
+            curl -fsSL -o "$RUNNER_TEMP/mods/fabric-api.jar" "$url"
+            echo "$sha512  $RUNNER_TEMP/mods/fabric-api.jar" | sha512sum -c -
+          fi
           if [ "${{ matrix.baritone }}" = "installed" ]; then
-            cp libs/baritone-api-fabric-*.jar "$RUNNER_TEMP/mods/"
+            version="$(sed -n 's/^baritone_version=//p' versions/${{ matrix.node.node }}/gradle.properties)"
+            cp "libs/baritone-api-${{ matrix.node.loader }}-$version.jar" "$RUNNER_TEMP/mods/"
           fi
           ls -la "$RUNNER_TEMP/mods"
       - name: live tests
