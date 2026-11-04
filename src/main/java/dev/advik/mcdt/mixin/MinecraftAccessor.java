@@ -12,6 +12,10 @@ public interface MinecraftAccessor {
 	@Invoker("startUseItem")
 	void invokeStartUseItem();
 
+	//? if >=26.1 {
+	/*@Invoker("pickBlockOrEntity")
+	*///?} else {
 	@Invoker("pickBlock")
+	//?}
 	void invokePickBlock();
 }

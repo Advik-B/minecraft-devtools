@@ -11,7 +11,11 @@ import dev.advik.mcdt.game.serializers.ItemSerializer;
 import dev.advik.mcdt.game.serializers.TextSerializer;
 import dev.advik.mcdt.http.Problems;
 import dev.advik.mcdt.mixin.*;
+//? if >=26.1 {
+/*import net.minecraft.client.multiplayer.chat.GuiMessage;
+*///?} else {
 import net.minecraft.client.GuiMessage;
+//?}
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -35,7 +39,6 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
@@ -120,11 +123,11 @@ public final class MinecraftGameClient implements GameClient {
 				window.getGuiScaledWidth(),
 				window.getGuiScaledHeight(),
 				window.getGuiScale(),
-				window.isFullscreen(),
+				McCompat.isFullscreen(client),
 				client.isWindowActive()
 		);
 
-		Screen screen = client.screen;
+		Screen screen = McCompat.screen(client);
 		ClientDto.ScreenSummary screenSummary = new ClientDto.ScreenSummary(
 				screen != null,
 				screen != null ? NameService.getInstance().resolveClassName(screen.getClass().getName()) : null,
@@ -261,7 +264,7 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		String dimension = McCompat.location(level.dimension()).toString();
-		long dayTime = level.getDayTime();
+		long dayTime = McCompat.dayTime(level);
 		long gameTime = level.getGameTime();
 		WorldDto.TimeInfo time = new WorldDto.TimeInfo(
 				dayTime,
@@ -277,7 +280,7 @@ public final class MinecraftGameClient implements GameClient {
 				level.getThunderLevel(1.0f)
 		);
 
-		String difficulty = level.getDifficulty().getKey();
+		String difficulty = level.getDifficulty().getSerializedName();
 		boolean hardcore = level.getLevelData().isHardcore();
 		BlockPos spawnPos = McCompat.spawnPos(level);
 		WorldDto.SpawnInfo spawn = new WorldDto.SpawnInfo(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
@@ -396,9 +399,9 @@ public final class MinecraftGameClient implements GameClient {
 			net.minecraft.world.entity.MobCategory mobCat = type.getCategory();
 
 			String cat;
-			if (type == net.minecraft.world.entity.EntityType.PLAYER) {
+			if (McCompat.isPlayerType(type)) {
 				cat = "player";
-			} else if (type == net.minecraft.world.entity.EntityType.ITEM) {
+			} else if (McCompat.isItemType(type)) {
 				cat = "item";
 			} else if (mobCat == net.minecraft.world.entity.MobCategory.MONSTER) {
 				cat = "hostile";
@@ -435,7 +438,7 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public ScreenDto getScreen() {
 		Minecraft client = Minecraft.getInstance();
-		Screen screen = client.screen;
+		Screen screen = McCompat.screen(client);
 		if (screen == null) {
 			return ScreenDto.closed();
 		}
@@ -742,7 +745,7 @@ public final class MinecraftGameClient implements GameClient {
 			for (Map.Entry<ResourceLocation, TextureAtlasSprite> entry : taa.getTexturesByName().entrySet()) {
 				TextureAtlasSprite sprite = entry.getValue();
 				var contents = sprite.contents();
-				int frameCount = (int) contents.getUniqueFrames().count();
+				int frameCount = McCompat.uniqueFrameCount(contents);
 				boolean animated = frameCount > 1;
 
 				sprites.put(entry.getKey().toString(), new TextureAtlasDto.SpriteInfo(
@@ -979,24 +982,24 @@ public final class MinecraftGameClient implements GameClient {
 			case "move" -> {
 				double targetX = request.dx() != null ? curX + request.dx() : (request.x() != null ? request.x() : curX);
 				double targetY = request.dy() != null ? curY + request.dy() : (request.y() != null ? request.y() : curY);
-				accessor.invokeOnMove(window, targetX, targetY);
+				McCompat.mouseMove(client, window, targetX, targetY);
 			}
 			case "click" -> {
 				if (request.x() != null && request.y() != null) {
-					accessor.invokeOnMove(window, request.x(), request.y());
+					McCompat.mouseMove(client, window, request.x(), request.y());
 				}
 				McCompat.mouseButton(client, window, buttonCode, 1);
 				McCompat.mouseButton(client, window, buttonCode, 0);
 			}
 			case "press" -> {
 				if (request.x() != null && request.y() != null) {
-					accessor.invokeOnMove(window, request.x(), request.y());
+					McCompat.mouseMove(client, window, request.x(), request.y());
 				}
 				McCompat.mouseButton(client, window, buttonCode, 1);
 			}
 			case "release" -> {
 				if (request.x() != null && request.y() != null) {
-					accessor.invokeOnMove(window, request.x(), request.y());
+					McCompat.mouseMove(client, window, request.x(), request.y());
 				}
 				McCompat.mouseButton(client, window, buttonCode, 0);
 			}
@@ -1046,11 +1049,11 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public ChatDto.HistoryResponse getChatHistory(int offset, int limit) {
 		Minecraft client = Minecraft.getInstance();
-		if (client.gui == null || client.gui.getChat() == null) {
+		if (client.gui == null || McCompat.chat(client) == null) {
 			return new ChatDto.HistoryResponse(0, offset, limit, List.of());
 		}
 
-		ChatComponentAccessor chatAccessor = (ChatComponentAccessor) client.gui.getChat();
+		ChatComponentAccessor chatAccessor = (ChatComponentAccessor) McCompat.chat(client);
 		List<GuiMessage> allMessages = chatAccessor.getAllMessages();
 		if (allMessages == null || allMessages.isEmpty()) {
 			return new ChatDto.HistoryResponse(0, offset, limit, List.of());
@@ -1166,7 +1169,7 @@ public final class MinecraftGameClient implements GameClient {
 					Entity target = client.level.getEntity(request.entityId());
 					if (target != null && client.gameMode != null) {
 						client.gameMode.attack(player, target);
-						player.swing(InteractionHand.MAIN_HAND);
+						McCompat.swing(player, InteractionHand.MAIN_HAND);
 					} else {
 						mcAccessor.invokeStartAttack();
 					}
@@ -1189,7 +1192,7 @@ public final class MinecraftGameClient implements GameClient {
 					client.gameMode.releaseUsingItem(player);
 				}
 			}
-			case "swing" -> player.swing(parseHand(request.hand()));
+			case "swing" -> McCompat.swing(player, parseHand(request.hand()));
 			case "pick_block" -> mcAccessor.invokePickBlock();
 			case "swap_hands" -> player.connection.send(new ServerboundPlayerActionPacket(
 					ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN));
@@ -1200,7 +1203,7 @@ public final class MinecraftGameClient implements GameClient {
 					throw Problems.invalidParameter("slot", "Hotbar slot index must be 0-8");
 				}
 			}
-			case "drop" -> player.drop(Boolean.TRUE.equals(request.all()));
+			case "drop" -> McCompat.dropSelected(client, Boolean.TRUE.equals(request.all()));
 			case "respawn" -> player.respawn();
 			case "interact_block" -> {
 				if (request.pos() == null || request.pos().length < 3) {
@@ -1229,7 +1232,7 @@ public final class MinecraftGameClient implements GameClient {
 				if ("attack".equalsIgnoreCase(request.interactionType())) {
 					client.gameMode.attack(player, target);
 				} else {
-					client.gameMode.interact(player, target, hand);
+					McCompat.interact(client, target, hand);
 				}
 			}
 			default -> throw Problems.invalidAction(action, "Unknown player action: " + action);
@@ -1241,16 +1244,16 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public ScreenActionDto.Response performScreenAction(ScreenActionDto.Request request) {
 		Minecraft client = Minecraft.getInstance();
-		Screen screen = client.screen;
+		Screen screen = McCompat.screen(client);
 		if (screen == null) {
 			throw Problems.noScreen();
 		}
 		String action = request.action() != null ? request.action().toLowerCase(Locale.ROOT) : "click";
 		if ("close".equals(action)) {
 			screen.onClose();
-			return new ScreenActionDto.Response(true, action, client.screen != null,
-					client.screen != null ? NameService.getInstance().resolveClassName(client.screen.getClass().getName()) : null,
-					client.screen != null ? TextSerializer.toPlainText(client.screen.getTitle()) : null, -1);
+			return new ScreenActionDto.Response(true, action, McCompat.screen(client) != null,
+					McCompat.screen(client) != null ? NameService.getInstance().resolveClassName(McCompat.screen(client).getClass().getName()) : null,
+					McCompat.screen(client) != null ? TextSerializer.toPlainText(McCompat.screen(client).getTitle()) : null, -1);
 		}
 
 		if ("click".equals(action)) {
@@ -1314,15 +1317,15 @@ public final class MinecraftGameClient implements GameClient {
 			throw Problems.invalidAction(action, "Unknown screen action: " + action);
 		}
 
-		return new ScreenActionDto.Response(true, action, client.screen != null,
-				client.screen != null ? NameService.getInstance().resolveClassName(client.screen.getClass().getName()) : null,
-				client.screen != null ? TextSerializer.toPlainText(client.screen.getTitle()) : null, -1);
+		return new ScreenActionDto.Response(true, action, McCompat.screen(client) != null,
+				McCompat.screen(client) != null ? NameService.getInstance().resolveClassName(McCompat.screen(client).getClass().getName()) : null,
+				McCompat.screen(client) != null ? TextSerializer.toPlainText(McCompat.screen(client).getTitle()) : null, -1);
 	}
 
 	@Override
 	public ScreenSlotDto.Response clickScreenSlot(ScreenSlotDto.Request request) {
 		Minecraft client = Minecraft.getInstance();
-		Screen screen = client.screen;
+		Screen screen = McCompat.screen(client);
 		if (screen == null) {
 			throw Problems.noScreen();
 		}
@@ -1336,16 +1339,13 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		String modeStr = request.mode() != null ? request.mode().toUpperCase(Locale.ROOT) : "PICKUP";
-		ClickType clickType;
-		try {
-			clickType = ClickType.valueOf(modeStr);
-		} catch (IllegalArgumentException e) {
-			throw Problems.invalidParameter("mode", "Unknown click type mode: " + request.mode());
-		}
-
 		int button = request.button() != null ? request.button() : 0;
 		if (client.gameMode != null && client.player != null) {
-			client.gameMode.handleInventoryMouseClick(menu.containerId, slot, button, clickType, client.player);
+			try {
+				McCompat.clickSlot(client, menu.containerId, slot, button, modeStr);
+			} catch (IllegalArgumentException e) {
+				throw Problems.invalidParameter("mode", "Unknown click type mode: " + request.mode());
+			}
 		}
 
 		ItemStack carried = menu.getCarried();
@@ -1421,7 +1421,7 @@ public final class MinecraftGameClient implements GameClient {
 			case "minecraft" -> client;
 			case "player" -> client.player;
 			case "level" -> client.level;
-			case "screen" -> client.screen;
+			case "screen" -> McCompat.screen(client);
 			case "options" -> client.options;
 			case "gameRenderer" -> client.gameRenderer;
 			default -> null;
@@ -1435,7 +1435,7 @@ public final class MinecraftGameClient implements GameClient {
 		roots.put("minecraft", client);
 		roots.put("player", client.player);
 		roots.put("level", client.level);
-		roots.put("screen", client.screen);
+		roots.put("screen", McCompat.screen(client));
 		roots.put("options", client.options);
 		roots.put("gameRenderer", client.gameRenderer);
 		return roots;
@@ -1443,7 +1443,7 @@ public final class MinecraftGameClient implements GameClient {
 
 	@Override
 	public boolean isSingleplayer() {
-		return Minecraft.getInstance().isSingleplayer();
+		return McCompat.isSingleplayer(Minecraft.getInstance());
 	}
 
 	@Override
@@ -1790,7 +1790,7 @@ public final class MinecraftGameClient implements GameClient {
 		HudDto.TabList tabList = null;
 		List<HudDto.SubtitleEntry> subtitles = null;
 
-		if (client.gui instanceof GuiAccessor guiAccessor) {
+		if (McCompat.hud(client) instanceof GuiAccessor guiAccessor) {
 			net.minecraft.network.chat.Component actionMsg = guiAccessor.getOverlayMessageString();
 			if (actionMsg != null && guiAccessor.getOverlayMessageTime() > 0) {
 				actionBar = TextSerializer.toPlainText(actionMsg);
@@ -1812,7 +1812,7 @@ public final class MinecraftGameClient implements GameClient {
 
 			if (all || include.contains("bossbars")) {
 				bossBars = new ArrayList<>();
-				if (client.gui.getBossOverlay() instanceof BossHealthOverlayAccessor bossAccessor) {
+				if (McCompat.bossOverlay(client) instanceof BossHealthOverlayAccessor bossAccessor) {
 					Map<UUID, net.minecraft.client.gui.components.LerpingBossEvent> events = bossAccessor.getEvents();
 					if (events != null) {
 						for (Map.Entry<UUID, net.minecraft.client.gui.components.LerpingBossEvent> entry : events.entrySet()) {
@@ -1835,7 +1835,7 @@ public final class MinecraftGameClient implements GameClient {
 			if (all || include.contains("tablist")) {
 				String header = null;
 				String footer = null;
-				if (client.gui.getTabList() instanceof PlayerTabOverlayAccessor tabAccessor) {
+				if (McCompat.tabList(client) instanceof PlayerTabOverlayAccessor tabAccessor) {
 					if (tabAccessor.getHeader() != null) header = TextSerializer.toPlainText(tabAccessor.getHeader());
 					if (tabAccessor.getFooter() != null) footer = TextSerializer.toPlainText(tabAccessor.getFooter());
 				}
@@ -1919,12 +1919,7 @@ public final class MinecraftGameClient implements GameClient {
 		List<HudDto.ToastInfo> toasts = null;
 		if (all || include.contains("toasts")) {
 			toasts = new ArrayList<>();
-			//? if >=1.21.2 {
-			Object toastManager = client.getToastManager();
-			//?} else {
-			/*Object toastManager = client.getToasts();
-			*///?}
-			if (toastManager instanceof ToastManagerAccessor toastAccessor) {
+			if (McCompat.toastManager(client) instanceof ToastManagerAccessor toastAccessor) {
 				List<?> visible = toastAccessor.getVisibleToasts();
 				if (visible != null) {
 					for (Object toastInst : visible) {
@@ -2006,7 +2001,7 @@ public final class MinecraftGameClient implements GameClient {
 				w.getGuiScaledWidth(),
 				w.getGuiScaledHeight(),
 				w.getGuiScale(),
-				w.isFullscreen(),
+				McCompat.isFullscreen(client),
 				client.isWindowActive()
 		);
 	}
@@ -2015,10 +2010,7 @@ public final class MinecraftGameClient implements GameClient {
 	public WindowDto.Response updateWindow(WindowDto.Request request) {
 		Minecraft client = Minecraft.getInstance();
 		if (request.fullscreen() != null) {
-			if (request.fullscreen() != client.getWindow().isFullscreen()) {
-				client.getWindow().toggleFullScreen();
-				client.options.fullscreen().set(request.fullscreen());
-			}
+			McCompat.setFullscreen(client, request.fullscreen());
 		}
 		return getWindow();
 	}
@@ -2213,10 +2205,17 @@ public final class MinecraftGameClient implements GameClient {
 			String icon = "";
 			if (adv.display().isPresent()) {
 				DisplayInfo d = adv.display().get();
+				//? if >=26.1 {
+				/*title = TextSerializer.toPlainText(d.title());
+				desc = TextSerializer.toPlainText(d.description());
+				type = d.type().name().toLowerCase();
+				icon = BuiltInRegistries.ITEM.getKey(d.icon().item().value()).toString();
+				*///?} else {
 				title = TextSerializer.toPlainText(d.getTitle());
 				desc = TextSerializer.toPlainText(d.getDescription());
 				type = d.getType().name().toLowerCase();
 				icon = BuiltInRegistries.ITEM.getKey(d.getIcon().getItem()).toString();
+				//?}
 			}
 
 			String parent = adv.parent().map(ResourceLocation::toString).orElse(null);
@@ -2359,7 +2358,7 @@ public final class MinecraftGameClient implements GameClient {
 		if (client.player == null) {
 			throw Problems.noPlayer();
 		}
-		if (!(client.screen instanceof AbstractContainerScreen<?> containerScreen)) {
+		if (!(McCompat.screen(client) instanceof AbstractContainerScreen<?> containerScreen)) {
 			throw Problems.noContainer();
 		}
 		int containerId = containerScreen.getMenu().containerId;
@@ -2398,8 +2397,8 @@ public final class MinecraftGameClient implements GameClient {
 		if (Boolean.TRUE.equals(paused)) {
 			client.pauseGame(false);
 		} else if (Boolean.FALSE.equals(paused)) {
-			if (client.screen instanceof PauseScreen) {
-				client.setScreen(null);
+			if (McCompat.screen(client) instanceof PauseScreen) {
+				McCompat.setScreen(client, null);
 			}
 		}
 		return getSession();
@@ -2413,7 +2412,7 @@ public final class MinecraftGameClient implements GameClient {
 				client.execute(() -> {
 					if (client.level != null) {
 						McCompat.disconnect(client);
-						client.setScreen(new TitleScreen());
+						McCompat.setScreen(client, new TitleScreen());
 					}
 				});
 			});
@@ -2439,7 +2438,7 @@ public final class MinecraftGameClient implements GameClient {
 			};
 		}
 		boolean commands = request != null && Boolean.TRUE.equals(request.allowCommands());
-		boolean published = client.getSingleplayerServer().publishServer(mode, commands, port);
+		boolean published = McCompat.publishToLan(client.getSingleplayerServer(), mode, commands, port);
 		return new SessionDto.LanResponse(published, port);
 	}
 

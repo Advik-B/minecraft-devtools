@@ -115,7 +115,7 @@ public final class McdtClient {
 
 	public static void onJoin(Minecraft client) {
 		String dimension = client.level != null ? McCompat.location(client.level.dimension()).toString() : "unknown";
-		boolean isSingleplayer = client.isSingleplayer();
+		boolean isSingleplayer = McCompat.isSingleplayer(client);
 		McdtCore instance = core;
 		if (!isSingleplayer && instance != null) {
 			ServerAllowlist.warnOnJoin(instance.config().allowedMultiplayerServers,

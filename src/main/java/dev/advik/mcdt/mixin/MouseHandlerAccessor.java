@@ -18,8 +18,13 @@ public interface MouseHandlerAccessor {
 	void invokeOnPress(long window, int button, int action, int modifiers);
 	//?}
 
+	//? if >=26.1 {
+	/*@Invoker("onMove")
+	void invokeOnMove(long window, double xpos, double ypos, double dx, double dy);
+	*///?} else {
 	@Invoker("onMove")
 	void invokeOnMove(long window, double xpos, double ypos);
+	//?}
 
 	@Invoker("onScroll")
 	void invokeOnScroll(long window, double xoffset, double yoffset);
