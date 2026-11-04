@@ -146,10 +146,7 @@ def test_goto_walks_to_target(api: Api, baritone: str) -> None:
     path_events = [e["data"] for e in events if e.get("topic", "").startswith("baritone.")]
     chat = [m.get("text") for m in expect(api.get("/v1/chat?limit=40"), 200)["messages"]]
     assert final["status"] == "completed", (
-        f"{final}
-events: {path_events}
-timeline: {timeline}
-chat: {chat}")
+        f"{final}\nevents: {path_events}\ntimeline: {timeline}\nchat: {chat}")
 
     px, py, pz = player_pos(api)
     distance = math.dist((px, pz), (target[0] + 0.5, target[2] + 0.5))
