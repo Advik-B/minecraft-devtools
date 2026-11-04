@@ -99,19 +99,6 @@ dependencies {
 	modLocalRuntime("com.terraformersmc:modmenu:${prop("modmenu_version")}")
 }
 
-val downloadBaritoneApi = tasks.register<DownloadVerified>("downloadBaritoneApi") {
-	group = "build setup"
-	description = "Downloads the pinned Baritone API Fabric jar."
-	url = McdtBuild.baritoneUrl("fabric", prop("baritone_version"))
-	sha256 = prop("baritone_sha256")
-	relativePath = McdtBuild.baritoneJarName("fabric", prop("baritone_version"))
-	outputDir = rootProject.layout.projectDirectory.dir("libs")
-}
-
-tasks.compileJava {
-	dependsOn(downloadBaritoneApi)
-}
-
 tasks.processResources {
 	val metadata = mapOf(
 		"version" to project.version.toString(),
