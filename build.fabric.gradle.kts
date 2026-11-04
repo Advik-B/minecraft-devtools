@@ -30,7 +30,16 @@ version = "$modVersion+$minecraftVersion-fabric"
 
 sourceSets.main { resources.srcDir(rootProject.file("src/fabric/resources")) }
 
+// A node can widen access to Minecraft internals it needs: versions/<node>/resources/mcdt.accesswidener (1.16.5 does).
+val accessWidener = project.file("resources/mcdt.accesswidener")
+if (accessWidener.exists()) {
+	sourceSets.main { resources.srcDir(project.file("resources")) }
+}
+
 loom {
+	if (accessWidener.exists()) {
+		accessWidenerPath = accessWidener
+	}
 	mods {
 		register("mcdt") {
 			sourceSet(sourceSets.main.get())
@@ -92,6 +101,7 @@ tasks.processResources {
 		"java_version" to prop("java_version"),
 		"loader_version" to prop("loader_version"),
 		"baritone_version" to prop("baritone_version"),
+		"access_widener" to if (accessWidener.exists()) "\n\t\"accessWidener\": \"mcdt.accesswidener\"," else "",
 		// Mod Menu opens the YACL screen; without YACL there is no entrypoint.
 		"modmenu_entrypoint" to if (project.hasProperty("yacl_version")) "\"dev.advik.mcdt.platform.fabric.FabricModMenuApi\"" else "",
 	)

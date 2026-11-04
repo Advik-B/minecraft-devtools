@@ -81,6 +81,7 @@ tasks.processResources {
 		"java_version" to prop("java_version"),
 		"loader_version" to prop("loader_version"),
 		"baritone_version" to prop("baritone_version"),
+		"access_widener" to "",
 		// Mod Menu opens the YACL screen; without YACL there is no entrypoint.
 		"modmenu_entrypoint" to if (project.hasProperty("yacl_version")) "\"dev.advik.mcdt.platform.fabric.FabricModMenuApi\"" else "",
 	)

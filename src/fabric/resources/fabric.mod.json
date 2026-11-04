@@ -11,7 +11,7 @@
 		"sources": "https://github.com/Advik-B/minecraft-devtools"
 	},
 	"license": "MIT",
-	"icon": "assets/mcdt/icon.png",
+	"icon": "assets/mcdt/icon.png",${access_widener}
 	"environment": "client",
 	"entrypoints": {
 		"client": [
