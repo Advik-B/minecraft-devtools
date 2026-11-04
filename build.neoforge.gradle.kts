@@ -25,6 +25,10 @@ repositories {
 
 sourceSets.main { resources.srcDir(rootProject.file("src/neoforge/resources")) }
 
+// The dev-run mod below reads the core and server source sets.
+evaluationDependsOn(":core")
+evaluationDependsOn(":server")
+
 neoForge {
 	version = prop("neoforge_version")
 	parchment {
@@ -36,6 +40,11 @@ neoForge {
 	mods {
 		register("mcdt") {
 			sourceSet(sourceSets.main.get())
+			// The built jar merges core and server in (see tasks.jar). Dev runs need them in the same mod module too:
+			// they share packages with the platform code (dev.advik.mcdt.game, ...), and a split package hides them.
+			for (module in listOf(":core", ":server")) {
+				sourceSet(project(module).the<SourceSetContainer>().named("main").get())
+			}
 		}
 	}
 	runs {
@@ -107,6 +116,17 @@ dependencies {
 
 	// Optional config UI: compile against it, never ship or require it.
 	compileOnly("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
+}
+
+// Dev runs before NeoForge 21.11: the bundled libraries must be game libraries too, or the mod module can't see them
+// (the built jar nests or shades them instead). 21.11 has no separate classpath for this; plain dependencies work.
+// Declared after `bundled` is filled, since MDG reads this configuration early.
+if (stonecutter.eval(mcVersion, "<1.21.11")) {
+	// Known gap: the OpenAPI plugin then can't see the generated spec, so /openapi.json is empty in these dev runs only.
+	configurations.named("additionalRuntimeClasspath") {
+		// Already the full resolved graph; resolving each module's POMs again would pull unpublished webjar deps.
+		dependencies.addAllLater(McdtBuild.bundledModules(project, bundled).map { deps -> deps.onEach { (it as ModuleDependency).isTransitive = false } })
+	}
 }
 
 tasks.processResources {
