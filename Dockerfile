@@ -15,6 +15,8 @@ ARG PORTABLEMC_VERSION=5.0.6
 ARG PORTABLEMC_SHA256=9b55d0d75b4e5a30d697109869a301009c5927883d34746ce212605e8a61ecad
 
 FROM oven/bun:1.3.14 AS bun
+# The node's JDK, for builds that ask Gradle for a toolchain (ModDevGradle does).
+FROM eclipse-temurin:${JAVA_VERSION}-jdk-noble AS node-jdk
 
 # ---- Node facts (loader, Minecraft version, launcher target, pinned jars) ----------------------------------------
 FROM eclipse-temurin:25-jdk-noble AS meta
@@ -31,11 +33,13 @@ FROM eclipse-temurin:25-jdk-noble AS build
 ARG NODE
 ARG MCDT_VERSION
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=node-jdk /opt/java/openjdk /opt/node-jdk
 WORKDIR /src
 COPY . .
 RUN --mount=type=cache,target=/root/.gradle \
 	chmod +x gradlew \
 	&& ./gradlew ":${NODE}:build" :docker-setup:shadowJar -x test --no-daemon --console=plain \
+		-Porg.gradle.java.installations.paths=/opt/node-jdk \
 		${MCDT_VERSION:+-Pversion=$MCDT_VERSION} \
 	&& mkdir -p /out/mods /out/baritone \
 	&& cp build/libs/mcdt-*+"${NODE}".jar /out/mods/ \

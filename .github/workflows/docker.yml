@@ -97,7 +97,7 @@ jobs:
           export JAVA_BIN="$(eval echo "\$JAVA_HOME_${JAVA_VERSION}_X64")/bin/java"
           bash scripts/ci/live-client.sh
       - name: upload results
-        if: always()
+        if: always() && env.LIVE_RESULTS != ''
         uses: actions/upload-artifact@v7
         with:
           name: docker-${{ matrix.node.node }}
