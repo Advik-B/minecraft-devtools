@@ -91,7 +91,7 @@ class McpShimTest {
 		assertTrue(scriptFile != null, "scripts/mcdt-mcp.py must exist");
 
 		ProcessBuilder pb = new ProcessBuilder(
-				"python",
+				"uv", "run", "--script",
 				scriptFile.getAbsolutePath(),
 				"--url", server.baseUrl(),
 				"--token", token.value(),

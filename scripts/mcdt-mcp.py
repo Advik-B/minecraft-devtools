@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.9"
+# dependencies = []
+# ///
 """
 MCDT Model Context Protocol (MCP) Stdio Shim
 Relays standard input/output JSON-RPC 2.0 messages to the live Minecraft DevTools HTTP/SSE server.

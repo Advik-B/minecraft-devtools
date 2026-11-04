@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -212,7 +211,7 @@ def test_events_stream_delivers_ticks(api: Api) -> None:
 
 def test_mcp_stdio_shim(api: Api) -> None:
     result = subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "mcdt-mcp.py"), "--url", api.base_url, "--token", api.token, "--no-sse"],
+        ["uv", "run", "--script", str(REPO / "scripts" / "mcdt-mcp.py"), "--url", api.base_url, "--token", api.token, "--no-sse"],
         input='{"jsonrpc":"2.0","id":99,"method":"ping"}\n', capture_output=True, text=True, timeout=60)
     assert '"id":99' in result.stdout.replace(" ", ""), f"shim output: {result.stdout!r} stderr: {result.stderr[-500:]!r}"
 
