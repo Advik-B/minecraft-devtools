@@ -5,3 +5,4 @@ Throwaway experiments for the multi-version plan in `docs/MULTIVERSION.md`. Noth
 - `legacy/`: one MCP-named source tree built with Unimined for Forge 1.8.9, Forge 1.12.2, Legacy Fabric 1.8.9 and Legacy Fabric 1.12.2. Each jar waits for the title screen, self-tests a loopback HTTP server, prints `MCDT-SPIKE RESULT ...`, writes `mcdt-spike.txt` and quits.
 
 Build locally with `./gradlew -p spikes/legacy build`. Launch tests run only in GitHub Actions (`.github/workflows/spikes.yml`).
+- `neoforge/`: NeoForge 1.21.1 (ModDevGradle) with the same jar-in-jar libraries as the Fabric build (Javalin 7, Jetty 12, Jackson, OpenAPI plugins, Kotlin stdlib). On the title screen it starts Javalin, calls a JSON route and a WebSocket echo, prints the result and quits.

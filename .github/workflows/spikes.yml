@@ -9,6 +9,62 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Spike 4: do the bundled Javalin/Jetty/Jackson jars load from jar-in-jar on NeoForge 1.21.1?
+  neoforge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        id: java
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v6
+      - name: build neoforge spike jar
+        run: |
+          chmod +x ./gradlew
+          ./gradlew -p spikes/neoforge jar --console=plain
+      - name: install display and launcher
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb libgl1 libgl1-mesa-dri libglx-mesa0 libegl1 libxrender1 libxtst6 libxi6 libxrandr2 libxcursor1 libxxf86vm1 libopenal1
+          pipx install portablemc==5.0.6
+      - name: launch until the spike reports
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          java21="$JAVA_HOME_21_X64/bin/java"
+          inst="$RUNNER_TEMP/inst"
+          mkdir -p "$inst/mods"
+          cp spikes/neoforge/build/libs/mcdt-spike-neoforge1211-0.0.0.jar "$inst/mods/"
+          printf 'pauseOnLostFocus:false\nonboardAccessibility:false\nsoundCategory_master:0.0\nrenderDistance:2\n' > "$inst/options.txt"
+          echo "INST=$inst" >> "$GITHUB_ENV"
+          portablemc --main-dir "$RUNNER_TEMP/pmc" --mc-dir "$inst" start --dry --jvm "$java21" "neoforge::21.1.265"
+          set +e
+          timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" \
+            portablemc --main-dir "$RUNNER_TEMP/pmc" --mc-dir "$inst" start \
+            --jvm "$java21" --jvm-arg=-Xmx2G -u SpikeBot "neoforge::21.1.265" > "$inst/launch.log" 2>&1
+          echo "launcher exit code: $?"
+          set -e
+          grep -E 'MCDT-SPIKE|Exception|Error' "$inst/launch.log" | head -40 || true
+          result="$(cat "$inst/mcdt-spike.txt" 2>/dev/null || true)"
+          echo "result: ${result:-<none>}"
+          case "$result" in *status=PASS*) ;; *) exit 1 ;; esac
+      - name: upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: neoforge-launch
+          path: |
+            ${{ env.INST }}/launch.log
+            ${{ env.INST }}/mcdt-spike.txt
+            ${{ env.INST }}/logs/
+            ${{ env.INST }}/crash-reports/
+          if-no-files-found: ignore
+
   legacy-build:
     runs-on: ubuntu-24.04
     steps:
