@@ -5,6 +5,10 @@ pluginManagement {
 			url = uri("https://maven.fabricmc.net/")
 		}
 		maven {
+			name = "NeoForged"
+			url = uri("https://maven.neoforged.net/releases")
+		}
+		maven {
 			name = "KikuGie"
 			url = uri("https://maven.kikugie.dev/releases")
 		}
@@ -14,6 +18,7 @@ pluginManagement {
 
 	plugins {
 		id("net.fabricmc.fabric-loom-remap") version providers.gradleProperty("loom_version")
+		id("net.neoforged.moddev") version providers.gradleProperty("moddev_version")
 	}
 }
 
@@ -30,6 +35,7 @@ include("core", "server")
 stonecutter {
 	create(rootProject) {
 		version("1.21.4-fabric", "1.21.4").buildscript = "build.fabric.gradle.kts"
+		version("1.21.4-neoforge", "1.21.4").buildscript = "build.neoforge.gradle.kts"
 		vcsVersion = "1.21.4-fabric"
 	}
 }

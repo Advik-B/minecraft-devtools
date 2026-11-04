@@ -5,6 +5,7 @@ build/
 out/
 libs/*
 !libs/baritone-api-fabric-*.jar
+!libs/baritone-api-neoforge-*.jar
 
 # eclipse
 
@@ -32,6 +33,7 @@ bin/
 # fabric
 
 run/
+versions/*/logs/
 
 # java
 

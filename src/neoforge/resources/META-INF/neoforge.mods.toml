@@ -1,0 +1,45 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "CC0-1.0"
+issueTrackerURL = "https://github.com/Advik-B/minecraft-devtools/issues"
+
+[[mods]]
+modId = "mcdt"
+version = "${version}"
+displayName = "Minecraft DevTools"
+description = '''Local REST and WebSocket API for the live Minecraft ${minecraft_version} client.'''
+logoFile = "assets/mcdt/icon.png"
+authors = "Advik"
+displayURL = "https://github.com/Advik-B/minecraft-devtools"
+
+[[mixins]]
+config = "mcdt.mixins.json"
+
+[[dependencies.mcdt]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${neoforge_version},)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.mcdt]]
+modId = "minecraft"
+type = "required"
+versionRange = "[${minecraft_version}]"
+ordering = "NONE"
+side = "CLIENT"
+
+# Baritone's NeoForge jar uses the mod id "baritoe".
+[[dependencies.mcdt]]
+modId = "baritoe"
+type = "optional"
+versionRange = "[0,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.mcdt]]
+modId = "yet_another_config_lib_v3"
+type = "optional"
+versionRange = "[0,)"
+ordering = "NONE"
+side = "CLIENT"

@@ -1,6 +1,7 @@
 plugins {
 	id("dev.kikugie.stonecutter")
 	id("net.fabricmc.fabric-loom-remap") apply false
+	id("net.neoforged.moddev") apply false
 }
 
 stonecutter active file(".sc_active_version")
