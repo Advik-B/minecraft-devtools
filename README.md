@@ -127,14 +127,16 @@ MCDT has a built-in MCP server at `/mcp`. `POST` takes JSON-RPC, and `GET` opens
 {
   "mcpServers": {
     "minecraft": {
-      "command": "python",
-      "args": ["/path/to/minecraft-devtools/scripts/mcdt-mcp.py"]
+      "command": "uv",
+      "args": ["run", "--script", "/path/to/minecraft-devtools/scripts/mcdt-mcp.py"]
     }
   }
 }
 ```
 
-For Claude Code: `claude mcp add minecraft -- python /path/to/minecraft-devtools/scripts/mcdt-mcp.py`
+For Claude Code: `claude mcp add minecraft -- uv run --script /path/to/minecraft-devtools/scripts/mcdt-mcp.py`
+
+The shim needs only [uv](https://docs.astral.sh/uv/): it has no dependencies, and uv provides the Python.
 
 The shim accepts `--url`, `--token`, `--port`, and `--no-sse`. There's also a PowerShell version, `mcdt-mcp.ps1`, which takes `-BaseUrl`, `-Token`, and `-Port`.
 
