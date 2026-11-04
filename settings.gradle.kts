@@ -32,6 +32,10 @@ rootProject.name = "mcdt"
 // Loader-neutral projects: no Minecraft types (see AGENTS.md).
 include("core", "server")
 
+// The Docker image's startup tool (docker/setup): installs the bundled and user mods before the game starts.
+include("docker-setup")
+project(":docker-setup").projectDir = file("docker/setup")
+
 // The platform: one node per Minecraft version and loader, all built from src/ (see stonecutter.gradle.kts).
 stonecutter {
 	create(rootProject) {
