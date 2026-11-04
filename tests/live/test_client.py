@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 import pytest
 
-from conftest import REPO, Api, expect, problem
+from conftest import REPO, Api, expect, problem, record_events, wait_for
 
 
 @dataclass(frozen=True)
@@ -199,6 +199,13 @@ def test_mcp(api: Api) -> None:
     expect(api.get("/v1/mcp/status"), 200,
            lambda j: j["enabled"] is True and j["protocolVersion"] == "2024-11-05" and j["registeredTools"] >= 5)
     expect(api.get("/v1/mcp/log"), 200, lambda j: len(j) >= 2)
+
+
+def test_events_stream_delivers_ticks(api: Api) -> None:
+    with record_events(api, ["tick"]) as events:
+        wait_for(lambda: len([e for e in events if e.get("topic") == "tick"]), lambda n: n >= 3, timeout=15, interval=0.2)
+    ticks = [e for e in events if e.get("topic") == "tick"]
+    assert len(ticks) >= 3, f"expected tick events, got {events[:5]}"
 
 
 def test_mcp_stdio_shim(api: Api) -> None:

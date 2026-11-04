@@ -13,11 +13,14 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import threading
 import time
-from typing import Any, Callable
+from contextlib import contextmanager
+from typing import Any, Callable, Iterator
 
 import httpx
 import pytest
+from websockets.sync.client import connect
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
@@ -63,7 +66,7 @@ class Api:
     def __init__(self, base_url: str, token: str) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
-        self.http = httpx.Client(base_url=self.base_url, timeout=60.0)
+        self.http = httpx.Client(base_url=self.base_url, timeout=60.0, follow_redirects=True)
         self._rpc_id = 0
 
     def request(self, method: str, path: str, *, json: Any = None, auth: bool = True,
@@ -100,12 +103,12 @@ def expect(response: httpx.Response, status: int, check: Callable[[Any], Any] | 
     body = response.text
     assert response.status_code == status, (
         f"{response.request.method} {response.request.url.raw_path.decode()} -> {response.status_code}, "
-        f"expected {status}: {body[:300]}")
+        f"expected {status}: {body[:1500]}")
     data = None
     if body[:1] in ("{", "["):
         data = response.json()
     if check is not None:
-        assert check(data), f"check failed for {response.request.url.raw_path.decode()}: {body[:300]}"
+        assert check(data), f"check failed for {response.request.url.raw_path.decode()}: {body[:1500]}"
     return data
 
 
@@ -122,6 +125,34 @@ def wait_for(fetch: Callable[[], Any], ok: Callable[[Any], bool], timeout: float
         time.sleep(interval)
         result = fetch()
     return result
+
+
+@contextmanager
+def record_events(api: Api, topics: list[str]) -> Iterator[list[dict[str, Any]]]:
+    """Subscribes to /v1/events and collects every message received while the block runs."""
+    url = "ws" + api.base_url[len("http"):] + "/v1/events"
+    received: list[dict[str, Any]] = []
+    stop = threading.Event()
+    with connect(url, additional_headers={"Authorization": f"Bearer {api.token}"}, open_timeout=10) as ws:
+        ws.send(json.dumps({"action": "subscribe", "topics": topics}))
+
+        def pump() -> None:
+            while not stop.is_set():
+                try:
+                    message = ws.recv(timeout=0.25)
+                except TimeoutError:
+                    continue
+                except Exception:
+                    return
+                received.append(json.loads(message))
+
+        thread = threading.Thread(target=pump, daemon=True)
+        thread.start()
+        try:
+            yield received
+        finally:
+            stop.set()
+            thread.join(timeout=2)
 
 
 @pytest.fixture(scope="session")

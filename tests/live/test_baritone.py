@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from conftest import Api, expect, problem, wait_for
+from conftest import Api, expect, problem, record_events, wait_for
 
 pytestmark = pytest.mark.baritone
 
@@ -112,11 +112,12 @@ def test_goto_walks_to_target(api: Api, baritone: str) -> None:
     require(baritone, "installed")
     x, y, z = (math.floor(v) for v in player_pos(api))
     target = (x + 6, y, z + 3)
-    started = start(api, "goto", {"x": target[0], "y": target[1], "z": target[2]})
-    assert started["type"] == "goto"
-
-    final = wait_for(lambda: job(api, started["jobId"]), lambda j: j["status"] in TERMINAL, timeout=120)
-    assert final["status"] == "completed", final
+    with record_events(api, ["baritone.path", "baritone.process"]) as events:
+        started = start(api, "goto", {"x": target[0], "y": target[1], "z": target[2]})
+        assert started["type"] == "goto"
+        final = wait_for(lambda: job(api, started["jobId"]), lambda j: j["status"] in TERMINAL, timeout=120)
+    path_events = [e["data"] for e in events if e.get("topic", "").startswith("baritone.")]
+    assert final["status"] == "completed", f"{final}; Baritone events: {path_events}"
 
     px, py, pz = player_pos(api)
     distance = math.dist((px, pz), (target[0] + 0.5, target[2] + 0.5))
