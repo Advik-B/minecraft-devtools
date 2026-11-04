@@ -208,6 +208,16 @@ Order: **1.21.11 → 26.x latest → 1.20.1 → 1.19.2 → 1.18.2 → 1.16.5 Fab
 - **Rendering:** the viewer and texture features ship only where the `RenderCompat` impl exists. Everywhere else the capability is off.
 - For each node: `chiseledBuild`, unit tests, and a Docker live smoke test.
 
+#### Phase 3 progress (2026-11-04)
+
+**1.21.11 (Fabric and NeoForge): done.** Both nodes pass the live suite locally (menu, world, quit), with screenshots, atlas readback, F3 text and the hitbox and chunk-border toggles checked by hand. Every capability stays on.
+- Mojmap's `ResourceLocation` → `Identifier` rename is a Stonecutter string replacement (`stonecutter.gradle.kts`).
+- Other API changes (inventory, `GameProfile` record, skins, options, input events, F3 entries, disconnect) go through `game/McCompat`, and GPU readback (async since 1.21.5) through `game/PixelReader`. Waiting on the copy needs a `glFlush` first: the engine's fence wait doesn't flush, so the screenshot timed out until that was added.
+- Version-specific mixins are added by `client/McdtMixinPlugin` instead of `mcdt.mixins.json`.
+- Found while testing: NeoForge `runClient` hasn't worked on any node (split packages between the mod and `core`/`server`, and on 21.1–21.4 libraries invisible to the mod module). Fixed in `build.neoforge.gradle.kts`, apart from an empty `/openapi.json` in pre-21.11 dev runs.
+
+**Next:** 26.3, then 1.16.5 Fabric, then the legacy era (Legacy Fabric 1.12.2 / 1.8.9, Cleanroom 1.12.2).
+
 ### Phase 4: Legacy era on modern Java
 - Create the `platform/legacy` source era (MCP names) with Unimined targets:
   - **Forge 1.12.2 via Cleanroom** (Java 21)
