@@ -16,7 +16,9 @@ import io.javalin.openapi.OpenApiSecurity;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 /**
  * Handles {@code GET /v1/health}. Dispatches through the {@link TaskQueue} onto the client thread.
@@ -25,18 +27,20 @@ public final class HealthHandler implements Handler {
 	private final McdtEnvironment env;
 	private final McdtConfig config;
 	private final TaskQueue queue;
+	private final Supplier<Set<Capability>> capabilities;
 
-	public HealthHandler(McdtEnvironment env, McdtConfig config, TaskQueue queue) {
+	public HealthHandler(McdtEnvironment env, McdtConfig config, TaskQueue queue, Supplier<Set<Capability>> capabilities) {
 		this.env = env;
 		this.config = config;
 		this.queue = queue;
+		this.capabilities = capabilities;
 	}
 
 	@OpenApi(
 			path = "/v1/health",
 			methods = {HttpMethod.GET},
 			summary = "Mod and runtime health",
-			description = "Returns mod version, Minecraft version, uptime, client tick, queue metrics, and Baritone status.",
+			description = "Returns mod version, Minecraft version, uptime, client tick, queue metrics, Baritone status, and the capabilities (features) this platform supports.",
 			tags = {"System"},
 			security = {@OpenApiSecurity(name = "BearerAuth")},
 			responses = {
@@ -84,7 +88,8 @@ public final class HealthHandler implements Handler {
 					queueStats,
 					env.baritone(),
 					config.permission.id(),
-					dev.advik.mcdt.events.EventHub.getInstance().totalDroppedEvents()
+					dev.advik.mcdt.events.EventHub.getInstance().totalDroppedEvents(),
+					Capability.ids(capabilities.get())
 			);
 
 			return Json.MAPPER.valueToTree(response);

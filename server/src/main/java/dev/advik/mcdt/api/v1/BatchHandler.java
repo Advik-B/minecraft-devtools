@@ -17,6 +17,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * Handler for POST /v1/batch.
@@ -26,11 +27,14 @@ public final class BatchHandler implements Handler {
 	private final McdtConfig config;
 	private final TaskQueue queue;
 	private final GameClient gameClient;
+	private final Consumer<Capability> requireCapability;
 
-	public BatchHandler(McdtConfig config, TaskQueue queue, GameClient gameClient) {
+	/** @param requireCapability throws {@code feature-unavailable} when a capability is off */
+	public BatchHandler(McdtConfig config, TaskQueue queue, GameClient gameClient, Consumer<Capability> requireCapability) {
 		this.config = config;
 		this.queue = queue;
 		this.gameClient = gameClient;
+		this.requireCapability = requireCapability;
 	}
 
 	@OpenApi(
@@ -161,10 +165,26 @@ public final class BatchHandler implements Handler {
 		ctx.future(() -> future);
 	}
 
+	/** The capability a batched read needs, matching the route gates in {@code HttpServer}. */
+	private static Capability capabilityFor(String path) {
+		return switch (path) {
+			case "/v1/textures/atlases", "/v1/textures/atlas" -> Capability.TEXTURES;
+			case "/v1/recipes" -> Capability.RECIPES;
+			case "/v1/stats" -> Capability.STATS;
+			case "/v1/advancements" -> Capability.ADVANCEMENTS;
+			case "/v1/view/blocks", "/v1/view/blocks/summary" -> Capability.BLOCK_VIEWER;
+			default -> null;
+		};
+	}
+
 	private Object executeSubRequest(String rawUrl) {
 		URI uri = URI.create(rawUrl);
 		String path = uri.getPath();
 		Map<String, String> query = parseQueryParams(uri.getRawQuery());
+		Capability required = capabilityFor(path);
+		if (required != null) {
+			requireCapability.accept(required);
+		}
 
 		return switch (path) {
 			case "/v1/client" -> gameClient.getClient();

@@ -20,6 +20,7 @@ import dev.advik.mcdt.security.RateLimiter;
 import dev.advik.mcdt.security.ConfirmManager;
 import dev.advik.mcdt.world.stream.WorldStreamService;
 import io.javalin.Javalin;
+import io.javalin.http.Handler;
 import io.javalin.http.HttpResponseException;
 import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
@@ -27,6 +28,7 @@ import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import java.net.BindException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -138,7 +140,7 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/favicon.ico", WebUiRoutes.serveAsset());
 			cfg.routes.get("/favicon.svg", WebUiRoutes.serveAsset());
 
-			HealthHandler healthHandler = new HealthHandler(env, config, queue);
+			HealthHandler healthHandler = new HealthHandler(env, config, queue, this::capabilities);
 			cfg.routes.get("/v1/health", healthHandler, McdtRole.READ);
 
 			cfg.routes.get("/v1/client", new ClientHandler(config, queue, gameClient), McdtRole.READ);
@@ -152,10 +154,10 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/world/entities", new EntitiesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/entities/categories", new EntityCategoriesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/world/raycast", new RaycastHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.post("/v1/world/block-models", new BlockModelsHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.get("/v1/view/blocks", new ViewBlocksHandlers.ViewHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.get("/v1/view/blocks/summary", new ViewBlocksHandlers.SummaryHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.post("/v1/batch", new BatchHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.post("/v1/world/block-models", requires(Capability.BLOCK_VIEWER, new BlockModelsHandler(config, queue, gameClient)), McdtRole.READ);
+			cfg.routes.get("/v1/view/blocks", requires(Capability.BLOCK_VIEWER, new ViewBlocksHandlers.ViewHandler(config, queue, gameClient)), McdtRole.READ);
+			cfg.routes.get("/v1/view/blocks/summary", requires(Capability.BLOCK_VIEWER, new ViewBlocksHandlers.SummaryHandler(config, queue, gameClient)), McdtRole.READ);
+			cfg.routes.post("/v1/batch", new BatchHandler(config, queue, gameClient, this::requireCapability), McdtRole.READ);
 			cfg.routes.get("/v1/screen", new ScreenHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/registries", new RegistriesHandler(config, queue, gameClient), McdtRole.READ);
 			cfg.routes.get("/v1/registries/{registry}", new RegistryEntriesHandler(config, queue, gameClient), McdtRole.READ);
@@ -190,16 +192,16 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.patch("/v1/resourcepacks", resourcePacksHandler::update, McdtRole.ACT);
 
 			// --- Phase 3: Stats, Advancements, Recipes ---
-			cfg.routes.get("/v1/stats", new StatsHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.get("/v1/advancements", new AdvancementsHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/stats", requires(Capability.STATS, new StatsHandler(config, queue, gameClient)), McdtRole.READ);
+			cfg.routes.get("/v1/advancements", requires(Capability.ADVANCEMENTS, new AdvancementsHandler(config, queue, gameClient)), McdtRole.READ);
 			RecipesHandler recipesHandler = new RecipesHandler(config, queue, gameClient);
-			cfg.routes.get("/v1/recipes", recipesHandler::get, McdtRole.READ);
-			cfg.routes.post("/v1/recipes/place", recipesHandler::place, McdtRole.ACT);
+			cfg.routes.get("/v1/recipes", requires(Capability.RECIPES, recipesHandler::get), McdtRole.READ);
+			cfg.routes.post("/v1/recipes/place", requires(Capability.RECIPES, recipesHandler::place), McdtRole.ACT);
 
-			cfg.routes.get("/v1/screenshot", new ScreenshotHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.get("/v1/textures/atlases", new TexturesAtlasHandlers.AtlasesHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.get("/v1/textures/atlas", new TexturesAtlasHandlers.AtlasHandler(config, queue, gameClient), McdtRole.READ);
-			cfg.routes.get("/v1/textures/atlas/image", new TexturesAtlasHandlers.ImageHandler(config, queue, gameClient), McdtRole.READ);
+			cfg.routes.get("/v1/screenshot", requires(Capability.SCREENSHOT, new ScreenshotHandler(config, queue, gameClient)), McdtRole.READ);
+			cfg.routes.get("/v1/textures/atlases", requires(Capability.TEXTURES, new TexturesAtlasHandlers.AtlasesHandler(config, queue, gameClient)), McdtRole.READ);
+			cfg.routes.get("/v1/textures/atlas", requires(Capability.TEXTURES, new TexturesAtlasHandlers.AtlasHandler(config, queue, gameClient)), McdtRole.READ);
+			cfg.routes.get("/v1/textures/atlas/image", requires(Capability.TEXTURES, new TexturesAtlasHandlers.ImageHandler(config, queue, gameClient)), McdtRole.READ);
 
 			ConfirmManager confirmManager = new ConfirmManager();
 
@@ -224,8 +226,8 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.delete("/v1/servers/{index}", serversHandler::deleteRequest, McdtRole.ACT);
 			cfg.routes.post("/v1/servers/{index}/delete/confirm", serversHandler::deleteConfirm, McdtRole.ACT);
 
-			cfg.routes.post("/v1/input/keys", new InputKeysHandler(config, queue, gameClient), McdtRole.ACT);
-			cfg.routes.post("/v1/input/mouse", new InputMouseHandler(config, queue, gameClient), McdtRole.ACT);
+			cfg.routes.post("/v1/input/keys", requires(Capability.INPUT, new InputKeysHandler(config, queue, gameClient)), McdtRole.ACT);
+			cfg.routes.post("/v1/input/mouse", requires(Capability.INPUT, new InputMouseHandler(config, queue, gameClient)), McdtRole.ACT);
 
 			ChatHandler chatHandler = new ChatHandler(config, queue, gameClient);
 			cfg.routes.post("/v1/chat", chatHandler, McdtRole.ACT);
@@ -258,12 +260,12 @@ public final class HttpServer implements AutoCloseable {
 			cfg.routes.get("/v1/classes/{name}", new ClassInspectHandler(config, queue, nameService, reflectionSerializer), McdtRole.READ);
 			cfg.routes.delete("/v1/objects/{handle}", new ObjectDeleteHandler(handleTable), McdtRole.READ);
 
-			if (decompilerService != null) {
-				cfg.routes.get("/v1/classes/{name}/source", new ClassSourceHandler(config, decompilerService), McdtRole.READ);
-			}
+			cfg.routes.get("/v1/classes/{name}/source", requires(Capability.DECOMPILER, decompilerService != null
+					? new ClassSourceHandler(config, decompilerService)
+					: ctx -> { throw Problems.featureUnavailable(Capability.DECOMPILER, platformName()); }), McdtRole.READ);
 
 			// --- Milestone M5 Raw Packet Send ---
-			cfg.routes.post("/v1/packets", new PacketsHandler(config, queue, gameClient, handleTable), McdtRole.REFLECT_WRITE);
+			cfg.routes.post("/v1/packets", requires(Capability.PACKETS, new PacketsHandler(config, queue, gameClient, handleTable)), McdtRole.REFLECT_WRITE);
 
 			// --- Milestone M5 Baritone Routes ---
 			cfg.routes.get("/v1/baritone", new BaritoneHandlers.StatusHandler(config, queue, baritoneService), McdtRole.READ);
@@ -284,6 +286,9 @@ public final class HttpServer implements AutoCloseable {
 			// --- Milestone M4 WebSocket Routes ---
 			dev.advik.mcdt.events.EventHub eventHub = dev.advik.mcdt.events.EventHub.getInstance();
 			cfg.routes.ws("/v1/events", new EventsWsHandler(config, token, boundPort::get, eventHub));
+			cfg.routes.wsBeforeUpgrade("/v1/input/keys", requires(Capability.INPUT, ctx -> {}));
+			cfg.routes.wsBeforeUpgrade("/v1/input/mouse", requires(Capability.INPUT, ctx -> {}));
+			cfg.routes.wsBeforeUpgrade("/v1/world/stream", requires(Capability.WORLD_STREAM, ctx -> {}));
 			cfg.routes.ws("/v1/input/keys", new InputKeysWsHandler(config, token, boundPort::get, queue, gameClient));
 			cfg.routes.ws("/v1/input/mouse", new InputMouseWsHandler(config, token, boundPort::get, queue, gameClient));
 			cfg.routes.ws("/v1/player/inventory", new InventoryWsHandler(config, token, boundPort::get, queue, gameClient));
@@ -414,6 +419,29 @@ public final class HttpServer implements AutoCloseable {
 			t = t.getCause();
 		}
 		return false;
+	}
+
+	/** The effective capability set: the platform's, narrowed by Baritone and the decompiler host. */
+	public Set<Capability> capabilities() {
+		return Capability.effective(gameClient.capabilities(), baritoneService.isInstalled(), decompilerService != null);
+	}
+
+	private String platformName() {
+		return "Minecraft " + env.gameVersion();
+	}
+
+	/** Wraps a handler so it answers 501 {@code feature-unavailable} when the capability is off. */
+	private Handler requires(Capability capability, Handler handler) {
+		return ctx -> {
+			requireCapability(capability);
+			handler.handle(ctx);
+		};
+	}
+
+	private void requireCapability(Capability capability) {
+		if (!capabilities().contains(capability)) {
+			throw Problems.featureUnavailable(capability, platformName());
+		}
 	}
 
 	private static String serializeProblem(Problem problem) {
