@@ -108,6 +108,7 @@ export async function getHealth(): Promise<HealthResponse | null> {
     appState.serverOnline = true
     appState.mcdtVersion = data.mcdtVersion || ''
     appState.gameVersion = data.gameVersion || ''
+    appState.capabilities = data.capabilities ?? null
   }
   return data
 }

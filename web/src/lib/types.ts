@@ -13,6 +13,8 @@ export interface HealthResponse {
   baritone: string
   permission: string
   droppedEvents: number
+  // Sorted capability ids, e.g. "textures", "block-viewer"
+  capabilities: string[]
 }
 
 // Mirrors api/v1/dto/ClientDto.java

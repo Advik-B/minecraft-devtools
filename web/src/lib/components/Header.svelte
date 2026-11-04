@@ -14,18 +14,31 @@
     Box
   } from 'lucide-svelte'
 
-  const tabs = [
+  type Tab = { id: typeof appState.activeTab; label: string; icon: typeof Activity; capability?: string }
+
+  const tabs: Tab[] = [
     { id: 'telemetry', label: 'Telemetry', icon: Activity },
     { id: 'inventory', label: 'Inventory', icon: Package },
     { id: 'radar', label: 'Radar', icon: Radar },
-    { id: 'viewer', label: '3D Viewer', icon: Box },
-    { id: 'textures', label: 'Textures', icon: Image },
-    { id: 'baritone', label: 'Baritone', icon: Bot },
+    { id: 'viewer', label: '3D Viewer', icon: Box, capability: 'block-viewer' },
+    { id: 'textures', label: 'Textures', icon: Image, capability: 'textures' },
+    { id: 'baritone', label: 'Baritone', icon: Bot, capability: 'baritone' },
     { id: 'actions', label: 'Controls & Actions', icon: Gamepad2 },
     { id: 'reflection', label: 'Reflection', icon: Cpu },
     { id: 'events', label: 'Events', icon: Radio },
     { id: 'docs', label: 'Docs', icon: BookOpen }
-  ] as const
+  ]
+
+  // Tabs whose capability the platform lacks are hidden
+  const visibleTabs = $derived(
+    tabs.filter((tab) => !tab.capability || appState.capabilities === null || appState.capabilities.includes(tab.capability))
+  )
+
+  $effect(() => {
+    if (!visibleTabs.some((tab) => tab.id === appState.activeTab)) {
+      appState.activeTab = 'telemetry'
+    }
+  })
 </script>
 
 <header class="w-full">
@@ -82,7 +95,7 @@
   <!-- Sticky Sub-Nav Tabs Bar -->
   <div class="sticky top-0 z-30 bg-base-100/95 backdrop-blur border-b border-base-300 px-4 sm:px-8">
     <div role="tablist" class="tabs tabs-border overflow-x-auto flex flex-nowrap py-0.5">
-      {#each tabs as tab}
+      {#each visibleTabs as tab}
         {@const IconComponent = tab.icon}
         <button
           role="tab"
