@@ -94,7 +94,8 @@ dependencies {
 		exclude(group = "org.ow2.asm")
 	}
 
-	testImplementation(testFixtures(project(":core")))
+	// NeoForge provides slf4j and pins it strictly (2.0.9 on 1.21.1).
+	testImplementation((testFixtures(project(":core")) as ModuleDependency).apply { exclude(group = "org.slf4j") })
 	testImplementation(platform("org.junit:junit-bom:${prop("junit_version")}"))
 	testImplementation("org.junit.jupiter:junit-jupiter")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -147,36 +148,42 @@ tasks.jacocoTestReport {
 	}
 }
 
-tasks.jar {
-	// The unrelocated jar; the mod jar is shadowJar.
-	archiveClassifier = "slim"
-	// One mod jar: the core and server modules' classes and resources are merged in (their libraries are jar-in-jar).
-	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+// The core and server modules' classes and resources, merged into the mod jar (their libraries are nested or relocated).
+fun CopySpec.mcdtModules() {
 	for (module in listOf(":core", ":server")) {
-		dependsOn("$module:classes")
 		from(project(module).layout.buildDirectory.dir("classes/java/main"))
 		from(project(module).layout.buildDirectory.dir("resources/main"))
 	}
-
 	from(rootProject.file("LICENSE")) {
 		rename { "${it}_mcdt" }
 	}
+}
+
+tasks.jar {
+	// Without the relocated libraries; the mod jar is shadowJar.
+	archiveClassifier = "slim"
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+	dependsOn(":core:classes", ":server:classes")
+	mcdtModules()
 }
 
 tasks.assemble {
 	dependsOn(":server:exportOpenApi")
 }
 
-// The mod jar: tasks.jar (MCDT, its jar-in-jar libraries and their metadata) plus the relocated libraries.
+// The mod jar: MCDT, the jar-in-jar libraries (tasks.jarJar) and the relocated libraries.
 tasks.shadowJar {
 	archiveClassifier = ""
 	configurations = listOf(relocated)
-	from(tasks.jar.map { zipTree(it.archiveFile) }) {
-		exclude("META-INF/MANIFEST.MF")
-	}
+	dependsOn(":core:classes", ":server:classes")
+	mcdtModules()
+	from(tasks.named("jarJar"))
 	relocate("com.fasterxml.jackson", McdtBuild.RELOCATED_JACKSON)
 	mergeServiceFiles()
-	duplicatesStrategy = DuplicatesStrategy.INCLUDE
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+	filesMatching("META-INF/services/**") {
+		duplicatesStrategy = DuplicatesStrategy.INCLUDE
+	}
 	// Merged libraries must not turn the mod into a named module, and their versioned classes would not be relocated.
 	exclude("module-info.class", "META-INF/versions/**", "META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
