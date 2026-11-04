@@ -41,6 +41,7 @@ project(":docker-setup").projectDir = file("docker/setup")
 // The platform: one node per Minecraft version and loader, all built from src/ (see stonecutter.gradle.kts).
 stonecutter {
 	create(rootProject) {
+		version("1.16.5-fabric", "1.16.5").buildscript = "build.fabric.gradle.kts"
 		version("1.21.1-fabric", "1.21.1").buildscript = "build.fabric.gradle.kts"
 		version("1.21.1-neoforge", "1.21.1").buildscript = "build.neoforge.gradle.kts"
 		version("1.21.4-fabric", "1.21.4").buildscript = "build.fabric.gradle.kts"

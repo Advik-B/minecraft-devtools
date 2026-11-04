@@ -1,5 +1,6 @@
 package dev.advik.mcdt.baritone.bridge;
 
+import dev.advik.mcdt.game.McCompat;
 import dev.advik.mcdt.game.McRegistries;
 import baritone.api.BaritoneAPI;
 import baritone.api.IBaritone;
@@ -174,7 +175,7 @@ public final class BaritoneBridge implements BaritoneService {
 	public JobResponse startGoto(GotoRequest req) {
 		Goal goal;
 		if (req.block() != null && !req.block().isBlank()) {
-			ResourceLocation rl = ResourceLocation.parse(req.block());
+			ResourceLocation rl = McCompat.parseId(req.block());
 			Block b = McRegistries.BLOCK.getOptional(rl).orElse(null);
 			if (b == null) {
 				throw Problems.badRequest("Unknown block type: " + req.block());

@@ -6,6 +6,7 @@ package dev.advik.mcdt.mixin;
 import net.minecraft.client.gui.Gui;
 //?}
 import net.minecraft.client.gui.components.BossHealthOverlay;
+import net.minecraft.client.gui.components.DebugScreenOverlay;
 import net.minecraft.client.gui.components.SubtitleOverlay;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
@@ -44,4 +45,10 @@ public interface GuiAccessor {
 
 	@Accessor("bossOverlay")
 	BossHealthOverlay getBossOverlayField();
+
+	// The F3 overlay has no getter before 1.17.
+	//? if <1.21 {
+	/*@Accessor("debugScreen")
+	DebugScreenOverlay getDebugScreen();
+	*///?}
 }

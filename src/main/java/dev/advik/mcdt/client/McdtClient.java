@@ -170,10 +170,11 @@ public final class McdtClient {
 	}
 
 	public static void onEntityUnload(Entity entity) {
+		String reason = McCompat.removalReason(entity);
 		EventHub.getInstance().publish("entity.remove", Map.of(
 				"id", entity.getId(),
 				"uuid", entity.getUUID().toString(),
-				"reason", entity.getRemovalReason() != null ? entity.getRemovalReason().name() : "DISCARDED"
+				"reason", reason != null ? reason : "DISCARDED"
 		));
 	}
 

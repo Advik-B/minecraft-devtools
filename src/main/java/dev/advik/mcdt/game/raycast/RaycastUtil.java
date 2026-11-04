@@ -1,5 +1,6 @@
 package dev.advik.mcdt.game.raycast;
 
+import dev.advik.mcdt.game.McCompat;
 import dev.advik.mcdt.game.McRegistries;
 import dev.advik.mcdt.api.v1.dto.RaycastDto;
 import dev.advik.mcdt.game.serializers.BlockStateSerializer;
@@ -28,7 +29,7 @@ public final class RaycastUtil {
 			boolean inside = bhr.isInside();
 
 			double distance = Minecraft.getInstance().player != null
-					? Minecraft.getInstance().player.getEyePosition().distanceTo(pos)
+					? McCompat.eyePosition(Minecraft.getInstance().player).distanceTo(pos)
 					: 0.0;
 
 			return new RaycastDto(
@@ -46,7 +47,7 @@ public final class RaycastUtil {
 			String name = e.getName().getString();
 
 			double distance = Minecraft.getInstance().player != null
-					? Minecraft.getInstance().player.getEyePosition().distanceTo(pos)
+					? McCompat.eyePosition(Minecraft.getInstance().player).distanceTo(pos)
 					: 0.0;
 
 			return new RaycastDto(
@@ -74,7 +75,7 @@ public final class RaycastUtil {
 		if (from != null && from.length >= 3) {
 			startVec = new Vec3(from[0], from[1], from[2]);
 		} else if (sourceEntity != null) {
-			startVec = sourceEntity.getEyePosition();
+			startVec = McCompat.eyePosition(sourceEntity);
 		} else {
 			startVec = Vec3.ZERO;
 		}
@@ -107,8 +108,10 @@ public final class RaycastUtil {
 					startVec,
 					endVec,
 					searchBox,
-					e -> !e.isSpectator() && e.isPickable(),
-					0.3f
+					e -> !e.isSpectator() && e.isPickable()
+					//? if >=1.21 {
+					, 0.3f
+					//?}
 			);
 		}
 

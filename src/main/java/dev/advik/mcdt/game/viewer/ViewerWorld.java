@@ -42,14 +42,21 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.FluidTags;
+//? if >=1.21 {
 import net.minecraft.util.RandomSource;
+//?}
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
+//? if >=1.21 {
 import net.minecraft.world.entity.vehicle.VehicleEntity;
+//?} else {
+/*import net.minecraft.world.entity.vehicle.AbstractMinecart;
+import net.minecraft.world.entity.vehicle.Boat;
+*///?}
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.LightLayer;
@@ -96,8 +103,10 @@ public final class ViewerWorld {
 				McCompat.location(level.dimension()).toString(),
 				//? if >=1.21.2 {
 				level.getMinY(),
-				//?} else {
+				//?} else if >=1.21 {
 				/*level.getMinBuildHeight(),
+				*///?} else {
+				/*0,
 				*///?}
 				level.getHeight(),
 				level.dimensionType().hasSkyLight()
@@ -125,9 +134,15 @@ public final class ViewerWorld {
 		LevelChunkSection[] sections = chunk.getSections();
 		List<ViewData.Section> result = new ArrayList<>();
 		for (int i = 0; i < sections.length; i++) {
-			int sectionY = chunk.getSectionYFromSectionIndex(i);
 			LevelChunkSection section = sections[i];
+			//? if >=1.21 {
+			int sectionY = chunk.getSectionYFromSectionIndex(i);
 			boolean empty = section == null || section.hasOnlyAir();
+			//?} else {
+			/*// Before 1.17 the world is 0-255: section i is at section y i.
+			int sectionY = i;
+			boolean empty = LevelChunkSection.isEmpty(section);
+			*///?}
 			if (sectionYs == null ? empty : !sectionYs.contains(sectionY)) continue;
 
 			SectionPos sectionPos = SectionPos.of(chunkX, sectionY, chunkZ);
@@ -169,7 +184,11 @@ public final class ViewerWorld {
 					int cx = qx * 4 + 2;
 					int cz = qz * 4 + 2;
 					int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, cx, cz);
+					//? if >=1.21 {
 					Biome biome = level.getNoiseBiome((baseX + cx) >> 2, y >> 2, (baseZ + cz) >> 2).value();
+					//?} else {
+					/*Biome biome = level.getNoiseBiome((baseX + cx) >> 2, y >> 2, (baseZ + cz) >> 2);
+					*///?}
 					int g = biome.getGrassColor(baseX + cx, baseZ + cz);
 					int f = biome.getFoliageColor();
 					int w = biome.getWaterColor();
@@ -235,13 +254,31 @@ public final class ViewerWorld {
 			}
 			return allFull ? null : sampled.getData();
 		}
-		return data.isDefinitelyFilledWith(15) ? null : data.getData().clone();
+		return filledWith(data, 15) ? null : data.getData().clone();
 	}
 
 	private static byte[] blockLight(LayerLightEventListener listener, SectionPos sectionPos) {
 		DataLayer data = listener.getDataLayerData(sectionPos);
-		if (data == null || data.isDefinitelyFilledWith(0)) return null;
+		if (data == null || filledWith(data, 0)) return null;
 		return data.getData().clone();
+	}
+
+	/** Whether every light value in the layer is {@code value}. */
+	private static boolean filledWith(DataLayer data, int value) {
+		//? if >=1.21 {
+		return data.isDefinitelyFilledWith(value);
+		//?} else {
+		/*if (data.isEmpty()) {
+			return value == 0;
+		}
+		byte packed = (byte) (value | value << 4);
+		for (byte b : data.getData()) {
+			if (b != packed) {
+				return false;
+			}
+		}
+		return true;
+		*///?}
 	}
 
 	public static ViewData.Pose pose() {
@@ -251,7 +288,7 @@ public final class ViewerWorld {
 		if (player == null || level == null) return null;
 		return new ViewData.Pose(
 				player.getX(), player.getY(), player.getZ(),
-				player.getYRot(), player.getXRot(),
+				McCompat.yRot(player), McCompat.xRot(player),
 				McCompat.dayTime(level),
 				skyBrightness(level)
 		);
@@ -285,7 +322,7 @@ public final class ViewerWorld {
 					McRegistries.ENTITY_TYPE.getKey(entity.getType()).toString(),
 					category(entity),
 					entity.getX(), entity.getY(), entity.getZ(),
-					entity.getYRot(),
+					McCompat.yRot(entity),
 					entity.getBbWidth(), entity.getBbHeight(),
 					entity == client.player,
 					name
@@ -297,7 +334,11 @@ public final class ViewerWorld {
 	private static int category(Entity entity) {
 		if (entity instanceof Player) return 1;
 		if (entity instanceof ItemEntity || entity instanceof ExperienceOrb) return 4;
+		//? if >=1.21 {
 		if (entity instanceof Projectile || entity instanceof VehicleEntity) return 5;
+		//?} else {
+		/*if (entity instanceof Projectile || entity instanceof AbstractMinecart || entity instanceof Boat) return 5;
+		*///?}
 		MobCategory category = entity.getType().getCategory();
 		if (category == MobCategory.MONSTER) return 2;
 		if (category == MobCategory.MISC) return 0;
@@ -314,7 +355,11 @@ public final class ViewerWorld {
 		//?}
 		BlockColors colors = client.getBlockColors();
 		TextureAtlas atlas = (TextureAtlas) client.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+		//? if >=1.21 {
 		RandomSource random = RandomSource.create();
+		//?} else {
+		/*java.util.Random random = new java.util.Random();
+		*///?}
 		List<BlockModelsDto.Model> models = new ArrayList<>();
 
 		for (Integer boxed : stateIds) {
@@ -399,8 +444,8 @@ public final class ViewerWorld {
 						*///?} else {
 						layerName(ItemBlockRenderTypes.getRenderLayer(fluidState)),
 						//?}
-						rect(atlas.getSprite(ResourceLocation.withDefaultNamespace(prefix + "_still"))),
-						rect(atlas.getSprite(ResourceLocation.withDefaultNamespace(prefix + "_flow")))
+						rect(atlas.getSprite(McCompat.id("minecraft", prefix + "_still"))),
+						rect(atlas.getSprite(McCompat.id("minecraft", prefix + "_flow")))
 				);
 			}
 
@@ -598,12 +643,10 @@ public final class ViewerWorld {
 			return Blocks.AIR.defaultBlockState().getFluidState();
 		}
 
-		@Override
 		public int getHeight() {
 			return 384;
 		}
 
-		@Override
 		//? if >=1.21.2 {
 		public int getMinY() {
 		//?} else {

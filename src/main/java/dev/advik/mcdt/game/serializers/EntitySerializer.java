@@ -1,5 +1,6 @@
 package dev.advik.mcdt.game.serializers;
 
+import dev.advik.mcdt.game.McCompat;
 import dev.advik.mcdt.game.McRegistries;
 import dev.advik.mcdt.api.v1.dto.EntitiesDto.BoundingBox;
 import dev.advik.mcdt.api.v1.dto.EntitiesDto.EntityInfo;
@@ -23,8 +24,8 @@ public final class EntitySerializer {
 		double[] pos = new double[]{entity.getX(), entity.getY(), entity.getZ()};
 		Vec3 vel = entity.getDeltaMovement();
 		double[] velocity = new double[]{vel.x, vel.y, vel.z};
-		float yaw = entity.getYRot();
-		float pitch = entity.getXRot();
+		float yaw = McCompat.yRot(entity);
+		float pitch = McCompat.xRot(entity);
 		double distance = origin != null ? entity.position().distanceTo(origin) : 0.0;
 		boolean alive = entity.isAlive();
 

@@ -9,7 +9,9 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+//? if >=1.21 {
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
+//?}
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
@@ -26,9 +28,12 @@ public final class FabricEntrypoint implements ClientModInitializer {
 		ClientLifecycleEvents.CLIENT_STOPPING.register(McdtClient::onClientStopping);
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> McdtClient.onJoin(client));
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> McdtClient.onDisconnect());
+		// Before 1.19 Fabric API has no message events; GuiChatMixin reports chat instead.
+		//? if >=1.21 {
 		ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) ->
 				McdtClient.onChatMessage(message));
 		ClientReceiveMessageEvents.GAME.register(McdtClient::onGameMessage);
+		//?}
 		ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> McdtClient.onChunkLoad(McCompat.chunkX(chunk.getPos()), McCompat.chunkZ(chunk.getPos())));
 		ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> McdtClient.onChunkUnload(McCompat.chunkX(chunk.getPos()), McCompat.chunkZ(chunk.getPos())));
 		ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> McdtClient.onEntityLoad(entity));

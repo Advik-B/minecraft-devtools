@@ -1,11 +1,14 @@
 package dev.advik.mcdt.game.serializers;
 
+import net.minecraft.network.chat.Component;
+
+//? if >=1.21 {
+import com.mojang.serialization.JsonOps;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
-import com.mojang.serialization.JsonOps;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
+//?}
 
 public final class TextSerializer {
 	private TextSerializer() {}
@@ -21,6 +24,7 @@ public final class TextSerializer {
 		if (component == null) {
 			return null;
 		}
+		//? if >=1.21 {
 		try {
 			Minecraft client = Minecraft.getInstance();
 			HolderLookup.Provider provider = null;
@@ -33,10 +37,19 @@ public final class TextSerializer {
 			}
 			return toJson(component, provider);
 		} catch (Throwable t) {
-			return "{\"text\":\"" + component.getString().replace("\"", "\\\"") + "\"}";
+			return fallbackJson(component);
 		}
+		//?} else {
+		/*// Before 1.20.5 components serialize without registry access.
+		try {
+			return Component.Serializer.toJson(component);
+		} catch (RuntimeException e) {
+			return fallbackJson(component);
+		}
+		*///?}
 	}
 
+	//? if >=1.21 {
 	public static String toJson(Component component, HolderLookup.Provider provider) {
 		if (component == null) {
 			return null;
@@ -46,7 +59,12 @@ public final class TextSerializer {
 			return ComponentSerialization.CODEC.encodeStart(lookup.createSerializationContext(JsonOps.INSTANCE), component)
 					.getOrThrow().toString();
 		} catch (Exception e) {
-			return "{\"text\":\"" + component.getString().replace("\"", "\\\"") + "\"}";
+			return fallbackJson(component);
 		}
+	}
+	//?}
+
+	private static String fallbackJson(Component component) {
+		return "{\"text\":\"" + component.getString().replace("\"", "\\\"") + "\"}";
 	}
 }

@@ -50,7 +50,11 @@ public final class PixelReader {
 		*///?} else if >=1.21.11 {
 		/*return read(client.getMainRenderTarget().getColorTexture(), true);
 		*///?} else {
+		//? if >=1.21 {
 		NativeImage image = Screenshot.takeScreenshot(client.getMainRenderTarget());
+		//?} else {
+		/*NativeImage image = Screenshot.takeScreenshot(client.getWindow().getWidth(), client.getWindow().getHeight(), client.getMainRenderTarget());
+		*///?}
 		try {
 			return new Image(image.getWidth(), image.getHeight(), image.makePixelArray());
 		} finally {

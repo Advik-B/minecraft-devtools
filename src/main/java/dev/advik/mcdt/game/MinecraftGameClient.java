@@ -54,7 +54,9 @@ import dev.advik.mcdt.mixin.ClientAdvancementsAccessor;
 import dev.advik.mcdt.reflection.NameService;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.advancements.Advancement;
+//? if >=1.21 {
 import net.minecraft.advancements.AdvancementHolder;
+//?}
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.advancements.DisplayInfo;
 import net.minecraft.client.ClientRecipeBook;
@@ -76,7 +78,9 @@ import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.multiplayer.ServerList;
+//? if >=1.21 {
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
+//?}
 import dev.advik.mcdt.game.viewer.ViewerWorld;
 import dev.advik.mcdt.world.stream.ViewData;
 import net.minecraft.world.level.storage.LevelStorageSource;
@@ -115,7 +119,7 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public ClientDto getClient() {
 		Minecraft client = Minecraft.getInstance();
-		int fps = client.getFps();
+		int fps = McCompat.fps(client);
 
 		Window window = client.getWindow();
 		ClientDto.WindowInfo windowInfo = new ClientDto.WindowInfo(
@@ -168,7 +172,7 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		double[] pos = new double[]{player.getX(), player.getY(), player.getZ()};
-		PlayerDto.Rotation rotation = new PlayerDto.Rotation(player.getYRot(), player.getXRot());
+		PlayerDto.Rotation rotation = new PlayerDto.Rotation(McCompat.yRot(player), McCompat.xRot(player));
 		Vec3 vel = player.getDeltaMovement();
 		double[] velocity = new double[]{vel.x, vel.y, vel.z};
 
@@ -190,7 +194,7 @@ public final class MinecraftGameClient implements GameClient {
 				: "survival";
 
 		String pose = player.getPose().name().toLowerCase();
-		boolean onGround = player.onGround();
+		boolean onGround = McCompat.onGround(player);
 		boolean sneaking = player.isCrouching();
 		boolean sprinting = player.isSprinting();
 		boolean swimming = player.isSwimming();
@@ -200,7 +204,11 @@ public final class MinecraftGameClient implements GameClient {
 
 		List<PlayerDto.EffectInfo> effects = new ArrayList<>();
 		for (var effect : player.getActiveEffects()) {
+			//? if >=1.21 {
 			String id = McRegistries.MOB_EFFECT.getKey(effect.getEffect().value()).toString();
+			//?} else {
+			/*String id = McRegistries.MOB_EFFECT.getKey(effect.getEffect()).toString();
+			*///?}
 			effects.add(new PlayerDto.EffectInfo(
 					id,
 					effect.getAmplifier(),
@@ -210,7 +218,7 @@ public final class MinecraftGameClient implements GameClient {
 			));
 		}
 
-		var abilities = player.getAbilities();
+		var abilities = McCompat.abilities(player);
 		PlayerDto.Abilities ab = new PlayerDto.Abilities(
 				abilities.flying,
 				abilities.mayfly,
@@ -234,8 +242,8 @@ public final class MinecraftGameClient implements GameClient {
 			throw Problems.noPlayer();
 		}
 
-		int selectedSlot = McCompat.selectedSlot(player.getInventory());
-		List<ItemStack> items = McCompat.mainItems(player.getInventory());
+		int selectedSlot = McCompat.selectedSlot(McCompat.inventory(player));
+		List<ItemStack> items = McCompat.mainItems(McCompat.inventory(player));
 		List<InventoryDto.SlotInfo> main = new ArrayList<>(items.size());
 		for (int i = 0; i < items.size(); i++) {
 			main.add(ItemSerializer.toSlotInfo(i, items.get(i)));
@@ -281,7 +289,7 @@ public final class MinecraftGameClient implements GameClient {
 				level.getThunderLevel(1.0f)
 		);
 
-		String difficulty = level.getDifficulty().getSerializedName();
+		String difficulty = McCompat.difficultyKey(level.getDifficulty());
 		boolean hardcore = level.getLevelData().isHardcore();
 		BlockPos spawnPos = McCompat.spawnPos(level);
 		WorldDto.SpawnInfo spawn = new WorldDto.SpawnInfo(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
@@ -466,7 +474,7 @@ public final class MinecraftGameClient implements GameClient {
 						widgetIndex++,
 						type,
 						TextSerializer.toPlainText(widget.getMessage()),
-						new ScreenDto.WidgetBounds(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
+						new ScreenDto.WidgetBounds(McCompat.widgetX(widget), McCompat.widgetY(widget), widget.getWidth(), widget.getHeight()),
 						widget.active,
 						widget.visible,
 						widget.isFocused()
@@ -505,8 +513,8 @@ public final class MinecraftGameClient implements GameClient {
 	@Override
 	public RegistriesDto.EntryResponse getRegistryEntries(String registryId, String query, int offset, int limit) {
 		ResourceLocation rl = registryId.contains(":")
-				? ResourceLocation.parse(registryId)
-				: ResourceLocation.fromNamespaceAndPath("minecraft", registryId);
+				? McCompat.parseId(registryId)
+				: McCompat.id("minecraft", registryId);
 
 		Registry<?> registry = McRegistries.REGISTRY.getOptional(rl).orElse(null);
 		if (registry == null) {
@@ -538,17 +546,17 @@ public final class MinecraftGameClient implements GameClient {
 		Minecraft client = Minecraft.getInstance();
 		var opt = client.options;
 
-		int fov = opt.fov().get();
-		int renderDistance = opt.renderDistance().get();
-		int simulationDistance = opt.simulationDistance().get();
-		int guiScale = opt.guiScale().get();
-		double gamma = opt.gamma().get();
-		int maxFps = opt.framerateLimit().get();
-		boolean fullscreen = opt.fullscreen().get();
-		boolean vsync = opt.enableVsync().get();
+		int fov = McCompat.fov(opt).get();
+		int renderDistance = McCompat.renderDistance(opt).get();
+		int simulationDistance = McCompat.simulationDistance(opt).get();
+		int guiScale = McCompat.guiScale(opt).get();
+		double gamma = McCompat.gamma(opt).get();
+		int maxFps = McCompat.framerateLimit(opt).get();
+		boolean fullscreen = McCompat.fullscreen(opt).get();
+		boolean vsync = McCompat.enableVsync(opt).get();
 		String graphicsMode = McCompat.graphicsMode(opt);
-		boolean bobView = opt.bobView().get();
-		double mouseSensitivity = opt.sensitivity().get();
+		boolean bobView = McCompat.bobView(opt).get();
+		double mouseSensitivity = McCompat.sensitivity(opt).get();
 		boolean invertYMouse = McCompat.invertMouseY(opt).get();
 
 		Map<String, Float> volumes = new LinkedHashMap<>();
@@ -745,15 +753,15 @@ public final class MinecraftGameClient implements GameClient {
 		if (atlas instanceof TextureAtlasAccessor taa && taa.getTexturesByName() != null) {
 			for (Map.Entry<ResourceLocation, TextureAtlasSprite> entry : taa.getTexturesByName().entrySet()) {
 				TextureAtlasSprite sprite = entry.getValue();
-				var contents = sprite.contents();
-				int frameCount = McCompat.uniqueFrameCount(contents);
+				int frameCount = McCompat.uniqueFrameCount(sprite);
 				boolean animated = frameCount > 1;
+				int[] rect = McCompat.spriteRect(sprite, getAtlasWidth(atlas), getAtlasHeight(atlas));
 
 				sprites.put(entry.getKey().toString(), new TextureAtlasDto.SpriteInfo(
-						sprite.getX(),
-						sprite.getY(),
-						contents.width(),
-						contents.height(),
+						rect[0],
+						rect[1],
+						rect[2],
+						rect[3],
 						sprite.getU0(),
 						sprite.getU1(),
 						sprite.getV0(),
@@ -788,11 +796,11 @@ public final class MinecraftGameClient implements GameClient {
 	}
 
 	private int getAtlasWidth(TextureAtlas atlas) {
-		return atlas instanceof TextureAtlasAccessor taa ? taa.getWidth() : 1024;
+		return McCompat.atlasSize(atlas)[0];
 	}
 
 	private int getAtlasHeight(TextureAtlas atlas) {
-		return atlas instanceof TextureAtlasAccessor taa ? taa.getHeight() : 1024;
+		return McCompat.atlasSize(atlas)[1];
 	}
 
 	private ResourceLocation resolveAtlasLocation(String atlasId) {
@@ -803,9 +811,9 @@ public final class MinecraftGameClient implements GameClient {
 			return TextureAtlas.LOCATION_PARTICLES;
 		}
 		if (atlasId.contains(":")) {
-			return ResourceLocation.parse(atlasId);
+			return McCompat.parseId(atlasId);
 		}
-		return ResourceLocation.fromNamespaceAndPath("minecraft",
+		return McCompat.id("minecraft",
 				atlasId.startsWith("textures/atlas/") ? atlasId : "textures/atlas/" + atlasId + ".png");
 	}
 
@@ -832,11 +840,9 @@ public final class MinecraftGameClient implements GameClient {
 
 	private byte[] extractTextureBytes(ResourceLocation loc, int defaultWidth, int defaultHeight) {
 		Minecraft client = Minecraft.getInstance();
-		var res = client.getResourceManager().getResource(loc);
-		if (res.isPresent()) {
-			try (var is = res.get().open()) {
-				return is.readAllBytes();
-			} catch (IOException ignored) {}
+		byte[] resource = McCompat.readResource(client, loc);
+		if (resource != null) {
+			return resource;
 		}
 
 		var texture = client.getTextureManager().getTexture(loc);
@@ -1039,10 +1045,10 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		if (isCommand) {
-			client.player.connection.sendCommand(text);
+			McCompat.sendChat(client.player, "/" + text);
 			return new ChatDto.SendResponse(true, "command", "/" + text, -1);
 		} else {
-			client.player.connection.sendChat(text);
+			McCompat.sendChat(client.player, text);
 			return new ChatDto.SendResponse(true, "chat", text, -1);
 		}
 	}
@@ -1055,17 +1061,17 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		ChatComponentAccessor chatAccessor = (ChatComponentAccessor) McCompat.chat(client);
-		List<GuiMessage> allMessages = chatAccessor.getAllMessages();
+		var allMessages = chatAccessor.getAllMessages();
 		if (allMessages == null || allMessages.isEmpty()) {
 			return new ChatDto.HistoryResponse(0, offset, limit, List.of());
 		}
 
 		List<ChatDto.MessageEntry> entries = new ArrayList<>(allMessages.size());
-		for (GuiMessage msg : allMessages) {
+		for (var msg : allMessages) {
 			entries.add(new ChatDto.MessageEntry(
-					TextSerializer.toPlainText(msg.content()),
-					TextSerializer.toJson(msg.content()),
-					msg.addedTime()
+					TextSerializer.toPlainText(McCompat.messageContent(msg)),
+					TextSerializer.toJson(McCompat.messageContent(msg)),
+					McCompat.messageTime(msg)
 			));
 		}
 
@@ -1084,8 +1090,8 @@ public final class MinecraftGameClient implements GameClient {
 			throw Problems.noPlayer();
 		}
 		LocalPlayer player = client.player;
-		float yaw = player.getYRot();
-		float pitch = player.getXRot();
+		float yaw = McCompat.yRot(player);
+		float pitch = McCompat.xRot(player);
 
 		if (request.target() != null && request.target().length >= 3) {
 			double dx = request.target()[0] - player.getX();
@@ -1109,8 +1115,7 @@ public final class MinecraftGameClient implements GameClient {
 		}
 
 		pitch = Math.max(-90.0f, Math.min(90.0f, pitch));
-		player.setYRot(yaw);
-		player.setXRot(pitch);
+		McCompat.setRot(player, yaw, pitch);
 		player.setYHeadRot(yaw);
 		player.yRotO = yaw;
 		player.xRotO = pitch;
@@ -1128,11 +1133,11 @@ public final class MinecraftGameClient implements GameClient {
 		if (Boolean.TRUE.equals(request.stop())) {
 			MovementTracker.getInstance().stop();
 			return new PlayerMoveDto.Response(false, false, false, false, false, false, false,
-					player.getAbilities().flying, 0, -1);
+					McCompat.abilities(player).flying, 0, -1);
 		}
 
 		if (request.fly() != null) {
-			player.getAbilities().flying = request.fly();
+			McCompat.abilities(player).flying = request.fly();
 			player.onUpdateAbilities();
 		}
 		if (Boolean.TRUE.equals(request.dismount())) {
@@ -1151,7 +1156,7 @@ public final class MinecraftGameClient implements GameClient {
 		MovementTracker.getInstance().start(forward, backward, left, right, jump, sneak, sprint, ticks);
 
 		return new PlayerMoveDto.Response(forward, backward, left, right, jump, sneak, sprint,
-				player.getAbilities().flying, MovementTracker.getInstance().getRemainingTicks(), -1);
+				McCompat.abilities(player).flying, MovementTracker.getInstance().getRemainingTicks(), -1);
 	}
 
 	@Override
@@ -1183,7 +1188,7 @@ public final class MinecraftGameClient implements GameClient {
 					BlockPos pos = new BlockPos(request.pos()[0], request.pos()[1], request.pos()[2]);
 					Direction dir = parseDirection(request.face());
 					BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), dir, pos, false);
-					client.gameMode.useItemOn(player, parseHand(request.hand()), hit);
+					McCompat.useItemOn(client, parseHand(request.hand()), hit);
 				} else {
 					mcAccessor.invokeStartUseItem();
 				}
@@ -1199,7 +1204,7 @@ public final class MinecraftGameClient implements GameClient {
 					ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN));
 			case "select_hotbar" -> {
 				if (request.slot() != null && request.slot() >= 0 && request.slot() <= 8) {
-					McCompat.setSelectedSlot(player.getInventory(), request.slot());
+					McCompat.setSelectedSlot(McCompat.inventory(player), request.slot());
 				} else {
 					throw Problems.invalidParameter("slot", "Hotbar slot index must be 0-8");
 				}
@@ -1216,7 +1221,7 @@ public final class MinecraftGameClient implements GameClient {
 				BlockPos pos = new BlockPos(request.pos()[0], request.pos()[1], request.pos()[2]);
 				Direction dir = parseDirection(request.face());
 				BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), dir, pos, false);
-				client.gameMode.useItemOn(player, parseHand(request.hand()), hit);
+				McCompat.useItemOn(client, parseHand(request.hand()), hit);
 			}
 			case "interact_entity" -> {
 				if (request.entityId() == null) {
@@ -1277,8 +1282,8 @@ public final class MinecraftGameClient implements GameClient {
 				if (targetWidget instanceof Button b) {
 					McCompat.pressButton(b);
 				} else {
-					McCompat.mouseClicked(targetWidget, targetWidget.getX() + targetWidget.getWidth() / 2.0,
-							targetWidget.getY() + targetWidget.getHeight() / 2.0, btn);
+					McCompat.mouseClicked(targetWidget, McCompat.widgetX(targetWidget) + targetWidget.getWidth() / 2.0,
+							McCompat.widgetY(targetWidget) + targetWidget.getHeight() / 2.0, btn);
 				}
 			} else if (request.x() != null && request.y() != null) {
 				int btn = request.button() != null ? request.button() : 0;
@@ -1349,7 +1354,7 @@ public final class MinecraftGameClient implements GameClient {
 			}
 		}
 
-		ItemStack carried = menu.getCarried();
+		ItemStack carried = McCompat.carried(menu, client.player);
 		ItemStack clicked = menu.getSlot(slot).getItem();
 
 		return new ScreenSlotDto.Response(slot, modeStr.toLowerCase(Locale.ROOT),
@@ -1362,16 +1367,16 @@ public final class MinecraftGameClient implements GameClient {
 		Minecraft client = Minecraft.getInstance();
 		var opt = client.options;
 
-		if (request.fov() != null) opt.fov().set(request.fov());
-		if (request.renderDistance() != null) opt.renderDistance().set(request.renderDistance());
-		if (request.simulationDistance() != null) opt.simulationDistance().set(request.simulationDistance());
-		if (request.guiScale() != null) opt.guiScale().set(request.guiScale());
-		if (request.gamma() != null) opt.gamma().set(request.gamma());
-		if (request.maxFps() != null) opt.framerateLimit().set(request.maxFps());
-		if (request.fullscreen() != null) opt.fullscreen().set(request.fullscreen());
-		if (request.vsync() != null) opt.enableVsync().set(request.vsync());
-		if (request.bobView() != null) opt.bobView().set(request.bobView());
-		if (request.mouseSensitivity() != null) opt.sensitivity().set(request.mouseSensitivity());
+		if (request.fov() != null) McCompat.fov(opt).set(request.fov());
+		if (request.renderDistance() != null) McCompat.renderDistance(opt).set(request.renderDistance());
+		if (request.simulationDistance() != null) McCompat.simulationDistance(opt).set(request.simulationDistance());
+		if (request.guiScale() != null) McCompat.guiScale(opt).set(request.guiScale());
+		if (request.gamma() != null) McCompat.gamma(opt).set(request.gamma());
+		if (request.maxFps() != null) McCompat.framerateLimit(opt).set(request.maxFps());
+		if (request.fullscreen() != null) McCompat.fullscreen(opt).set(request.fullscreen());
+		if (request.vsync() != null) McCompat.enableVsync(opt).set(request.vsync());
+		if (request.bobView() != null) McCompat.bobView(opt).set(request.bobView());
+		if (request.mouseSensitivity() != null) McCompat.sensitivity(opt).set(request.mouseSensitivity());
 		if (request.invertYMouse() != null) McCompat.invertMouseY(opt).set(request.invertYMouse());
 		if (request.pauseOnLostFocus() != null) opt.pauseOnLostFocus = request.pauseOnLostFocus();
 		if (request.language() != null && !request.language().isBlank()) opt.languageCode = request.language();
@@ -1380,7 +1385,7 @@ public final class MinecraftGameClient implements GameClient {
 			for (var entry : request.soundVolumes().entrySet()) {
 				for (SoundSource source : SoundSource.values()) {
 					if (source.getName().equalsIgnoreCase(entry.getKey())) {
-						opt.getSoundSourceOptionInstance(source).set(entry.getValue().doubleValue());
+						McCompat.soundVolume(opt, source).set(entry.getValue().doubleValue());
 						break;
 					}
 				}
@@ -1539,10 +1544,10 @@ public final class MinecraftGameClient implements GameClient {
 		double minCov = minCoverage != null ? Math.max(0.0, minCoverage) : 0.0;
 
 		long tick = client.level.getGameTime();
-		Vec3 eyePos = player.getEyePosition();
-		float yaw = player.getYRot();
-		float pitch = player.getXRot();
-		float fov = (float) client.options.fov().get();
+		Vec3 eyePos = McCompat.eyePosition(player);
+		float yaw = McCompat.yRot(player);
+		float pitch = McCompat.xRot(player);
+		float fov = (float) McCompat.fov(client.options).get();
 
 		ViewBlocksDto.CameraInfo camera = new ViewBlocksDto.CameraInfo(
 				new double[]{eyePos.x, eyePos.y, eyePos.z},
@@ -1821,7 +1826,7 @@ public final class MinecraftGameClient implements GameClient {
 							bossBars.add(new HudDto.BossBarInfo(
 									entry.getKey().toString(),
 									TextSerializer.toPlainText(ev.getName()),
-									ev.getProgress(),
+									McCompat.bossProgress(ev),
 									ev.getColor().getName(),
 									ev.getOverlay().getName(),
 									ev.shouldDarkenScreen(),
@@ -1842,7 +1847,7 @@ public final class MinecraftGameClient implements GameClient {
 				}
 				List<HudDto.TabList.PlayerEntry> players = new ArrayList<>();
 				if (client.getConnection() != null) {
-					for (net.minecraft.client.multiplayer.PlayerInfo info : client.getConnection().getListedOnlinePlayers()) {
+					for (net.minecraft.client.multiplayer.PlayerInfo info : McCompat.listedPlayers(client)) {
 						players.add(new HudDto.TabList.PlayerEntry(
 								McCompat.profileName(info.getProfile()),
 								McCompat.profileId(info.getProfile()).toString(),
@@ -1884,9 +1889,15 @@ public final class MinecraftGameClient implements GameClient {
 		if (all || include.contains("scoreboard")) {
 			if (client.level != null) {
 				net.minecraft.world.scores.Scoreboard sb = client.level.getScoreboard();
+				//? if >=1.21 {
 				net.minecraft.world.scores.Objective obj = sb.getDisplayObjective(net.minecraft.world.scores.DisplaySlot.SIDEBAR);
+				//?} else {
+				/*// Display slot 1 is the sidebar.
+				net.minecraft.world.scores.Objective obj = sb.getDisplayObjective(1);
+				*///?}
 				if (obj != null) {
 					List<HudDto.ScoreboardSidebar.ScoreEntry> scoreEntries = new ArrayList<>();
+					//? if >=1.21 {
 					for (net.minecraft.world.scores.PlayerScoreEntry pse : sb.listPlayerScores(obj)) {
 						if (!pse.isHidden()) {
 							scoreEntries.add(new HudDto.ScoreboardSidebar.ScoreEntry(
@@ -1896,6 +1907,14 @@ public final class MinecraftGameClient implements GameClient {
 							));
 						}
 					}
+					//?} else {
+					/*for (net.minecraft.world.scores.Score score : sb.getPlayerScores(obj)) {
+						if (score.getOwner() != null && !score.getOwner().startsWith("#")) {
+							scoreEntries.add(new HudDto.ScoreboardSidebar.ScoreEntry(
+									score.getOwner(), score.getScore(), Integer.toString(score.getScore())));
+						}
+					}
+					*///?}
 					scoreboard = new HudDto.ScoreboardSidebar(
 							obj.getName(),
 							TextSerializer.toPlainText(obj.getDisplayName()),
@@ -1909,7 +1928,7 @@ public final class MinecraftGameClient implements GameClient {
 		if (all || include.contains("helditem")) {
 			ItemStack main = player.getMainHandItem();
 			ItemStack off = player.getOffhandItem();
-			int selected = McCompat.selectedSlot(player.getInventory());
+			int selected = McCompat.selectedSlot(McCompat.inventory(player));
 			heldItem = new HudDto.HeldItemInfo(
 					!main.isEmpty() ? ItemSerializer.toSlotInfo(selected, main) : null,
 					!off.isEmpty() ? ItemSerializer.toSlotInfo(40, off) : null,
@@ -1959,12 +1978,12 @@ public final class MinecraftGameClient implements GameClient {
 			case THIRD_PERSON_FRONT -> "third_person_front";
 		};
 
-		double fov = client.options.fov().get();
+		double fov = McCompat.fov(client.options).get();
 		double[] eyePos = client.player != null
-				? new double[]{client.player.getEyePosition().x, client.player.getEyePosition().y, client.player.getEyePosition().z}
+				? new double[]{McCompat.eyePosition(client.player).x, McCompat.eyePosition(client.player).y, McCompat.eyePosition(client.player).z}
 				: new double[]{0, 0, 0};
 		CameraDto.Rotation rot = client.player != null
-				? new CameraDto.Rotation(client.player.getYRot(), client.player.getXRot())
+				? new CameraDto.Rotation(McCompat.yRot(client.player), McCompat.xRot(client.player))
 				: new CameraDto.Rotation(0, 0);
 
 		return new CameraDto.Response(perspective, fov, eyePos, rot);
@@ -1986,7 +2005,7 @@ public final class MinecraftGameClient implements GameClient {
 
 		if (request.fov() != null) {
 			int clampedFov = (int) Math.round(Math.max(30.0, Math.min(110.0, request.fov())));
-			client.options.fov().set(clampedFov);
+			McCompat.fov(client.options).set(clampedFov);
 		}
 
 		return getCamera();
@@ -2191,35 +2210,49 @@ public final class MinecraftGameClient implements GameClient {
 			throw Problems.noPlayer();
 		}
 		ClientAdvancements clientAdvancements = client.getConnection().getAdvancements();
-		Map<AdvancementHolder, AdvancementProgress> progressMap = ((ClientAdvancementsAccessor) clientAdvancements).getProgress();
+		var progressMap = ((ClientAdvancementsAccessor) clientAdvancements).getProgress();
 
 		List<AdvancementsDto.AdvancementInfo> list = new ArrayList<>();
-		for (Map.Entry<AdvancementHolder, AdvancementProgress> entry : progressMap.entrySet()) {
-			AdvancementHolder holder = entry.getKey();
+		for (var entry : progressMap.entrySet()) {
 			AdvancementProgress progress = entry.getValue();
+			//? if >=1.21 {
+			AdvancementHolder holder = entry.getKey();
 			String id = holder.id().toString();
 			Advancement adv = holder.value();
+			java.util.Optional<DisplayInfo> display = adv.display();
+			String parent = adv.parent().map(ResourceLocation::toString).orElse(null);
+			//?} else {
+			/*// Before 1.20.2 the advancement is the key itself, with nullable display and parent.
+			Advancement adv = entry.getKey();
+			String id = adv.getId().toString();
+			java.util.Optional<DisplayInfo> display = java.util.Optional.ofNullable(adv.getDisplay());
+			String parent = adv.getParent() != null ? adv.getParent().getId().toString() : null;
+			*///?}
 
 			String title = id;
 			String desc = "";
 			String type = "task";
 			String icon = "";
-			if (adv.display().isPresent()) {
-				DisplayInfo d = adv.display().get();
+			if (display.isPresent()) {
+				DisplayInfo d = display.get();
 				//? if >=26.1 {
 				/*title = TextSerializer.toPlainText(d.title());
 				desc = TextSerializer.toPlainText(d.description());
 				type = d.type().name().toLowerCase();
 				icon = McRegistries.ITEM.getKey(d.icon().item().value()).toString();
-				*///?} else {
+				*///?} else if >=1.21 {
 				title = TextSerializer.toPlainText(d.getTitle());
 				desc = TextSerializer.toPlainText(d.getDescription());
 				type = d.getType().name().toLowerCase();
 				icon = McRegistries.ITEM.getKey(d.getIcon().getItem()).toString();
-				//?}
+				//?} else {
+				/*title = TextSerializer.toPlainText(d.getTitle());
+				desc = TextSerializer.toPlainText(d.getDescription());
+				type = d.getFrame().name().toLowerCase();
+				icon = McRegistries.ITEM.getKey(d.getIcon().getItem()).toString();
+				*///?}
 			}
 
-			String parent = adv.parent().map(ResourceLocation::toString).orElse(null);
 			boolean isDone = progress.isDone();
 			float percent = progress.getPercent();
 
@@ -2449,8 +2482,12 @@ public final class MinecraftGameClient implements GameClient {
 		LevelStorageSource levelSource = client.getLevelSource();
 		List<WorldsDto.WorldSummaryInfo> list = new ArrayList<>();
 		try {
+			//? if >=1.21 {
 			LevelStorageSource.LevelCandidates candidates = levelSource.findLevelCandidates();
 			List<LevelSummary> summaries = levelSource.loadLevelSummaries(candidates).join();
+			//?} else {
+			/*List<LevelSummary> summaries = levelSource.getLevelList();
+			*///?}
 			for (LevelSummary s : summaries) {
 				list.add(new WorldsDto.WorldSummaryInfo(
 						s.getLevelId(),
@@ -2458,7 +2495,11 @@ public final class MinecraftGameClient implements GameClient {
 						s.getLastPlayed(),
 						s.getGameMode().getName(),
 						s.isHardcore(),
+						//? if >=1.21 {
 						s.hasCommands(),
+						//?} else {
+						/*s.hasCheats(),
+						*///?}
 						s.getWorldVersionName().getString(),
 						s.isLocked()
 				));
@@ -2473,7 +2514,11 @@ public final class MinecraftGameClient implements GameClient {
 	public WorldsDto.LoadResponse loadWorld(String levelId) {
 		Minecraft client = Minecraft.getInstance();
 		CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS).execute(() -> {
+			//? if >=1.21 {
 			client.execute(() -> client.createWorldOpenFlows().openWorld(levelId, () -> {}));
+			//?} else {
+			/*client.execute(() -> client.loadLevel(levelId));
+			*///?}
 		});
 		return new WorldsDto.LoadResponse(true, levelId);
 	}
@@ -2498,7 +2543,12 @@ public final class MinecraftGameClient implements GameClient {
 		for (int i = 0; i < serverList.size(); i++) {
 			ServerData sd = serverList.get(i);
 			String motd = sd.motd != null ? sd.motd.getString() : "";
+			//? if >=1.21 {
 			String count = sd.players != null ? sd.players.online() + "/" + sd.players.max() : "0/0";
+			//?} else {
+			/*// Before 1.19.4 the player count is only kept as the status text ("3/20").
+			String count = sd.status != null ? sd.status.getString() : "0/0";
+			*///?}
 			list.add(new ServersDto.ServerEntryInfo(i, sd.name, sd.ip, sd.ping, motd, count));
 		}
 		return new ServersDto.ListResponse(list.size(), list);
@@ -2512,8 +2562,13 @@ public final class MinecraftGameClient implements GameClient {
 		}
 		ServerList serverList = new ServerList(client);
 		serverList.load();
+		//? if >=1.21 {
 		ServerData sd = new ServerData(request.name(), request.address(), ServerData.Type.OTHER);
 		serverList.add(sd, false);
+		//?} else {
+		/*ServerData sd = new ServerData(request.name(), request.address(), false);
+		serverList.add(sd);
+		*///?}
 		serverList.save();
 		return getServers();
 	}
@@ -2553,11 +2608,18 @@ public final class MinecraftGameClient implements GameClient {
 		if (address == null || address.isBlank()) {
 			throw Problems.invalidParameter("address", "Server address must not be empty");
 		}
+		//? if >=1.21 {
 		ServerAddress sa = ServerAddress.parseString(address);
 		ServerData sd = new ServerData("Server", address, ServerData.Type.OTHER);
 		CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS).execute(() -> {
 			client.execute(() -> ConnectScreen.startConnecting(new TitleScreen(), client, sa, sd, false, null));
 		});
+		//?} else {
+		/*ServerData sd = new ServerData("Server", address, false);
+		CompletableFuture.delayedExecutor(50, TimeUnit.MILLISECONDS).execute(() -> {
+			client.execute(() -> McCompat.setScreen(client, new ConnectScreen(new TitleScreen(), client, sd)));
+		});
+		*///?}
 		return new ServersDto.ConnectResponse(true, address);
 	}
 }
