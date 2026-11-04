@@ -80,8 +80,15 @@ class McpShimTest {
 
 	@Test
 	void testPythonShimStdioRelay() throws Exception {
-		File scriptFile = new File("scripts/mcdt-mcp.py");
-		assertTrue(scriptFile.exists(), "scripts/mcdt-mcp.py must exist");
+		// Tests run from the module directory; the script lives at the repository root.
+		File scriptFile = null;
+		for (File dir = new File("").getAbsoluteFile(); dir != null && scriptFile == null; dir = dir.getParentFile()) {
+			File candidate = new File(dir, "scripts/mcdt-mcp.py");
+			if (candidate.isFile()) {
+				scriptFile = candidate;
+			}
+		}
+		assertTrue(scriptFile != null, "scripts/mcdt-mcp.py must exist");
 
 		ProcessBuilder pb = new ProcessBuilder(
 				"python",
