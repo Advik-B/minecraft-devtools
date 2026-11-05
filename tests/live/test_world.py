@@ -53,8 +53,10 @@ def test_block_models(api: Api, capabilities: set[str]) -> None:
     grass = by_state["minecraft:grass_block[snowy=false]"]
     assert any(q.get("tint", 0) == 1 for q in grass["quads"]), "grass_block has no grass-tinted quad"
 
+    # Leaves are cutout with Fancy graphics but solid with Fast (CI), so check the layer on a sapling.
+    sapling = first("minecraft:oak_sapling")
+    assert sapling.get("layer") in ("cutout", "cutout_mipped"), sapling.get("layer")
     leaves = first("minecraft:oak_leaves")
-    assert leaves["layer"] in ("cutout", "cutout_mipped"), leaves["layer"]
     assert any(q.get("tint", 0) == 2 for q in leaves["quads"]), "oak_leaves has no foliage-tinted quad"
 
     water = first("minecraft:water")
