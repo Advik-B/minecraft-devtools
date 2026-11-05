@@ -1482,6 +1482,11 @@ public final class MinecraftGameClient implements GameClient {
 		//? if <1.21.2 {
 		/*set.remove(dev.advik.mcdt.api.v1.Capability.RECIPES);
 		*///?}
+		// Before 1.19 there is no chat signing; before 1.20.5 items have NBT instead of data components.
+		//? if <1.21 {
+		/*set.remove(dev.advik.mcdt.api.v1.Capability.CHAT_SIGNING);
+		set.remove(dev.advik.mcdt.api.v1.Capability.ITEM_COMPONENTS);
+		*///?}
 		return java.util.Collections.unmodifiableSet(set);
 	}
 
