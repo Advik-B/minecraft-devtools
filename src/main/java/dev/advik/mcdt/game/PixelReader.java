@@ -94,28 +94,24 @@ public final class PixelReader {
 		GpuBuffer buffer = RenderSystem.getDevice().createBuffer(() -> "MCDT readback", GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_MAP_READ,
 				(long) width * height * pixelSize);
 		CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
-		int[][] result = new int[1][];
+		// The copy's callback isn't used: OpenGL runs it from the fenced-task queue, but Vulkan only runs it when the
+		// frame's resources are released, frames later. Instead, submit the recorded commands and block on a fence
+		// placed after the copy; the GPU runs commands in order, so once it signals the buffer holds the pixels.
 		encoder.copyTextureToBuffer(texture, buffer, 0L, () -> {
-			try (GpuBufferSlice.MappedView view = buffer.map(true, false)) {
-				result[0] = toArgb(view.data(), width, height, framebuffer);
-			} finally {
-				buffer.close();
-			}
 		}, 0);
-
-		// Submit the recorded commands (OpenGL or Vulkan), then block on a fence placed after the copy: the GPU runs
-		// commands in order, so once it signals, the copy's own fence has too and its callback can run.
-		try (GpuFence fence = encoder.createFence()) {
-			encoder.submit();
-			if (!fence.awaitCompletion(TIMEOUT_NANOS)) {
-				throw Problems.textureFailed("Timed out reading " + texture.getLabel() + " back from the GPU");
+		try {
+			try (GpuFence fence = encoder.createFence()) {
+				encoder.submit();
+				if (!fence.awaitCompletion(TIMEOUT_NANOS)) {
+					throw Problems.textureFailed("Timed out reading " + texture.getLabel() + " back from the GPU");
+				}
 			}
+			try (GpuBufferSlice.MappedView view = buffer.map(true, false)) {
+				return new Image(width, height, toArgb(view.data(), width, height, framebuffer));
+			}
+		} finally {
+			buffer.close();
 		}
-		RenderSystem.executePendingTasks();
-		if (result[0] == null) {
-			throw Problems.textureFailed("The GPU copy of " + texture.getLabel() + " did not complete");
-		}
-		return new Image(width, height, result[0]);
 	}
 	*///?} else if >=1.21.11 {
 	/*/^*
