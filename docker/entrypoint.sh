@@ -17,7 +17,8 @@ display_num="${DISPLAY#:}"
 display_num="${display_num%%.*}"
 rm -f "/tmp/.X${display_num}-lock" "/tmp/.X11-unix/X${display_num}"
 # setsid keeps Xvfb out of the process group that `docker stop` signals, so the display outlives the game.
-setsid Xvfb "$DISPLAY" -screen 0 "${MC_WIDTH}x${MC_HEIGHT}x24" -nolisten tcp >/tmp/xvfb.log 2>&1 &
+# x24+32 adds 32-bit visuals: 26.x opens its window through SDL3, which wants an alpha channel.
+setsid Xvfb "$DISPLAY" -screen 0 "${MC_WIDTH}x${MC_HEIGHT}x24+32" +extension GLX +render -nolisten tcp >/tmp/xvfb.log 2>&1 &
 i=0
 while [ ! -S "/tmp/.X11-unix/X${display_num}" ]; do
 	i=$((i + 1))

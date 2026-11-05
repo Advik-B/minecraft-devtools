@@ -113,7 +113,9 @@ else
 
 	log "launching $MC_TARGET"
 	export LIBGL_ALWAYS_SOFTWARE=1 MCDT_PERMISSION=reflect-write MCDT_ALLOW_QUIT=true MCDT_PORT="$PORT"
-	xvfb-run -a -s "-screen 0 1280x720x24" \
+	# x24+32 adds 32-bit visuals: 26.x opens its window through SDL3, which wants an alpha channel
+	# ("Couldn't find matching GLX visual" otherwise).
+	xvfb-run -a -s "-screen 0 1280x720x24+32 +extension GLX +render -noreset" \
 		portablemc --main-dir "$PMC" start --mc-dir "$INST" --jvm "$JAVA_BIN" --jvm-arg=-Xmx2G -u McdtBot "$MC_TARGET" \
 		> "$RESULTS/launch.log" 2>&1 &
 	LAUNCHER=$!
