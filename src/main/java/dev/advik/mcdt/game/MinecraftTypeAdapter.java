@@ -1,5 +1,6 @@
 package dev.advik.mcdt.game;
 
+import dev.advik.mcdt.game.McCompat;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.advik.mcdt.game.serializers.BlockStateSerializer;
 import dev.advik.mcdt.game.serializers.EntitySerializer;
@@ -74,7 +75,7 @@ public final class MinecraftTypeAdapter implements GameTypeAdapter {
 		}
 
 		if (targetType == ResourceLocation.class) {
-			return ResourceLocation.parse(node.asText());
+			return McCompat.parseId(node.asText());
 		}
 
 		if (targetType == InteractionHand.class) {

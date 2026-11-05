@@ -1,5 +1,7 @@
 package dev.advik.mcdt.reflection;
 
+import dev.advik.mcdt.game.McCompat;
+
 import dev.advik.mcdt.security.BearerToken;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
@@ -107,10 +109,10 @@ class ReflectionSerializerTest {
 		assertEquals(20, posMap.get("y"));
 		assertEquals(30, posMap.get("z"));
 
-		ResourceLocation res = ResourceLocation.parse("minecraft:diamond_sword");
+		ResourceLocation res = McCompat.parseId("minecraft:diamond_sword");
 		assertEquals("minecraft:diamond_sword", serializer.serialize(res, 0, 1, new HashSet<>(), null, null));
 
-		Component comp = Component.literal("Hello Minecraft");
+		Component comp = McCompat.literal("Hello Minecraft");
 		Object compObj = serializer.serialize(comp, 0, 1, new HashSet<>(), null, null);
 		assertTrue(compObj instanceof Map<?, ?>);
 		Map<?, ?> compMap = (Map<?, ?>) compObj;

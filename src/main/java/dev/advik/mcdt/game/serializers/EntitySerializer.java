@@ -1,8 +1,9 @@
 package dev.advik.mcdt.game.serializers;
 
+import dev.advik.mcdt.game.McCompat;
+import dev.advik.mcdt.game.McRegistries;
 import dev.advik.mcdt.api.v1.dto.EntitiesDto.BoundingBox;
 import dev.advik.mcdt.api.v1.dto.EntitiesDto.EntityInfo;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
@@ -19,12 +20,12 @@ public final class EntitySerializer {
 	public static EntityInfo toEntityInfo(Entity entity, Vec3 origin) {
 		int id = entity.getId();
 		String uuid = entity.getStringUUID();
-		String type = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
+		String type = McRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
 		double[] pos = new double[]{entity.getX(), entity.getY(), entity.getZ()};
 		Vec3 vel = entity.getDeltaMovement();
 		double[] velocity = new double[]{vel.x, vel.y, vel.z};
-		float yaw = entity.getYRot();
-		float pitch = entity.getXRot();
+		float yaw = McCompat.yRot(entity);
+		float pitch = McCompat.xRot(entity);
 		double distance = origin != null ? entity.position().distanceTo(origin) : 0.0;
 		boolean alive = entity.isAlive();
 

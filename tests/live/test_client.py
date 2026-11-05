@@ -78,8 +78,9 @@ REFLECTION = cases(
     Case("inspect options", "/v1/objects/options", check=lambda j: j["$handle"] == "options" and j["fields"] is not None),
     Case("inspect gameRenderer", "/v1/objects/gameRenderer",
          check=lambda j: j["$handle"] == "gameRenderer" and j["fields"] is not None),
-    Case("path renderDistance", "/v1/objects/minecraft?path=options.renderDistance().get()",
-         check=lambda j: j["path"] == "options.renderDistance().get()" and j["value"] is not None),
+    # A method call every supported version has (option getters like renderDistance() arrived in 1.19).
+    Case("path camera type", "/v1/objects/minecraft?path=options.getCameraType()",
+         check=lambda j: j["path"] == "options.getCameraType()" and j["value"] is not None),
     Case("path fps", "/v1/objects/minecraft?path=fps", check=lambda j: j["path"] == "fps" and j["value"] is not None),
     Case("invalid path", "/v1/objects/minecraft?path=invalid.fakeField", status=400, check=problem("path-evaluation-failed")),
     Case("missing field", "/v1/objects/minecraft/fields/nonExistent", status=404, check=problem("field-not-found")),

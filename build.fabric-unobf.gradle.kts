@@ -64,11 +64,14 @@ dependencies {
 	compileOnly(files(baritoneJar))
 	testImplementation(files(baritoneJar))
 
-	// Optional config UI: compile against it, run it in dev, never ship or require it.
-	compileOnly("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
-	compileOnly("com.terraformersmc:modmenu:${prop("modmenu_version")}")
-	localRuntime("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
-	localRuntime("com.terraformersmc:modmenu:${prop("modmenu_version")}")
+	// Optional config UI: compile against it, run it in dev, never ship or require it. Nodes without YACL (1.16.5)
+	// have no config screen.
+	if (project.hasProperty("yacl_version")) {
+		compileOnly("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
+		compileOnly("com.terraformersmc:modmenu:${prop("modmenu_version")}")
+		localRuntime("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
+		localRuntime("com.terraformersmc:modmenu:${prop("modmenu_version")}")
+	}
 }
 
 tasks.processResources {
@@ -78,6 +81,11 @@ tasks.processResources {
 		"java_version" to prop("java_version"),
 		"loader_version" to prop("loader_version"),
 		"baritone_version" to prop("baritone_version"),
+		// Fabric API's mod id is "fabric" in its old releases (1.16.5 here), "fabric-api" since.
+		"fabric_api_mod_id" to (project.findProperty("fabric_api_mod_id") ?: "fabric-api").toString(),
+		"access_widener" to "",
+		// Mod Menu opens the YACL screen; without YACL there is no entrypoint.
+		"modmenu_entrypoint" to if (project.hasProperty("yacl_version")) "\"dev.advik.mcdt.platform.fabric.FabricModMenuApi\"" else "",
 	)
 	inputs.properties(metadata)
 

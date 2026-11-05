@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.List;
 
-/** Visible toasts. 1.21.2 renamed {@code ToastComponent} to {@code ToastManager}. */
+/** Visible toasts. 1.21.2 renamed {@code ToastComponent} to {@code ToastManager}; before 1.17 they're an array. */
 //? if >=1.21.2 {
 @Mixin(ToastManager.class)
 //?} else {
@@ -19,8 +19,14 @@ import java.util.List;
 public interface ToastManagerAccessor {
 	//? if >=1.21.2 {
 	@Accessor("visibleToasts")
-	//?} else {
-	/*@Accessor("visible")
-	*///?}
 	List<?> getVisibleToasts();
+	//?} else if >=1.21 {
+	/*@Accessor("visible")
+	List<?> getVisibleToasts();
+	*///?} else {
+	/*// ToastInstance is package-private; the 1.16.5 access widener (versions/1.16.5-fabric/resources) opens it.
+	// Accessor interfaces can hold only accessors, so McCompat.visibleToasts turns this into a list.
+	@Accessor("visible")
+	ToastComponent.ToastInstance<?>[] getVisibleToastArray();
+	*///?}
 }

@@ -1,6 +1,6 @@
 package dev.advik.mcdt.game.serializers;
 
-import net.minecraft.core.registries.BuiltInRegistries;
+import dev.advik.mcdt.game.McRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 
@@ -15,7 +15,7 @@ public final class BlockStateSerializer {
 			return "minecraft:air";
 		}
 
-		String blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+		String blockId = McRegistries.BLOCK.getKey(state.getBlock()).toString();
 		Collection<Property<?>> properties = state.getProperties();
 		if (properties.isEmpty()) {
 			return blockId;

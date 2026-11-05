@@ -1,4 +1,4 @@
-//? if fabric {
+//? if fabric && >=1.21 {
 package dev.advik.mcdt.platform.fabric;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;

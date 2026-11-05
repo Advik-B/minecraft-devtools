@@ -1,5 +1,7 @@
 package dev.advik.mcdt.baritone.bridge;
 
+import dev.advik.mcdt.game.McCompat;
+import dev.advik.mcdt.game.McRegistries;
 import baritone.api.BaritoneAPI;
 import baritone.api.IBaritone;
 import baritone.api.Settings;
@@ -20,7 +22,6 @@ import dev.advik.mcdt.reflection.GameTypeAdapters;
 import dev.advik.mcdt.reflection.HandleTable;
 import dev.advik.mcdt.reflection.TypeConverter;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
@@ -174,8 +175,8 @@ public final class BaritoneBridge implements BaritoneService {
 	public JobResponse startGoto(GotoRequest req) {
 		Goal goal;
 		if (req.block() != null && !req.block().isBlank()) {
-			ResourceLocation rl = ResourceLocation.parse(req.block());
-			Block b = BuiltInRegistries.BLOCK.getOptional(rl).orElse(null);
+			ResourceLocation rl = McCompat.parseId(req.block());
+			Block b = McRegistries.BLOCK.getOptional(rl).orElse(null);
 			if (b == null) {
 				throw Problems.badRequest("Unknown block type: " + req.block());
 			}
@@ -349,10 +350,10 @@ public final class BaritoneBridge implements BaritoneService {
 			return e.name();
 		}
 		if (value instanceof Block block) {
-			return BuiltInRegistries.BLOCK.getKey(block).toString();
+			return McRegistries.BLOCK.getKey(block).toString();
 		}
 		if (value instanceof Item item) {
-			return BuiltInRegistries.ITEM.getKey(item).toString();
+			return McRegistries.ITEM.getKey(item).toString();
 		}
 		if (value instanceof Collection<?> values) {
 			List<Object> out = new ArrayList<>(values.size());

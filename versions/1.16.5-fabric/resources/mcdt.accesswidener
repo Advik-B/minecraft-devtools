@@ -1,0 +1,3 @@
+accessWidener v1 named
+# ToastComponent.visible holds these; the toast HUD reads it through ToastManagerAccessor.
+accessible class net/minecraft/client/gui/components/toasts/ToastComponent$ToastInstance

@@ -18,10 +18,12 @@ public final class McdtMixinPlugin implements IMixinConfigPlugin {
 		if (MixinEnvironment.getCurrentEnvironment().getSide() != MixinEnvironment.Side.CLIENT) {
 			return null;
 		}
-		//? if <1.21.11 {
+		//? if >=1.21.11 {
+		/*return null;
+		*///?} else if >=1.21 {
 		return List.of("DebugRendererAccessor", "DebugScreenOverlayAccessor");
 		//?} else {
-		/*return null;
+		/*return List.of("DebugRendererAccessor", "DebugScreenOverlayAccessor", "GuiChatMixin");
 		*///?}
 	}
 

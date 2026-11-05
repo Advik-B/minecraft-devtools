@@ -30,7 +30,16 @@ version = "$modVersion+$minecraftVersion-fabric"
 
 sourceSets.main { resources.srcDir(rootProject.file("src/fabric/resources")) }
 
+// Node-only resources (versions/<node>/resources), e.g. an access widener for Minecraft internals the node needs.
+if (project.file("resources").isDirectory) {
+	sourceSets.main { resources.srcDir(project.file("resources")) }
+}
+val accessWidener = project.file("resources/mcdt.accesswidener")
+
 loom {
+	if (accessWidener.exists()) {
+		accessWidenerPath = accessWidener
+	}
 	mods {
 		register("mcdt") {
 			sourceSet(sourceSets.main.get())
@@ -62,6 +71,10 @@ dependencies {
 	modImplementation("net.fabricmc.fabric-api:fabric-api:${prop("fabric_api_version")}")
 
 	implementation("org.slf4j:slf4j-api:2.0.16")
+	// Minecraft ships SLF4J only since 1.18; older nodes bundle it and route it to Log4j (Log4jSlf4jProvider).
+	if (project.hasProperty("bundle_slf4j")) {
+		include("org.slf4j:slf4j-api:2.0.16")
+	}
 	testImplementation("org.slf4j:slf4j-api:2.0.16")
 	testRuntimeOnly("org.slf4j:slf4j-simple:2.0.16")
 
@@ -75,11 +88,14 @@ dependencies {
 	modCompileOnly(files(baritoneJar))
 	testImplementation(files(baritoneJar))
 
-	// Optional config UI: compile against it, run it in dev, never ship or require it.
-	modCompileOnly("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
-	modCompileOnly("com.terraformersmc:modmenu:${prop("modmenu_version")}")
-	modLocalRuntime("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
-	modLocalRuntime("com.terraformersmc:modmenu:${prop("modmenu_version")}")
+	// Optional config UI: compile against it, run it in dev, never ship or require it. Nodes without YACL (1.16.5)
+	// have no config screen.
+	if (project.hasProperty("yacl_version")) {
+		modCompileOnly("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
+		modCompileOnly("com.terraformersmc:modmenu:${prop("modmenu_version")}")
+		modLocalRuntime("dev.isxander:yet-another-config-lib:${prop("yacl_version")}")
+		modLocalRuntime("com.terraformersmc:modmenu:${prop("modmenu_version")}")
+	}
 }
 
 tasks.processResources {
@@ -89,6 +105,11 @@ tasks.processResources {
 		"java_version" to prop("java_version"),
 		"loader_version" to prop("loader_version"),
 		"baritone_version" to prop("baritone_version"),
+		// Fabric API's mod id is "fabric" in its old releases (1.16.5 here), "fabric-api" since.
+		"fabric_api_mod_id" to (project.findProperty("fabric_api_mod_id") ?: "fabric-api").toString(),
+		"access_widener" to if (accessWidener.exists()) "\n\t\"accessWidener\": \"mcdt.accesswidener\"," else "",
+		// Mod Menu opens the YACL screen; without YACL there is no entrypoint.
+		"modmenu_entrypoint" to if (project.hasProperty("yacl_version")) "\"dev.advik.mcdt.platform.fabric.FabricModMenuApi\"" else "",
 	)
 	inputs.properties(metadata)
 

@@ -13,9 +13,12 @@ public interface TextureAtlasAccessor {
 	@Accessor("texturesByName")
 	Map<ResourceLocation, TextureAtlasSprite> getTexturesByName();
 
+	// Before 1.17 the atlas doesn't store its size (McCompat.atlasSize reads it from the GL texture).
+	//? if >=1.21 {
 	@Accessor("width")
 	int getWidth();
 
 	@Accessor("height")
 	int getHeight();
+	//?}
 }
