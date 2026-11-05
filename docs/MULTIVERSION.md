@@ -221,7 +221,12 @@ Order: **1.21.11 → 26.x latest → 1.20.1 → 1.19.2 → 1.18.2 → 1.16.5 Fab
 - 26.1 reworked a lot of client API: the current screen moved to `Gui` and the HUD to `Gui.hud`, rendering moved to `com.mojang.renderpearl` (with a Vulkan backend, so the readback flushes with `CommandEncoder.submit()` instead of `glFlush`), plus world clocks, `ContainerInput`, and block models as material-tagged quads with tint sources. About 100 compile errors, all behind `>=26.1` branches.
 - `ServerboundSwingPacket` is gone in 26.x, so the platform packet test uses `ServerboundClientCommandPacket`, which every node has.
 
-**Next:** 1.16.5 Fabric, then the legacy era (Legacy Fabric 1.12.2 / 1.8.9, Cleanroom 1.12.2).
+**1.16.5 (Fabric): done, full parity.** Passes the live suite locally (menu, world with block models, quit) on Java 25; CI runs it on 17. Off: `recipes`, `item-components`, `chat-signing`, and the config screen (no YACL for 1.16).
+- About 250 compile errors from ~35 API gaps: fields where 1.17+ has getters (rotation, inventory, abilities, widget position), options as fields instead of `OptionInstance` (now `McCompat.Opt`), `Registry.*` instead of `BuiltInRegistries` (now `McRegistries`), advancements without holders, the old scoreboard, server list and world list, skins as separate getters, pre-1.17 chunk sections and light layers in the viewer.
+- Found only by running it: Fabric API's mod id is `fabric` there (the jar would never load); Minecraft has no SLF4J before 1.18, so the jar nests slf4j-api with a Log4j bridge (without it, the first log call would crash, and in dev every MCDT log went to a no-op logger); `ToastComponent$ToastInstance` is package-private, so 1.16.5 ships an access widener; an accessor mixin can't have default methods; `Connection.getReceiving()` doesn't exist yet. Chat events come from a `Gui.handleChat` mixin, since Fabric API 0.42 has no message events.
+- Also found: a NeoForge 1.21.11 unit test showed `McCompat` loading `DebugScreenEntries` eagerly, which needs NeoForge's mod list; the F3 entry list is now a lazy holder.
+
+**Next:** the legacy era (Legacy Fabric 1.12.2 / 1.8.9, Cleanroom 1.12.2).
 
 ### Phase 4: Legacy era on modern Java
 - Create the `platform/legacy` source era (MCP names) with Unimined targets:
