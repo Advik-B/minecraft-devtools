@@ -64,7 +64,7 @@ LABEL org.opencontainers.image.title="mcdt-${NODE}" \
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
 		ca-certificates curl tini \
-		xvfb xauth libgl1 libgl1-mesa-dri libglx-mesa0 libegl1 \
+		xvfb xauth libgl1 libgl1-mesa-dri libglx-mesa0 libegl1 libegl-mesa0 libvulkan1 mesa-vulkan-drivers \
 		libxrender1 libxtst6 libxi6 libxrandr2 libxcursor1 libxxf86vm1 libopenal1 \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& mkdir -m 1777 -p /tmp/.X11-unix
@@ -104,6 +104,7 @@ ENV MC_AUTH=offline \
 	MCDT_PORT=25580 \
 	DISPLAY=:99 \
 	LIBGL_ALWAYS_SOFTWARE=1 \
+	SDL_VIDEO_FORCE_EGL=1 \
 	PMC_MAIN_DIR=/data/.portablemc \
 	PMC_MSA_DB_FILE=/data/portablemc_msa.json
 
