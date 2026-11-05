@@ -30,5 +30,9 @@
   {
     "node": "26.3-neoforge",
     "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler"
+  },
+  {
+    "node": "1.16.5-fabric",
+    "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,stats,toasts,bossbars,subtitles,offhand,decompiler"
   }
 ]
