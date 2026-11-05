@@ -11,8 +11,7 @@ import dev.advik.mcdt.http.HttpServer;
 import dev.advik.mcdt.http.RequestLogWriter;
 import dev.advik.mcdt.json.Json;
 import dev.advik.mcdt.security.BearerToken;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
-import net.minecraft.world.InteractionHand;
+import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,34 +99,34 @@ class PacketsEndpointTest {
 	@Test
 	void testPacketsPermissionGated() throws Exception {
 		config.permission = Permission.ACT;
-		HttpResponse<String> resp = postPacket("{\"packet\":\"ServerboundSwingPacket\",\"data\":{\"hand\":\"MAIN_HAND\"}}");
+		HttpResponse<String> resp = postPacket("{\"packet\":\"ServerboundClientCommandPacket\",\"data\":{\"action\":\"REQUEST_STATS\"}}");
 		assertEquals(403, resp.statusCode());
 		assertTrue(resp.body().contains("permission-denied"));
 	}
 
 	@Test
-	void testSendServerboundSwingPacket() throws Exception {
-		HttpResponse<String> resp = postPacket("{\"packet\":\"ServerboundSwingPacket\",\"data\":{\"hand\":\"MAIN_HAND\"}}");
+	void testSendServerboundClientCommandPacket() throws Exception {
+		HttpResponse<String> resp = postPacket("{\"packet\":\"ServerboundClientCommandPacket\",\"data\":{\"action\":\"REQUEST_STATS\"}}");
 		assertEquals(200, resp.statusCode());
 
 		JsonNode json = Json.MAPPER.readTree(resp.body());
 		assertTrue(json.get("success").asBoolean());
-		assertTrue(json.get("packet").asText().contains("ServerboundSwingPacket"));
+		assertTrue(json.get("packet").asText().contains("ServerboundClientCommandPacket"));
 
 		assertEquals(1, mockGameClient.sentPackets.size());
 		Object packet = mockGameClient.sentPackets.get(0);
-		assertTrue(packet instanceof ServerboundSwingPacket);
-		assertEquals(InteractionHand.MAIN_HAND, ((ServerboundSwingPacket) packet).getHand());
+		assertTrue(packet instanceof ServerboundClientCommandPacket);
+		assertEquals(ServerboundClientCommandPacket.Action.REQUEST_STATS, ((ServerboundClientCommandPacket) packet).getAction());
 	}
 
 	@Test
-	void testSendPacketOffHand() throws Exception {
-		HttpResponse<String> resp = postPacket("{\"packet\":\"ServerboundSwingPacket\",\"data\":{\"hand\":\"off_hand\"}}");
+	void testSendPacketLowerCaseEnum() throws Exception {
+		HttpResponse<String> resp = postPacket("{\"packet\":\"ServerboundClientCommandPacket\",\"data\":{\"action\":\"perform_respawn\"}}");
 		assertEquals(200, resp.statusCode());
 
 		assertEquals(1, mockGameClient.sentPackets.size());
-		ServerboundSwingPacket packet = (ServerboundSwingPacket) mockGameClient.sentPackets.get(0);
-		assertEquals(InteractionHand.OFF_HAND, packet.getHand());
+		ServerboundClientCommandPacket packet = (ServerboundClientCommandPacket) mockGameClient.sentPackets.get(0);
+		assertEquals(ServerboundClientCommandPacket.Action.PERFORM_RESPAWN, packet.getAction());
 	}
 
 	@Test
@@ -140,7 +139,7 @@ class PacketsEndpointTest {
 	@Test
 	void testPacketNoWorld() throws Exception {
 		mockGameClient.hasWorld = false;
-		HttpResponse<String> resp = postPacket("{\"packet\":\"ServerboundSwingPacket\",\"data\":{\"hand\":\"MAIN_HAND\"}}");
+		HttpResponse<String> resp = postPacket("{\"packet\":\"ServerboundClientCommandPacket\",\"data\":{\"action\":\"REQUEST_STATS\"}}");
 		assertEquals(409, resp.statusCode());
 		assertTrue(resp.body().contains("no-world"));
 	}

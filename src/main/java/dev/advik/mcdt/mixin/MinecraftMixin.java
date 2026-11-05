@@ -3,6 +3,7 @@ package dev.advik.mcdt.mixin;
 import dev.advik.mcdt.events.EventHub;
 import dev.advik.mcdt.reflection.NameService;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.Screen;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,6 +14,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Map;
 
+/** Screen open/close events. The current screen moved from Minecraft to Gui in 26.1. */
+//? if >=26.1 {
+/*@Mixin(Gui.class)
+public abstract class MinecraftMixin {
+	@Inject(method = "setScreen", at = @At("HEAD"))
+	private void mcdt$onSetScreen(@Nullable Screen newScreen, CallbackInfo ci) {
+		Screen oldScreen = ((Gui) (Object) this).screen();
+*///?} else {
 @Mixin(Minecraft.class)
 public abstract class MinecraftMixin {
 	@Shadow @Nullable public Screen screen;
@@ -20,6 +29,7 @@ public abstract class MinecraftMixin {
 	@Inject(method = "setScreen", at = @At("HEAD"))
 	private void mcdt$onSetScreen(@Nullable Screen newScreen, CallbackInfo ci) {
 		Screen oldScreen = this.screen;
+//?}
 		if (oldScreen != null && (newScreen == null || oldScreen != newScreen)) {
 			EventHub.getInstance().publish("screen.close", Map.of(
 					"screen", NameService.getInstance().resolveClassName(oldScreen.getClass().getName())

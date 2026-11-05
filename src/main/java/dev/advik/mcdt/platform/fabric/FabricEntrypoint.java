@@ -3,6 +3,7 @@ package dev.advik.mcdt.platform.fabric;
 
 import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.client.McdtClient;
+import dev.advik.mcdt.game.McCompat;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
@@ -28,8 +29,8 @@ public final class FabricEntrypoint implements ClientModInitializer {
 		ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) ->
 				McdtClient.onChatMessage(message));
 		ClientReceiveMessageEvents.GAME.register(McdtClient::onGameMessage);
-		ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> McdtClient.onChunkLoad(chunk.getPos().x, chunk.getPos().z));
-		ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> McdtClient.onChunkUnload(chunk.getPos().x, chunk.getPos().z));
+		ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> McdtClient.onChunkLoad(McCompat.chunkX(chunk.getPos()), McCompat.chunkZ(chunk.getPos())));
+		ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> McdtClient.onChunkUnload(McCompat.chunkX(chunk.getPos()), McCompat.chunkZ(chunk.getPos())));
 		ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> McdtClient.onEntityLoad(entity));
 		ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> McdtClient.onEntityUnload(entity));
 	}

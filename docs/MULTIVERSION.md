@@ -216,7 +216,12 @@ Order: **1.21.11 → 26.x latest → 1.20.1 → 1.19.2 → 1.18.2 → 1.16.5 Fab
 - Version-specific mixins are added by `client/McdtMixinPlugin` instead of `mcdt.mixins.json`.
 - Found while testing: NeoForge `runClient` hasn't worked on any node (split packages between the mod and `core`/`server`, and on 21.1–21.4 libraries invisible to the mod module). Fixed in `build.neoforge.gradle.kts`, apart from an empty `/openapi.json` in pre-21.11 dev runs.
 
-**Next:** 26.3, then 1.16.5 Fabric, then the legacy era (Legacy Fabric 1.12.2 / 1.8.9, Cleanroom 1.12.2).
+**26.3 (Fabric and NeoForge): done.** Both nodes pass the live suite locally, now including a block-model check, with every capability on.
+- Build: `net.fabricmc.fabric-loom` (no remapping) from the same Loom 1.18 line through `build.fabric-unobf.gradle.kts`, Java 25, Fabric Loader 0.20.1 pinned per node, no Parchment. The Fabric scripts share their setup through the `mcdt.node` buildSrc plugin. (Loom 1.19 needs Gradle 9.8, so it waits.) NeoForge 26.3 builds with the existing MDG.
+- 26.1 reworked a lot of client API: the current screen moved to `Gui` and the HUD to `Gui.hud`, rendering moved to `com.mojang.renderpearl` (with a Vulkan backend, so the readback flushes with `CommandEncoder.submit()` instead of `glFlush`), plus world clocks, `ContainerInput`, and block models as material-tagged quads with tint sources. About 100 compile errors, all behind `>=26.1` branches.
+- `ServerboundSwingPacket` is gone in 26.x, so the platform packet test uses `ServerboundClientCommandPacket`, which every node has.
+
+**Next:** 1.16.5 Fabric, then the legacy era (Legacy Fabric 1.12.2 / 1.8.9, Cleanroom 1.12.2).
 
 ### Phase 4: Legacy era on modern Java
 - Create the `platform/legacy` source era (MCP names) with Unimined targets:

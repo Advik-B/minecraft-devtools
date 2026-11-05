@@ -10,18 +10,31 @@ import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.BiomeColors;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-//? if >=1.21.11 {
+//? if >=26.1 {
+/*import net.minecraft.client.color.block.BlockTintSource;
+import net.minecraft.client.model.geom.builders.UVPair;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.world.level.CardinalLighting;
+*///?} else if >=1.21.11 {
 /*import net.minecraft.client.model.geom.builders.UVPair;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.world.level.BlockAndTintGetter;
 *///?} else {
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.world.level.BlockAndTintGetter;
 //?}
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -37,7 +50,6 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.vehicle.VehicleEntity;
-import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.LightLayer;
@@ -240,7 +252,7 @@ public final class ViewerWorld {
 		return new ViewData.Pose(
 				player.getX(), player.getY(), player.getZ(),
 				player.getYRot(), player.getXRot(),
-				level.getDayTime(),
+				McCompat.dayTime(level),
 				skyBrightness(level)
 		);
 	}
@@ -294,7 +306,12 @@ public final class ViewerWorld {
 
 	public static BlockModelsDto.Response blockModels(List<Integer> stateIds) {
 		Minecraft client = Minecraft.getInstance();
+		//? if >=26.1 {
+		/*var modelSet = client.getModelManager().getBlockStateModelSet();
+		var fluidModels = client.getModelManager().getFluidStateModelSet();
+		*///?} else {
 		var shaper = client.getModelManager().getBlockModelShaper();
+		//?}
 		BlockColors colors = client.getBlockColors();
 		TextureAtlas atlas = (TextureAtlas) client.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
 		RandomSource random = RandomSource.create();
@@ -327,7 +344,23 @@ public final class ViewerWorld {
 			}
 
 			List<BlockModelsDto.Quad> quads = new ArrayList<>();
-			//? if >=1.21.11 {
+			//? if >=26.1 {
+			/*BlockStateModel model = modelSet.get(state);
+			random.setSeed(42L);
+			List<BlockStateModelPart> parts = new ArrayList<>();
+			model.collectParts(random, parts);
+			boolean ambientOcclusion = false;
+			// The chunk layer now comes from the quads' materials: the most transparent one wins.
+			ChunkSectionLayer layer = ChunkSectionLayer.SOLID;
+			for (BlockStateModelPart part : parts) {
+				for (Direction cull : Direction.values()) {
+					layer = addQuads(quads, part.getQuads(cull), cull, state, colors, layer);
+				}
+				layer = addQuads(quads, part.getQuads(null), null, state, colors, layer);
+				ambientOcclusion |= part.useAmbientOcclusion();
+			}
+			String blockLayer = layerName(layer);
+			*///?} else if >=1.21.11 {
 			/*BlockStateModel model = shaper.getBlockModel(state);
 			random.setSeed(42L);
 			List<BlockModelPart> parts = model.collectParts(random);
@@ -339,6 +372,7 @@ public final class ViewerWorld {
 				addQuads(quads, part.getQuads(null), null, state, colors);
 				ambientOcclusion |= part.useAmbientOcclusion();
 			}
+			String blockLayer = layerName(ItemBlockRenderTypes.getChunkRenderType(state));
 			*///?} else {
 			BakedModel model = shaper.getBlockModel(state);
 			for (Direction cull : Direction.values()) {
@@ -348,6 +382,7 @@ public final class ViewerWorld {
 			random.setSeed(42L);
 			addQuads(quads, model.getQuads(state, null, random), null, state, colors);
 			boolean ambientOcclusion = model.useAmbientOcclusion();
+			String blockLayer = layerName(ItemBlockRenderTypes.getChunkRenderType(state));
 			//?}
 
 			BlockModelsDto.Fluid fluid = null;
@@ -359,7 +394,11 @@ public final class ViewerWorld {
 						water ? "water" : "lava",
 						fluidState.getOwnHeight(),
 						fluidState.hasProperty(FlowingFluid.FALLING) && fluidState.getValue(FlowingFluid.FALLING),
+						//? if >=26.1 {
+						/*layerName(fluidModels.get(fluidState).layer()),
+						*///?} else {
 						layerName(ItemBlockRenderTypes.getRenderLayer(fluidState)),
+						//?}
 						rect(atlas.getSprite(ResourceLocation.withDefaultNamespace(prefix + "_still"))),
 						rect(atlas.getSprite(ResourceLocation.withDefaultNamespace(prefix + "_flow")))
 				);
@@ -370,7 +409,7 @@ public final class ViewerWorld {
 					stateStr,
 					blockId,
 					false,
-					layerName(ItemBlockRenderTypes.getChunkRenderType(state)),
+					blockLayer,
 					occlusion,
 					state.skipRendering(state, Direction.UP),
 					state.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE, BlockPos.ZERO),
@@ -383,11 +422,16 @@ public final class ViewerWorld {
 		return new BlockModelsDto.Response(models);
 	}
 
+	//? if >=26.1 {
+	/*/^* Adds the quads and returns the most transparent chunk layer seen so far (starting from {@code layer}). ^/
+	private static ChunkSectionLayer addQuads(List<BlockModelsDto.Quad> out, List<BakedQuad> quads, Direction cull, BlockState state, BlockColors colors, ChunkSectionLayer layer) {
+	*///?} else {
 	private static void addQuads(List<BlockModelsDto.Quad> out, List<BakedQuad> quads, Direction cull, BlockState state, BlockColors colors) {
+	//?}
 		for (BakedQuad quad : quads) {
 			float[] pos = new float[12];
 			float[] uv = new float[8];
-			//? if >=1.21.11 {
+			//? if >=26.1 {
 			/*for (int i = 0; i < 4; i++) {
 				var p = quad.position(i);
 				pos[i * 3] = p.x();
@@ -396,6 +440,25 @@ public final class ViewerWorld {
 				uv[i * 2] = UVPair.unpackU(quad.packedUV(i));
 				uv[i * 2 + 1] = UVPair.unpackV(quad.packedUV(i));
 			}
+			var material = quad.materialInfo();
+			boolean tinted = material.isTinted();
+			int tintIndex = material.tintIndex();
+			int direction = quad.direction().get3DDataValue();
+			// A model element with "shade": false now gets a shade direction override instead of a flag.
+			boolean shade = material.shadeDirectionOverride() == null;
+			if (material.layer().ordinal() > layer.ordinal()) {
+				layer = material.layer();
+			}
+			*///?} else if >=1.21.11 {
+			/*for (int i = 0; i < 4; i++) {
+				var p = quad.position(i);
+				pos[i * 3] = p.x();
+				pos[i * 3 + 1] = p.y();
+				pos[i * 3 + 2] = p.z();
+				uv[i * 2] = UVPair.unpackU(quad.packedUV(i));
+				uv[i * 2 + 1] = UVPair.unpackV(quad.packedUV(i));
+			}
+			boolean tinted = quad.isTinted();
 			int tintIndex = quad.tintIndex();
 			int direction = quad.direction().get3DDataValue();
 			boolean shade = quad.shade();
@@ -410,14 +473,15 @@ public final class ViewerWorld {
 				uv[i * 2] = Float.intBitsToFloat(v[base + 4]);
 				uv[i * 2 + 1] = Float.intBitsToFloat(v[base + 5]);
 			}
+			boolean tinted = quad.isTinted();
 			int tintIndex = quad.getTintIndex();
 			int direction = quad.getDirection().get3DDataValue();
 			boolean shade = quad.isShade();
 			//?}
 			int tint = TINT_NONE;
 			int color = 0;
-			if (quad.isTinted()) {
-				int c = colors.getColor(state, TintProbe.INSTANCE, BlockPos.ZERO, tintIndex) & 0xFFFFFF;
+			if (tinted) {
+				int c = tintColor(colors, state, tintIndex);
 				switch (c) {
 					case SENTINEL_GRASS -> tint = TINT_GRASS;
 					case SENTINEL_FOLIAGE -> tint = TINT_FOLIAGE;
@@ -439,13 +503,35 @@ public final class ViewerWorld {
 					shade
 			));
 		}
+		//? if >=26.1 {
+		/*return layer;
+		*///?}
+	}
+
+	/** The color a block's tint index resolves to at the probe position (0xFFFFFF: untinted). */
+	private static int tintColor(BlockColors colors, BlockState state, int tintIndex) {
+		//? if >=26.1 {
+		/*BlockTintSource source = colors.getTintSource(state, tintIndex);
+		return source != null ? source.colorInWorld(state, TintProbe.INSTANCE, BlockPos.ZERO) & 0xFFFFFF : 0xFFFFFF;
+		*///?} else {
+		return colors.getColor(state, TintProbe.INSTANCE, BlockPos.ZERO, tintIndex) & 0xFFFFFF;
+		//?}
 	}
 
 	private static float[] rect(TextureAtlasSprite sprite) {
 		return new float[] {sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1()};
 	}
 
-	//? if >=1.21.11 {
+	//? if >=26.1 {
+	/*/^* Tripwire has no layer of its own any more; it renders as cutout. ^/
+	private static String layerName(ChunkSectionLayer layer) {
+		return switch (layer) {
+			case TRANSLUCENT -> "translucent";
+			case CUTOUT -> "cutout";
+			default -> "solid";
+		};
+	}
+	*///?} else if >=1.21.11 {
 	/*/^* Chunk layers lost the cutout/cutout-mipped split; mipped cutout is now just "cutout". ^/
 	private static String layerName(ChunkSectionLayer layer) {
 		return switch (layer) {
@@ -480,10 +566,17 @@ public final class ViewerWorld {
 			return 0xFFFFFF;
 		}
 
+		//? if >=26.1 {
+		/*@Override
+		public CardinalLighting cardinalLighting() {
+			return CardinalLighting.DEFAULT;
+		}
+		*///?} else {
 		@Override
 		public float getShade(Direction direction, boolean shade) {
 			return 1.0f;
 		}
+		//?}
 
 		@Override
 		public LevelLightEngine getLightEngine() {

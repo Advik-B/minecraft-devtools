@@ -3,6 +3,7 @@
 
 import dev.advik.mcdt.Mcdt;
 import dev.advik.mcdt.client.McdtClient;
+import dev.advik.mcdt.game.McCompat;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -55,12 +56,12 @@ public final class NeoForgeMod {
 		});
 		NeoForge.EVENT_BUS.addListener(ChunkEvent.Load.class, event -> {
 			if (event.getLevel().isClientSide()) {
-				McdtClient.onChunkLoad(event.getChunk().getPos().x, event.getChunk().getPos().z);
+				McdtClient.onChunkLoad(McCompat.chunkX(event.getChunk().getPos()), McCompat.chunkZ(event.getChunk().getPos()));
 			}
 		});
 		NeoForge.EVENT_BUS.addListener(ChunkEvent.Unload.class, event -> {
 			if (event.getLevel().isClientSide()) {
-				McdtClient.onChunkUnload(event.getChunk().getPos().x, event.getChunk().getPos().z);
+				McdtClient.onChunkUnload(McCompat.chunkX(event.getChunk().getPos()), McCompat.chunkZ(event.getChunk().getPos()));
 			}
 		});
 		NeoForge.EVENT_BUS.addListener(EntityJoinLevelEvent.class, event -> {

@@ -22,5 +22,13 @@
   {
     "node": "1.21.11-neoforge",
     "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler"
+  },
+  {
+    "node": "26.3-fabric",
+    "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler"
+  },
+  {
+    "node": "26.3-neoforge",
+    "caps": "textures,block-viewer,world-stream,screenshot,packets,input,advancements,recipes,stats,toasts,bossbars,subtitles,offhand,item-components,chat-signing,decompiler"
   }
 ]

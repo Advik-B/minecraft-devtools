@@ -6,7 +6,15 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 
 import java.util.concurrent.TimeUnit;
 
-//? if >=1.21.11 {
+//? if >=26.1 {
+/*import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.GpuFence;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import java.nio.ByteBuffer;
+*///?} else if >=1.21.11 {
 /*import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuFence;
 import org.lwjgl.opengl.GL11;
@@ -37,7 +45,9 @@ public final class PixelReader {
 
 	/** The main framebuffer, fully opaque. */
 	public static Image screenshot(Minecraft client) {
-		//? if >=1.21.11 {
+		//? if >=26.1 {
+		/*return read(client.gameRenderer.mainRenderTarget().getColorTexture(), true);
+		*///?} else if >=1.21.11 {
 		/*return read(client.getMainRenderTarget().getColorTexture(), true);
 		*///?} else {
 		NativeImage image = Screenshot.takeScreenshot(client.getMainRenderTarget());
@@ -69,7 +79,41 @@ public final class PixelReader {
 		//?}
 	}
 
-	//? if >=1.21.11 {
+	//? if >=26.1 {
+	/*/^*
+	 * Copies mip level 0 of a texture into a mapped buffer and converts it to ARGB. Framebuffers are stored bottom
+	 * row first, so {@code framebuffer} flips the rows and drops the alpha channel.
+	 ^/
+	private static Image read(GpuTexture texture, boolean framebuffer) {
+		int width = texture.getWidth(0);
+		int height = texture.getHeight(0);
+		int pixelSize = texture.getFormat().blockSize();
+		if (pixelSize != 4) {
+			throw Problems.textureFailed("Unsupported texture format " + texture.getFormat() + " for " + texture.getLabel());
+		}
+		GpuBuffer buffer = RenderSystem.getDevice().createBuffer(() -> "MCDT readback", GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_MAP_READ,
+				(long) width * height * pixelSize);
+		CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+		// The copy's callback isn't used: OpenGL runs it from the fenced-task queue, but Vulkan only runs it when the
+		// frame's resources are released, frames later. Instead, submit the recorded commands and block on a fence
+		// placed after the copy; the GPU runs commands in order, so once it signals the buffer holds the pixels.
+		encoder.copyTextureToBuffer(texture, buffer, 0L, () -> {
+		}, 0);
+		try {
+			try (GpuFence fence = encoder.createFence()) {
+				encoder.submit();
+				if (!fence.awaitCompletion(TIMEOUT_NANOS)) {
+					throw Problems.textureFailed("Timed out reading " + texture.getLabel() + " back from the GPU");
+				}
+			}
+			try (GpuBufferSlice.MappedView view = buffer.map(true, false)) {
+				return new Image(width, height, toArgb(view.data(), width, height, framebuffer));
+			}
+		} finally {
+			buffer.close();
+		}
+	}
+	*///?} else if >=1.21.11 {
 	/*/^*
 	 * Copies mip level 0 of a texture into a mapped buffer and converts it to ARGB. Framebuffers are stored bottom
 	 * row first, so {@code framebuffer} flips the rows and drops the alpha channel.
@@ -107,8 +151,10 @@ public final class PixelReader {
 		}
 		return new Image(width, height, result[0]);
 	}
+	*///?}
 
-	private static int[] toArgb(ByteBuffer data, int width, int height, boolean framebuffer) {
+	//? if >=1.21.11 {
+	/*private static int[] toArgb(ByteBuffer data, int width, int height, boolean framebuffer) {
 		int[] argb = new int[width * height];
 		for (int y = 0; y < height; y++) {
 			int srcRow = framebuffer ? height - 1 - y : y;

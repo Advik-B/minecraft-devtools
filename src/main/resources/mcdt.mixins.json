@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "dev.advik.mcdt.mixin",
   "plugin": "dev.advik.mcdt.client.McdtMixinPlugin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_${java_version}",
   "client": [
     "ChatComponentAccessor",
     "KeyboardHandlerAccessor",

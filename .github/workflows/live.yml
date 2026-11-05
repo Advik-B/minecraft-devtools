@@ -47,7 +47,7 @@ jobs:
       - name: install display and launcher
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q xvfb x11-xserver-utils libgl1 libgl1-mesa-dri libglx-mesa0 libegl1 libxrender1 libxtst6 libxi6 libxrandr2 libxcursor1 libxxf86vm1 libopenal1
+          sudo apt-get install -y -q xvfb x11-xserver-utils libgl1 libgl1-mesa-dri libglx-mesa0 libegl1 libegl-mesa0 libvulkan1 mesa-vulkan-drivers libxrender1 libxtst6 libxi6 libxrandr2 libxcursor1 libxxf86vm1 libopenal1
           pipx install portablemc==5.0.6
           pipx install uv
       - name: collect mods

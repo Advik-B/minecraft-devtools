@@ -14,8 +14,10 @@ prop() { sed -n "s/^$1=//p" "$2" | tr -d '\r' | head -n 1; }
 LOADER="${NODE#*-}"
 MC_VERSION="$(prop minecraft_version "$NODE_PROPS")"
 BARITONE_VERSION="$(prop baritone_version "$NODE_PROPS")"
+# A node may pin its own Fabric Loader (26.x needs a newer one than the shared default).
+LOADER_VERSION="$(prop loader_version "$NODE_PROPS")"
 case "$LOADER" in
-	fabric) MC_TARGET="fabric:$MC_VERSION:$(prop loader_version "$ROOT/gradle.properties")" ;;
+	fabric) MC_TARGET="fabric:$MC_VERSION:${LOADER_VERSION:-$(prop loader_version "$ROOT/gradle.properties")}" ;;
 	neoforge) MC_TARGET="neoforge::$(prop neoforge_version "$NODE_PROPS")" ;;
 	*) echo "node-env.sh: unknown loader: $LOADER" >&2; exit 1 ;;
 esac

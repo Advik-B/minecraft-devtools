@@ -18,6 +18,8 @@ pluginManagement {
 
 	plugins {
 		id("net.fabricmc.fabric-loom-remap") version providers.gradleProperty("loom_version")
+		// Unobfuscated Minecraft (26.x): no intermediary, no remapping.
+		id("net.fabricmc.fabric-loom") version providers.gradleProperty("loom_version")
 		id("net.neoforged.moddev") version providers.gradleProperty("moddev_version")
 		id("com.gradleup.shadow") version providers.gradleProperty("shadow_version")
 	}
@@ -45,6 +47,8 @@ stonecutter {
 		version("1.21.4-neoforge", "1.21.4").buildscript = "build.neoforge.gradle.kts"
 		version("1.21.11-fabric", "1.21.11").buildscript = "build.fabric.gradle.kts"
 		version("1.21.11-neoforge", "1.21.11").buildscript = "build.neoforge.gradle.kts"
+		version("26.3-fabric", "26.3").buildscript = "build.fabric-unobf.gradle.kts"
+		version("26.3-neoforge", "26.3").buildscript = "build.neoforge.gradle.kts"
 		vcsVersion = "1.21.4-fabric"
 	}
 }

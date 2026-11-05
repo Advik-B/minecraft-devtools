@@ -112,8 +112,11 @@ else
 	portablemc --main-dir "$PMC" start --mc-dir "$INST" --dry --jvm "$JAVA_BIN" "$MC_TARGET"
 
 	log "launching $MC_TARGET"
-	export LIBGL_ALWAYS_SOFTWARE=1 MCDT_PERMISSION=reflect-write MCDT_ALLOW_QUIT=true MCDT_PORT="$PORT"
-	xvfb-run -a -s "-screen 0 1280x720x24" \
+	# 26.x opens its window through SDL3 and asks for an sRGB-capable framebuffer. Xvfb's GLX visuals have none
+	# ("Couldn't find matching GLX visual"), so SDL goes through Mesa's EGL instead. Older versions use GLFW and
+	# ignore the variable. x24+32 adds 32-bit visuals for the alpha channel.
+	export LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEO_FORCE_EGL=1 MCDT_PERMISSION=reflect-write MCDT_ALLOW_QUIT=true MCDT_PORT="$PORT"
+	xvfb-run -a -s "-screen 0 1280x720x24+32 +extension GLX +render -noreset" \
 		portablemc --main-dir "$PMC" start --mc-dir "$INST" --jvm "$JAVA_BIN" --jvm-arg=-Xmx2G -u McdtBot "$MC_TARGET" \
 		> "$RESULTS/launch.log" 2>&1 &
 	LAUNCHER=$!

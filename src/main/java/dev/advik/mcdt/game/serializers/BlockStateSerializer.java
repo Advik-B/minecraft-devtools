@@ -4,7 +4,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 
-import java.util.Map;
+import java.util.Collection;
 import java.util.stream.Collectors;
 
 public final class BlockStateSerializer {
@@ -16,20 +16,19 @@ public final class BlockStateSerializer {
 		}
 
 		String blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-		Map<Property<?>, Comparable<?>> values = state.getValues();
-		if (values.isEmpty()) {
+		Collection<Property<?>> properties = state.getProperties();
+		if (properties.isEmpty()) {
 			return blockId;
 		}
 
-		String props = values.entrySet().stream()
-				.map(e -> e.getKey().getName() + "=" + getName(e.getKey(), e.getValue()))
+		String props = properties.stream()
+				.map(p -> p.getName() + "=" + valueName(state, p))
 				.collect(Collectors.joining(","));
 
 		return blockId + "[" + props + "]";
 	}
 
-	@SuppressWarnings("unchecked")
-	private static <T extends Comparable<T>> String getName(Property<T> property, Comparable<?> value) {
-		return property.getName((T) value);
+	private static <T extends Comparable<T>> String valueName(BlockState state, Property<T> property) {
+		return property.getName(state.getValue(property));
 	}
 }

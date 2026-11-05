@@ -31,9 +31,12 @@ evaluationDependsOn(":server")
 
 neoForge {
 	version = prop("neoforge_version")
-	parchment {
-		minecraftVersion = mcVersion
-		mappingsVersion = prop("parchment_version")
+	// No Parchment for unobfuscated Minecraft (26.x): its own jar already has the names.
+	if (project.hasProperty("parchment_version")) {
+		parchment {
+			minecraftVersion = mcVersion
+			mappingsVersion = prop("parchment_version")
+		}
 	}
 	// The platform tests use Minecraft types, as on Fabric.
 	addModdingDependenciesTo(sourceSets.test.get())
@@ -135,10 +138,11 @@ tasks.processResources {
 		"minecraft_version" to mcVersion,
 		"neoforge_version" to prop("neoforge_version"),
 		"baritone_version" to prop("baritone_version"),
+		"java_version" to javaVersion.toString(),
 	)
 	inputs.properties(metadata)
 
-	filesMatching("META-INF/neoforge.mods.toml") {
+	filesMatching(listOf("META-INF/neoforge.mods.toml", "mcdt.mixins.json")) {
 		expand(metadata)
 	}
 }

@@ -1,13 +1,22 @@
 package dev.advik.mcdt.mixin;
 
+//? if >=26.1 {
+/*import net.minecraft.client.gui.Hud;
+*///?} else {
 import net.minecraft.client.gui.Gui;
+//?}
 import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.gui.components.SubtitleOverlay;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
+/** The HUD state: Gui before 26.1, Hud since (see McCompat.hud). */
+//? if >=26.1 {
+/*@Mixin(Hud.class)
+*///?} else {
 @Mixin(Gui.class)
+//?}
 public interface GuiAccessor {
 	@Accessor("overlayMessageString")
 	Component getOverlayMessageString();
