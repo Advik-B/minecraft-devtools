@@ -25,11 +25,8 @@ public interface ToastManagerAccessor {
 	List<?> getVisibleToasts();
 	*///?} else {
 	/*// ToastInstance is package-private; the 1.16.5 access widener (versions/1.16.5-fabric/resources) opens it.
+	// Accessor interfaces can hold only accessors, so McCompat.visibleToasts turns this into a list.
 	@Accessor("visible")
 	ToastComponent.ToastInstance<?>[] getVisibleToastArray();
-
-	default List<?> getVisibleToasts() {
-		return java.util.Arrays.asList(getVisibleToastArray());
-	}
 	*///?}
 }

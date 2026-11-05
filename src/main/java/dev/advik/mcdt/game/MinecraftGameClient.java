@@ -1940,7 +1940,7 @@ public final class MinecraftGameClient implements GameClient {
 		if (all || include.contains("toasts")) {
 			toasts = new ArrayList<>();
 			if (McCompat.toastManager(client) instanceof ToastManagerAccessor toastAccessor) {
-				List<?> visible = toastAccessor.getVisibleToasts();
+				List<?> visible = McCompat.visibleToasts(toastAccessor);
 				if (visible != null) {
 					for (Object toastInst : visible) {
 						if (toastInst != null) {

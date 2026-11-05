@@ -16,7 +16,15 @@ import java.util.Map;
 
 @Mixin(Connection.class)
 public abstract class ConnectionMixin {
+	//? if >=1.21 {
 	@Shadow public abstract PacketFlow getReceiving();
+	//?} else {
+	/*@Shadow @org.spongepowered.asm.mixin.Final private PacketFlow receiving;
+
+	private PacketFlow getReceiving() {
+		return receiving;
+	}
+	*///?}
 
 	@Inject(method = "channelRead0(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/protocol/Packet;)V", at = @At("HEAD"))
 	private void mcdt$onChannelRead0(ChannelHandlerContext ctx, Packet<?> packet, CallbackInfo ci) {

@@ -22,6 +22,13 @@ import net.fabricmc.loader.api.ModContainer;
 public final class FabricEntrypoint implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
+		//? if <1.21 {
+		/*// Minecraft ships SLF4J only since 1.18: point the bundled copy at Log4j before anything logs. A service file would
+		// do the same, but in dev runs SLF4J is on the system classpath and would load the provider too early.
+		if (System.getProperty("slf4j.provider") == null) {
+			System.setProperty("slf4j.provider", "dev.advik.mcdt.platform.fabric.Log4jSlf4jProvider");
+		}
+		*///?}
 		ClientLifecycleEvents.CLIENT_STARTED.register(client ->
 				McdtClient.onClientStarted(client, modVersion(Mcdt.MOD_ID), baritoneVersion()));
 		ClientTickEvents.END_CLIENT_TICK.register(McdtClient::onEndClientTick);

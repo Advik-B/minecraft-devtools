@@ -81,6 +81,8 @@ tasks.processResources {
 		"java_version" to prop("java_version"),
 		"loader_version" to prop("loader_version"),
 		"baritone_version" to prop("baritone_version"),
+		// Fabric API's mod id is "fabric" in its old releases (1.16.5 here), "fabric-api" since.
+		"fabric_api_mod_id" to (project.findProperty("fabric_api_mod_id") ?: "fabric-api").toString(),
 		"access_widener" to "",
 		// Mod Menu opens the YACL screen; without YACL there is no entrypoint.
 		"modmenu_entrypoint" to if (project.hasProperty("yacl_version")) "\"dev.advik.mcdt.platform.fabric.FabricModMenuApi\"" else "",

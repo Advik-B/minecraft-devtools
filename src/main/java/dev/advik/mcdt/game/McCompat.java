@@ -682,6 +682,14 @@ public final class McCompat {
 		*///?}
 	}
 
+	public static List<?> visibleToasts(dev.advik.mcdt.mixin.ToastManagerAccessor accessor) {
+		//? if >=1.21 {
+		return accessor.getVisibleToasts();
+		//?} else {
+		/*return java.util.Arrays.asList(accessor.getVisibleToastArray());
+		*///?}
+	}
+
 	public static boolean isFullscreen(Minecraft client) {
 		//? if >=26.1 {
 		/*return client.options.fullscreen().get();
